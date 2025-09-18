@@ -22,4 +22,10 @@ class Equipment extends Model
     {
         return $this->hasMany(EquipmentRequestItem::class);
     }
+
+    public function category()
+    {
+        return $this->belongsTo(EquipmentCategory::class, 'category_id');
+    }
 }
+

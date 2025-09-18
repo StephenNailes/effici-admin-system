@@ -18,7 +18,7 @@ export default function ActivityLog() {
   const [currentPage, setCurrentPage] = useState(1);
   const logsPerPage = 8;
 
-  // ✅ Replace dummy data with real data
+  // ✅ Remove dummy data
   const allRequests = logs || [];
   console.log("Logs from Laravel:", logs);
   // 🔍 Filtering

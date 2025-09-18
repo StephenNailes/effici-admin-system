@@ -7,25 +7,14 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 
+
 class EquipmentController extends Controller
 {
     /**
-     * Show the equipment borrowing page
+     * Return all equipment for admin view (with category)
      */
-    public function index()
+    public function all()
     {
-        $user = Auth::user();
-
-        // ✅ Only students can request equipment
-        if ($user->role !== 'student') {
-            return Inertia::render('student/BorrowEquipment', [
-                'equipment'     => [],
-                'activityPlans' => [],
-                'error'         => 'Only students are allowed to request equipment.',
-            ]);
-        }
-
-        // ✅ Fetch equipment WITH category name
         $equipment = DB::table('equipment as e')
             ->leftJoin('equipment_categories as c', 'c.id', '=', 'e.category_id')
             ->select(
@@ -38,19 +27,7 @@ class EquipmentController extends Controller
             ->orderBy('e.name')
             ->get();
 
-        // ✅ Fetch the student’s activity plans
-        $activityPlans = DB::table('activity_plans')
-            ->where('user_id', $user->id)
-            ->whereIn('status', ['pending','approved'])
-            ->select('id', 'activity_name', 'start_datetime', 'end_datetime', 'status')
-            ->orderBy('start_datetime')
-            ->get();
-
-        return Inertia::render('student/BorrowEquipment', [
-            'equipment'     => $equipment,
-            'activityPlans' => $activityPlans,
-            'error'         => null,
-        ]);
+        return response()->json($equipment);
     }
 
     /**
@@ -83,5 +60,82 @@ class EquipmentController extends Controller
         ", [$data['start'], $data['end']]);
 
         return response()->json($rows);
+    }
+
+    /**
+     * Show current available equipment for students (no date range)
+     */
+    public function availableForStudent()
+    {
+        $user = Auth::user();
+        if ($user->role !== 'student') {
+            return response()->json(['error' => 'Only students can view available equipment.'], 403);
+        }
+
+        // Get all equipment and calculate current available quantity
+        $equipment = DB::select("
+            SELECT
+                e.id,
+                e.name,
+                e.description,
+                e.total_quantity,
+                c.name as category,
+                (MAX(e.total_quantity)
+                    - COALESCE(SUM(
+                        CASE
+                            WHEN er.status IN ('pending','approved','checked_out')
+                            THEN eri.quantity ELSE 0
+                        END
+                    ), 0)
+                ) AS available
+            FROM equipment e
+            LEFT JOIN equipment_categories c ON c.id = e.category_id
+            LEFT JOIN equipment_request_items eri ON eri.equipment_id = e.id
+            LEFT JOIN equipment_requests er ON er.id = eri.equipment_request_id
+            GROUP BY e.id, c.name, e.name, e.description, e.total_quantity
+            ORDER BY e.name
+        ");
+
+        return response()->json($equipment);
+    }
+
+    /**
+     * Show the equipment borrowing page for students
+     */
+    public function index()
+    {
+        $user = Auth::user();
+        if ($user->role !== 'student') {
+            return Inertia::render('student/BorrowEquipment', [
+                'equipment'     => [],
+                'activityPlans' => [],
+                'error'         => 'Only students are allowed to request equipment.',
+            ]);
+        }
+
+        $equipment = DB::table('equipment as e')
+            ->leftJoin('equipment_categories as c', 'c.id', '=', 'e.category_id')
+            ->select(
+                'e.id',
+                'e.name',
+                'e.description',
+                'e.total_quantity',
+                'c.name as category'
+            )
+            ->orderBy('e.name')
+            ->get();
+
+        $activityPlans = DB::table('activity_plans')
+            ->where('user_id', $user->id)
+            ->whereIn('status', ['pending','approved'])
+            ->select('id', 'activity_name', 'start_datetime', 'end_datetime', 'status')
+            ->orderBy('start_datetime')
+            ->get();
+
+        return Inertia::render('student/BorrowEquipment', [
+            'equipment'     => $equipment,
+            'activityPlans' => $activityPlans,
+            'error'         => null,
+        ]);
     }
 }

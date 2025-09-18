@@ -2,6 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
+
 use App\Models\EquipmentRequest;
 use App\Models\Equipment;
 use App\Models\RequestApproval;
@@ -11,84 +14,185 @@ use Illuminate\Support\Facades\DB;
 class EquipmentRequestController extends Controller
 {
     /**
-     * Show logged-in student's equipment requests for Activity Log
+     * Equipment Management: Get all requests with lifecycle statuses for admin
      */
-  public function index()
-{
-    $requests = EquipmentRequest::with(['items.equipment'])
-        ->where('user_id', auth()->id())
-        ->orderByDesc('created_at')
-        ->get()
-        ->map(function ($req) {
+    public function manage()
+    {
+        $requests = EquipmentRequest::with(['items.equipment', 'user'])
+            ->whereIn('status', [
+                'approved', 'checked_out', 'returned', 'overdue', 'completed', 'cancelled'
+            ])
+            ->orderByDesc('created_at')
+            ->get()
+            ->map(function ($req) {
+                return [
+                    'id' => $req->id,
+                    'student_name' => $req->user->first_name . ' ' . $req->user->last_name,
+                    'purpose' => $req->purpose,
+                    'status' => $req->status,
+                    'items' => $req->items->map(function ($item) {
+                        return [
+                            'id' => $item->id,
+                            'equipment_name' => $item->equipment->name ?? 'Unknown',
+                            'quantity' => $item->quantity,
+                        ];
+                    }),
+                ];
+            });
+    Log::info('Equipment Management API returned:', ['count' => $requests->count(), 'requests' => $requests]);
+        return response()->json($requests);
+    }
+
+    /**
+     * Equipment Management: Update request status and adjust stock
+     */
+    public function updateStatus(Request $request, $id)
+    {
+        $validated = $request->validate([
+            'status' => 'required|string|in:checked_out,returned,overdue,completed,cancelled'
+        ]);
+        $newStatus = $validated['status'];
+
+        $equipmentRequest = EquipmentRequest::with('items.equipment')->findOrFail($id);
+        $currentStatus = $equipmentRequest->status;
+
+        // Only allow logical transitions
+        $validTransitions = [
+            'approved' => ['checked_out', 'cancelled'],
+            'checked_out' => ['returned', 'overdue'],
+            'returned' => ['completed'],
+        ];
+        if (!isset($validTransitions[$currentStatus]) || !in_array($newStatus, $validTransitions[$currentStatus])) {
+            return response()->json(['error' => 'Invalid status transition'], 422);
+        }
+
+        DB::transaction(function () use ($equipmentRequest, $newStatus, $currentStatus) {
+            // Adjust stock if needed
+            if ($currentStatus === 'approved' && $newStatus === 'checked_out') {
+                foreach ($equipmentRequest->items as $item) {
+                    $equipment = $item->equipment;
+                    $equipment->total_quantity -= $item->quantity;
+                    $equipment->save();
+                }
+            }
+            if ($currentStatus === 'checked_out' && $newStatus === 'returned') {
+                foreach ($equipmentRequest->items as $item) {
+                    $equipment = $item->equipment;
+                    $equipment->total_quantity += $item->quantity;
+                    $equipment->save();
+                }
+            }
+            // Update status
+            $equipmentRequest->status = $newStatus;
+            $equipmentRequest->save();
+        });
+
+        return response()->json(['success' => true]);
+    }
+    /**
+     * Show the equipment request page and student's requests
+     */
+    public function showBorrowEquipment()
+    {
+        $studentRequests = EquipmentRequest::with(['items.equipment'])
+            ->where('user_id', Auth::id())
+            ->orderByDesc('created_at')
+            ->get();
+
+        $equipment = Equipment::with('category')->orderBy('name')->get()->map(function ($eq) {
             return [
-                'id' => $req->id,
-                'type' => 'Equipment Request',
-                'date' => $req->created_at->toDateTimeString(),
-                'status' => ucfirst($req->status),
-                'purpose' => $req->purpose,
-                'items' => $req->items->map(function ($item) {
-                    return [
-                        'name' => $item->equipment->name ?? 'Unknown',
-                        'quantity' => $item->quantity,
-                    ];
-                })->toArray(), // ✅ ensure items included
+                'id' => $eq->id,
+                'name' => $eq->name,
+                'description' => $eq->description,
+                'total_quantity' => $eq->total_quantity,
+                'category' => $eq->category->name ?? null,
             ];
         });
 
-    return inertia('student/ActivityLog', [
-        'logs' => $requests,
-    ]);
-}
+        return inertia('student/BorrowEquipment', [
+            'equipment' => $equipment,
+            'studentRequests' => $studentRequests,
+        ]);
+    }
+    /**
+     * Show logged-in student's equipment requests for Activity Log
+     */
+    public function index()
+    {
+        $requests = EquipmentRequest::with(['items.equipment'])
+            ->where('user_id', Auth::id())
+            ->orderByDesc('created_at')
+            ->get()
+            ->map(function ($req) {
+                return [
+                    'id' => $req->id,
+                    'type' => 'Equipment Request',
+                    'date' => $req->created_at->toDateTimeString(),
+                    'status' => ucfirst($req->status),
+                    'purpose' => $req->purpose,
+                    'items' => $req->items->map(function ($item) {
+                        return [
+                            'name' => $item->equipment->name ?? 'Unknown',
+                            'quantity' => $item->quantity,
+                        ];
+                    })->toArray(),
+                ];
+            });
+
+        return inertia('student/ActivityLog', [
+            'logs' => $requests,
+        ]);
+    }
 
     /**
      * Store a new equipment request
      */
-    
     public function store(Request $request)
-{
-    $validated = $request->validate([
-        'purpose' => 'required|string|max:255',
-        'start_datetime' => 'required|date',
-        'end_datetime' => 'required|date|after_or_equal:start_datetime',
-        'items' => 'required|array|min:1',
-        'items.*.equipment_id' => 'required|exists:equipment,id',
-        'items.*.quantity' => 'required|integer|min:1',
-        'category' => 'required|string', // relax rule
-    ]);
-
-    // Normalize case (Urgent → urgent, etc.)
-    $validated['category'] = strtolower($validated['category']);
-
-    if (!in_array($validated['category'], ['minor','normal','urgent'])) {
-        return back()->withErrors(['category' => 'Invalid category selected']);
-    }
-
-    DB::transaction(function () use ($validated) {
-        $eq = EquipmentRequest::create([
-            'user_id' => auth()->id(),
-            'activity_plan_id' => $validated['activity_plan_id'] ?? null,
-            'purpose' => $validated['purpose'],
-            'start_datetime' => $validated['start_datetime'],
-            'end_datetime' => $validated['end_datetime'],
-            'status' => 'pending',
-            'category' => $validated['category'], // guaranteed lowercase
+    {
+        $validated = $request->validate([
+            'purpose' => 'required|string|max:255',
+            'start_datetime' => 'required|date',
+            'end_datetime' => 'required|date|after_or_equal:start_datetime',
+            'items' => 'required|array|min:1',
+            'items.*.equipment_id' => 'required|exists:equipment,id',
+            'items.*.quantity' => 'required|integer|min:1',
+            'category' => 'required|string',
         ]);
 
-        foreach ($validated['items'] as $item) {
-            $eq->items()->create($item);
+        $validated['category'] = strtolower($validated['category']);
+
+        if (!in_array($validated['category'], ['minor', 'normal', 'urgent'])) {
+            return back()->withErrors(['category' => 'Invalid category selected']);
         }
 
-        RequestApproval::create([
-            'request_type' => 'equipment',
-            'request_id' => $eq->id,
-            'approver_role' => 'admin_assistant',
-            'status' => 'pending',
-            'category' => $eq->category, // now safe
-        ]);
-    });
+        DB::transaction(function () use ($validated) {
+            $eq = EquipmentRequest::create([
+                'user_id' => Auth::id(),
+                'activity_plan_id' => $validated['activity_plan_id'] ?? null,
+                'purpose' => $validated['purpose'],
+                'start_datetime' => $validated['start_datetime'],
+                'end_datetime' => $validated['end_datetime'],
+                'status' => 'pending',
+                'category' => $validated['category'],
+            ]);
 
-    return redirect()->back()->with('success', 'Equipment request submitted successfully!');
-}
+            foreach ($validated['items'] as $item) {
+                $eq->items()->create($item);
+            }
+
+            RequestApproval::create([
+                'request_type' => 'equipment',
+                'request_id' => $eq->id,
+                'approver_role' => 'admin_assistant',
+                'status' => 'pending',
+                'category' => $eq->category,
+            ]);
+        });
+
+        // Redirect to equipment-requests page with flash success message
+        return redirect()->route('equipment-requests.index')
+            ->with('success', 'Equipment request submitted successfully!');
+    }
 
     /**
      * Check equipment availability

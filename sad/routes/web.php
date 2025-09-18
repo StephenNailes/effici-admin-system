@@ -17,7 +17,7 @@ use App\Http\Controllers\EquipmentRequestController;
 use App\Http\Controllers\DocumentController;
 use App\Http\Controllers\CommentController;
 use App\Http\Controllers\ApprovalController;
-use App\Http\Controllers\ActivityLogController;
+
 use App\Models\Event;
 use App\Models\Announcement;
 
@@ -124,15 +124,23 @@ Route::middleware(['auth', 'verified'])->prefix('student')->group(function () {
 
 // 🟩 Equipment Request API (outside student prefix)
 Route::middleware(['auth', 'verified'])->group(function () {
+    Route::get('/equipment-requests', [EquipmentRequestController::class, 'showBorrowEquipment'])
+        ->name('equipment-requests.index');
     Route::post('/equipment-requests', [EquipmentRequestController::class, 'store'])
         ->name('equipment-requests.store');
     Route::post('/equipment/availability', [EquipmentController::class, 'availability'])
         ->name('equipment.availability');
+    Route::get('/api/equipment/all', [EquipmentController::class, 'all']);
+
+    // Equipment Management API for admin
+    Route::get('/api/equipment-requests/manage', [EquipmentRequestController::class, 'manage']);
+    Route::patch('/api/equipment-requests/{id}/status', [EquipmentRequestController::class, 'updateStatus']);
 });
 
 // 🟩 Admin + Dean Request Pages
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/admin/requests', fn () => Inertia::render('admin_assistant/request'))->name('admin.requests');
+    Route::get('/admin/equipment-management', fn () => Inertia::render('admin_assistant/EquipmentManagement'))->name('admin.equipment-management');
     Route::get('/dean/requests', fn () => Inertia::render('dean/request'))->name('dean.requests');
 
     Route::get('/admin/activity-history', fn () => Inertia::render('admin_assistant/ActivityHistory'))

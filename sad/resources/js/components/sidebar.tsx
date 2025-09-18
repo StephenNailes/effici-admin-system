@@ -82,12 +82,13 @@ export default function Sidebar() {
     ],
     admin_assistant: [
       { name: 'Home', href: route('admin.dashboard'), icon: <FaHome /> },
-      { name: 'Request', href: route('admin.requests'), icon: <FaFileAlt /> },
+      { name: 'Requests', href: route('admin.requests'), icon: <FaFileAlt /> },
+      { name: 'Equipment Management', href: route('admin.equipment-management'), icon: <FaToolbox /> },
       { name: 'Activity History', href: route('admin.activity-history'), icon: <FaChartLine /> },
     ],
     dean: [
       { name: 'Home', href: route('dean.dashboard'), icon: <FaHome /> },
-      { name: 'Request', href: route('dean.requests'), icon: <FaFileAlt /> },
+      { name: 'Requests', href: route('dean.requests'), icon: <FaFileAlt /> },
       { name: 'Activity History', href: route('dean.activity-history'), icon: <FaChartLine /> },
     ],
   };
