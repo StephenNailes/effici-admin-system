@@ -60,6 +60,7 @@ class EquipmentRequestController extends Controller
         $validTransitions = [
             'approved' => ['checked_out', 'cancelled'],
             'checked_out' => ['returned', 'overdue'],
+            'overdue' => ['returned'],
             'returned' => ['completed'],
         ];
         if (!isset($validTransitions[$currentStatus]) || !in_array($newStatus, $validTransitions[$currentStatus])) {
@@ -75,7 +76,8 @@ class EquipmentRequestController extends Controller
                     $equipment->save();
                 }
             }
-            if ($currentStatus === 'checked_out' && $newStatus === 'returned') {
+            // Return stock for both checked_out->returned and overdue->returned
+            if ((($currentStatus === 'checked_out') || ($currentStatus === 'overdue')) && $newStatus === 'returned') {
                 foreach ($equipmentRequest->items as $item) {
                     $equipment = $item->equipment;
                     $equipment->total_quantity += $item->quantity;

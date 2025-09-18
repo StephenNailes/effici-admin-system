@@ -87,6 +87,17 @@ export default function Request() {
 
   // Enhanced filtering logic for search
   const filteredRequests = requests
+    // Remove equipment requests that are approved
+    .filter((r) => {
+      // If request_type is 'equipment' and approval_status is 'approved', exclude it
+      if (
+        r.request_type?.toLowerCase() === "equipment" &&
+        r.approval_status?.toLowerCase() === "approved"
+      ) {
+        return false;
+      }
+      return true;
+    })
     .filter((r) => {
       const term = searchTerm.toLowerCase();
 

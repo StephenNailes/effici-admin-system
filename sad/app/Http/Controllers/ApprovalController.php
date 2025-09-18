@@ -33,7 +33,9 @@ class ApprovalController extends Controller
                 DB::raw("CONCAT(u.first_name, ' ', u.last_name) as student_name"),
                 'ap.activity_name',
                 'ap.activity_purpose',
-                'er.purpose as equipment_purpose'
+                'er.purpose as equipment_purpose',
+                'er.status as equipment_status',
+                'ap.status as activity_status'
             )
             ->where('ra.approver_role', $role)
             ->orderBy('ra.created_at', 'desc')

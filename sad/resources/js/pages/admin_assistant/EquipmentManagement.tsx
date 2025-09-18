@@ -27,6 +27,8 @@ function getValidActions(status: string) {
       return ["check_out", "cancel"];
     case "checked_out":
       return ["return", "mark_overdue"];
+    case "overdue":
+      return ["return"];
     case "returned":
       return ["complete"];
     default:
@@ -110,22 +112,22 @@ export default function EquipmentManagement() {
           {/* Fixed Table */}
           <div className="overflow-x-auto">
             <table className="min-w-full table-fixed border-collapse">
-              <thead className="bg-gray-100 text-gray-700 text-base uppercase">
+              <thead className="bg-gray-100 text-gray-700 text-sm uppercase">
                 <tr>
-                  <th className="py-4 px-6 w-[10%] text-left">Request ID</th>
-                  <th className="py-4 px-6 w-[20%] text-left">Student Name</th>
-                  <th className="py-4 px-6 w-[20%] text-left">Purpose</th>
-                  <th className="py-4 px-6 w-[25%] text-left">Requested Items</th>
-                  <th className="py-4 px-6 w-[12%] text-center">Status</th>
-                  <th className="py-4 px-6 w-[13%] text-center">Actions</th>
+                  <th className="py-2 px-3 w-[10%] text-left">Request ID</th>
+                  <th className="py-2 px-3 w-[20%] text-left">Student Name</th>
+                  <th className="py-2 px-3 w-[20%] text-left">Purpose</th>
+                  <th className="py-2 px-3 w-[25%] text-left">Requested Items</th>
+                  <th className="py-2 px-3 w-[12%] text-center">Status</th>
+                  <th className="py-2 px-3 w-[13%] text-center">Actions</th>
                 </tr>
               </thead>
-              <tbody className="text-black text-base divide-y divide-gray-100">
+              <tbody className="text-black text-sm divide-y divide-gray-100">
                 {loading ? (
                   <tr>
                     <td
                       colSpan={6}
-                      className="py-10 px-6 text-center text-gray-400"
+                      className="py-6 px-3 text-center text-gray-400"
                     >
                       Loading...
                     </td>
@@ -134,7 +136,7 @@ export default function EquipmentManagement() {
                   <tr>
                     <td
                       colSpan={6}
-                      className="py-10 px-6 text-center text-red-400"
+                      className="py-6 px-3 text-center text-red-400"
                     >
                       {error}
                     </td>
@@ -143,7 +145,7 @@ export default function EquipmentManagement() {
                   <tr>
                     <td
                       colSpan={6}
-                      className="py-10 px-6 text-center text-gray-400"
+                      className="py-6 px-3 text-center text-gray-400"
                     >
                       No equipment requests found.
                     </td>
@@ -154,12 +156,12 @@ export default function EquipmentManagement() {
                       key={req.id}
                       className="hover:bg-gray-50 transition duration-150"
                     >
-                      <td className="py-4 px-6 font-semibold text-left">
+                      <td className="py-2 px-3 font-semibold text-left">
                         {req.id}
                       </td>
-                      <td className="py-4 px-6 text-left">{req.student_name}</td>
-                      <td className="py-4 px-6 text-left">{req.purpose}</td>
-                      <td className="py-4 px-6 text-left">
+                      <td className="py-2 px-3 text-left">{req.student_name}</td>
+                      <td className="py-2 px-3 text-left">{req.purpose}</td>
+                      <td className="py-2 px-3 text-left">
                         {req.items?.map((item: any) => (
                           <div key={item.id} className="mb-1">
                             <span className="font-medium">
@@ -171,18 +173,18 @@ export default function EquipmentManagement() {
                           </div>
                         ))}
                       </td>
-                      <td className="py-4 px-6 text-center">
+                      <td className="py-2 px-3 text-center">
                         <span
-                          className={`inline-flex items-center gap-2 px-4 py-1.5 rounded-full font-semibold text-sm shadow-sm ${STATUS_COLORS[req.status] || "bg-gray-100 text-gray-700"}`}
+                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded font-semibold text-xs shadow-sm ${STATUS_COLORS[req.status] || "bg-gray-100 text-gray-700"}`}
                         >
                           {STATUS_LABELS[req.status] || req.status}
                         </span>
                       </td>
-                      <td className="py-4 px-6 space-x-2 text-center">
+                      <td className="py-2 px-3 space-x-1 text-center">
                         {getValidActions(req.status).map((action) => (
                           <button
                             key={action}
-                            className="px-4 py-2 rounded-full bg-red-600 text-white text-sm font-bold shadow hover:bg-red-700 transition"
+                            className="px-2 py-1 rounded bg-red-600 text-white text-xs font-bold shadow hover:bg-red-700 transition"
                             onClick={() => handleAction(req.id, action)}
                             disabled={loading}
                           >

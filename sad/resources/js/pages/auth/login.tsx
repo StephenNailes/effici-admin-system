@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { toast } from 'react-toastify'
 import { router } from '@inertiajs/react'
 import { FiEye, FiEyeOff } from 'react-icons/fi'
 import { motion } from 'framer-motion'
@@ -27,6 +28,22 @@ export default function Login() {
       }
     })
   }
+
+    // Example: Show logout success toast (call this after logout)
+    useEffect(() => {
+      const urlParams = new URLSearchParams(window.location.search)
+      if (urlParams.get('logout') === 'success') {
+        toast.success('Logout successful!', {
+          position: 'top-right',
+          autoClose: 3000,
+          theme: 'colored',
+        })
+        // Remove the query param so it only shows once
+        urlParams.delete('logout')
+        const newUrl = window.location.pathname + (urlParams.toString() ? '?' + urlParams.toString() : '')
+        window.history.replaceState({}, '', newUrl)
+      }
+    }, [])
 
   useEffect(() => {
     if (error) {

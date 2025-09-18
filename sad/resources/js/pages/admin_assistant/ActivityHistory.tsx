@@ -10,18 +10,77 @@ export default function ActivityHistory() {
   const [activities, setActivities] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // Fetch admin activities on mount
+  // Fetch admin assistant activities on mount
   useEffect(() => {
     setLoading(true);
     setError(null);
-    // Replace with your actual API endpoint for admin activities
-    fetch("/api/admin/activities")
+    fetch("/api/approvals?role=admin_assistant")
       .then((res) => {
         if (!res.ok) throw new Error("Failed to fetch activities");
         return res.json();
       })
       .then((data) => {
-        setActivities(Array.isArray(data) ? data : []);
+        // Map API response to table format
+        const mapped = (data.requests || []).map((item: any) => {
+          let status = "-";
+          if (item.request_type === "equipment") {
+            // Prioritize equipment_status, fallback to approval_status
+            const possibleStatuses = [
+              item.equipment_status,
+              item.final_status,
+              item.status,
+              item.approval_status
+            ];
+            status = possibleStatuses.find(s => s && typeof s === "string" && s.trim() !== "") || "-";
+            // Normalize status to match frontend display
+            const statusMap: Record<string, string> = {
+              completed: "completed",
+              cancelled: "cancelled",
+              returned: "returned",
+              checked_out: "checked out",
+              checkedout: "checked out",
+              overdue: "overdue",
+              pending: "pending",
+              approved: "approved"
+            };
+            const normalized = status.replace(/_/g, " ").toLowerCase();
+            status = statusMap[normalized] || status;
+          } else {
+            // For activity plans, prioritize activity_status, fallback to approval_status
+            const possibleStatuses = [
+              item.activity_status,
+              item.status,
+              item.approval_status
+            ];
+            status = possibleStatuses.find(s => s && typeof s === "string" && s.trim() !== "") || "-";
+            // Normalize status
+            const statusMap: Record<string, string> = {
+              completed: "completed",
+              cancelled: "cancelled",
+              returned: "returned",
+              checked_out: "checked out",
+              checkedout: "checked out",
+              overdue: "overdue",
+              pending: "pending",
+              approved: "approved",
+              "under revision": "under revision"
+            };
+            const normalized = status.replace(/_/g, " ").toLowerCase();
+            status = statusMap[normalized] || status;
+          }
+          return {
+            id: item.approval_id || item.id,
+            student: item.student_name || "-",
+            type: item.request_type === "activity_plan" ? "Activity Plan" : "Equipment",
+            dateSubmitted: item.submitted_at ? item.submitted_at.slice(0, 10) : "-",
+            purpose:
+              item.request_type === "activity_plan"
+                ? item.activity_purpose || "-"
+                : item.equipment_purpose || "-",
+            status,
+          };
+        });
+        setActivities(mapped);
       })
       .catch((err) => {
         setError(err.message);
@@ -64,10 +123,12 @@ export default function ActivityHistory() {
   // Filter logic
   const filteredActivities = activities.filter((activity) => {
     const matchesType = typeFilter === "All Types" || activity.type === typeFilter;
-    const matchesStatus = statusFilter === "All Status" || activity.status === statusFilter;
+    const matchesStatus =
+      statusFilter === "All Status" ||
+      activity.status?.toLowerCase() === statusFilter.toLowerCase();
     const matchesSearch =
-      activity.student?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      activity.id?.toLowerCase().includes(searchTerm.toLowerCase());
+      (activity.student?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        String(activity.id).toLowerCase().includes(searchTerm.toLowerCase()));
     let matchesDate = true;
     if (dateFilter instanceof Date) {
       const selectedDate = dateFilter.toISOString().slice(0, 10);
@@ -135,6 +196,11 @@ export default function ActivityHistory() {
               <option>Pending</option>
               <option>Approved</option>
               <option>Completed</option>
+              <option>Under Revision</option>
+              <option>Cancelled</option>
+              <option>Checked Out</option>
+              <option>Returned</option>
+              <option>Overdue</option>
             </select>
           </div>
         </div>
@@ -153,7 +219,7 @@ export default function ActivityHistory() {
                   <th className="py-3 px-6">Student</th>
                   <th className="py-3 px-6">Type</th>
                   <th className="py-3 px-6">Date Submitted</th>
-                  <th className="py-3 px-6">Date of Activity</th>
+                  <th className="py-3 px-6">Purpose</th>
                   <th className="py-3 px-6">Status</th>
                 </tr>
               </thead>
@@ -207,21 +273,66 @@ export default function ActivityHistory() {
                       <td className="py-3 px-6">{activity.student}</td>
                       <td className="py-3 px-6">{activity.type}</td>
                       <td className="py-3 px-6">{activity.dateSubmitted}</td>
-                      <td className="py-3 px-6">{activity.dateOfActivity}</td>
+                      <td className="py-3 px-6">{activity.purpose}</td>
                       <td className="py-3 px-6">
-                        {activity.status === "Completed" ? (
-                          <span className="inline-flex items-center gap-1 px-2 py-1 rounded bg-green-100 text-green-700 text-xs font-semibold">
-                            <Check className="w-4 h-4" /> Completed
-                          </span>
-                        ) : activity.status === "Pending" ? (
-                          <span className="inline-flex items-center gap-1 px-2 py-1 rounded bg-yellow-100 text-yellow-700 text-xs font-semibold">
-                            <Eye className="w-4 h-4" /> Pending
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 px-2 py-1 rounded bg-blue-100 text-blue-700 text-xs font-semibold">
-                            Approved
-                          </span>
-                        )}
+                        {(() => {
+                          const status = activity.status?.toLowerCase();
+                          if (status === "completed") {
+                            return (
+                              <span className="inline-flex items-center gap-1 px-2 py-1 rounded bg-green-100 text-green-700 text-xs font-semibold">
+                                <Check className="w-4 h-4" /> Completed
+                              </span>
+                            );
+                          } else if (status === "pending") {
+                            return (
+                              <span className="inline-flex items-center gap-1 px-2 py-1 rounded bg-yellow-100 text-yellow-700 text-xs font-semibold">
+                                <Eye className="w-4 h-4" /> Pending
+                              </span>
+                            );
+                          } else if (status === "approved") {
+                            return (
+                              <span className="inline-flex items-center gap-1 px-2 py-1 rounded bg-blue-100 text-blue-700 text-xs font-semibold">
+                                Approved
+                              </span>
+                            );
+                          } else if (status === "under revision") {
+                            return (
+                              <span className="inline-flex items-center gap-1 px-2 py-1 rounded bg-purple-100 text-purple-700 text-xs font-semibold">
+                                Under Revision
+                              </span>
+                            );
+                          } else if (status === "cancelled") {
+                            return (
+                              <span className="inline-flex items-center gap-1 px-2 py-1 rounded bg-red-200 text-red-700 text-xs font-semibold">
+                                Cancelled
+                              </span>
+                            );
+                          } else if (status === "checked out") {
+                            return (
+                              <span className="inline-flex items-center gap-1 px-2 py-1 rounded bg-indigo-100 text-indigo-700 text-xs font-semibold">
+                                Checked Out
+                              </span>
+                            );
+                          } else if (status === "returned") {
+                            return (
+                              <span className="inline-flex items-center gap-1 px-2 py-1 rounded bg-gray-200 text-gray-700 text-xs font-semibold">
+                                Returned
+                              </span>
+                            );
+                          } else if (status === "overdue") {
+                            return (
+                              <span className="inline-flex items-center gap-1 px-2 py-1 rounded bg-red-100 text-red-700 text-xs font-semibold">
+                                Overdue
+                              </span>
+                            );
+                          } else {
+                            return (
+                              <span className="inline-flex items-center gap-1 px-2 py-1 rounded bg-gray-100 text-gray-700 text-xs font-semibold">
+                                {activity.status}
+                              </span>
+                            );
+                          }
+                        })()}
                       </td>
                     </tr>
                   ))
