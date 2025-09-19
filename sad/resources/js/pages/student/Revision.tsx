@@ -5,106 +5,6 @@ import { ArrowLeft, ArrowRight } from "lucide-react"
 import { FaSearch, FaFilter } from "react-icons/fa"
 import { useState } from 'react'
 
-// Dummy data for demonstration
-const dummyRevisions = [
- {
-  id: 1,
-  title: 'Budget Proposal',
-  comment: 'Revise the estimated expenses for supplies.',
-  status: 'Revision',
-},
-{
-  id: 2,
-  title: 'Event Program',
-  comment: 'Add more details about the opening ceremony.',
-  status: 'Revision',
-},
-{
-  id: 3,
-  title: 'Logistics Plan',
-  comment: 'Specify the transportation arrangements.',
-  status: 'Revision',
-},
-{
-  id: 4,
-  title: 'Safety Guidelines',
-  comment: 'Include emergency contact numbers.',
-  status: 'Revision',
-},
-{
-  id: 5,
-  title: 'Volunteer List',
-  comment: 'Provide complete contact details of volunteers.',
-  status: 'Revision',
-},
-{
-  id: 6,
-  title: 'Catering Plan',
-  comment: 'Clarify the number of meals per participant.',
-  status: 'Revision',
-},
-{
-  id: 7,
-  title: 'Sponsorship Proposal',
-  comment: 'Revise the benefits section for sponsors.',
-  status: 'Revision',
-},
-{
-  id: 8,
-  title: 'Venue Layout',
-  comment: 'Add seating arrangement for VIP guests.',
-  status: 'Revision',
-},
-{
-  id: 9,
-  title: 'Marketing Plan',
-  comment: 'Include a timeline for social media promotions.',
-  status: 'Revision',
-},
-{
-  id: 10,
-  title: 'Technical Requirements',
-  comment: 'List the audio-visual equipment needed.',
-  status: 'Revision',
-},
-{
-  id: 11,
-  title: 'Schedule of Activities',
-  comment: 'Adjust the timing of breakout sessions.',
-  status: 'Revision',
-},
-{
-  id: 12,
-  title: 'Budget Report',
-  comment: 'Double-check the totals in the expense breakdown.',
-  status: 'Revision',
-},
-{
-  id: 13,
-  title: 'Guest List',
-  comment: 'Confirm the spelling of official titles.',
-  status: 'Revision',
-},
-{
-  id: 14,
-  title: 'Evaluation Form',
-  comment: 'Add a section for suggestions and feedback.',
-  status: 'Revision',
-},
-{
-  id: 15,
-  title: 'Stage Design',
-  comment: 'Revise the placement of banners and backdrops.',
-  status: 'Revision',
-},
-{
-  id: 16,
-  title: 'Transportation Schedule',
-  comment: 'Provide exact departure and arrival times.',
-  status: 'Revision',
-}
-]
-
 // Define the type of each revision
 interface Revision {
   id: number
@@ -133,7 +33,7 @@ const getStatusBadge = (status: string) => {
   )
 }
 
-export default function Revision({ revisions = dummyRevisions }: RevisionProps) {
+export default function Revision({ revisions = [] }: RevisionProps) {
   // Search and filter states
   const [search, setSearch] = useState("")
   const [showFilter, setShowFilter] = useState(false)
