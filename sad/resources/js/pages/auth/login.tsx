@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { toast } from 'react-toastify'
 import { router } from '@inertiajs/react'
-import { FiEye, FiEyeOff } from 'react-icons/fi'
+import { FiEye, FiEyeOff, FiLogIn } from 'react-icons/fi'
 import { motion } from 'framer-motion'
 
 export default function Login() {
@@ -55,7 +55,7 @@ export default function Login() {
   return (
     <div className="relative min-h-screen flex items-center justify-center bg-gray-950 text-white [font-family:'Poppins',sans-serif]">
       {/* Background image with dark overlay */}
-      <div className="absolute inset-0 bg-[url('/images/uic-bg.png')] bg-cover bg-center" />
+      <div className="absolute inset-0 bg-[url('/images/uic-bg.png')] bg-cover bg-center blur-sm" />
       <div className="absolute inset-0 bg-black/70" />
 
       {/* Login container */}
@@ -72,7 +72,7 @@ export default function Login() {
           transition={{ duration: 0.8, delay: 0.2 }}
           className="flex flex-col justify-center p-12 md:p-16 w-full md:w-[480px] min-h-[600px]"
         >
-          <h2 className="text-4xl font-extrabold text-center text-red-600 mb-8 tracking-tight">Login</h2>
+          <h2 className="text-4xl font-extrabold text-center text-gray-800 mb-8 tracking-tight">Login</h2>
 
           {/* Error Message */}
           {error && (
@@ -125,8 +125,8 @@ export default function Login() {
             </div>
 
             {/* Remember me and Forgot password */}
-            <div className="flex items-center justify-between text-base">
-              <label htmlFor="remember" className="flex items-center gap-2 text-gray-700">
+            <div className="flex items-center justify-between text-sm">
+              <label htmlFor="remember" className="flex items-center gap-2 text-gray-600">
                 <input
                   id="remember"
                   type="checkbox"
@@ -136,7 +136,7 @@ export default function Login() {
                 />
                 Remember me
               </label>
-              <a href="/forgot-password" className="text-red-500 hover:underline font-semibold">Forgot password?</a>
+              <a href="/forgot-password" className="text-red-500 hover:underline font-medium">Forgot password?</a>
             </div>
 
             {/* Submit */}
@@ -144,13 +144,14 @@ export default function Login() {
               whileHover={{ scale: 1.04 }}
               whileTap={{ scale: 0.98 }}
               type="submit"
-              className="w-full py-3 rounded-lg bg-red-500 text-white font-bold text-lg hover:bg-red-600 transition duration-150 shadow"
+              className="w-full py-3 rounded-lg bg-red-500 text-white font-bold text-lg hover:bg-red-600 transition duration-150 shadow flex items-center justify-center gap-2"
             >
+              <FiLogIn className="text-xl" />
               Login
             </motion.button>
 
             {/* Link to Register */}
-            <div className="text-center text-base text-gray-700 mt-3">
+            <div className="text-center text-sm text-gray-700 mt-3">
               Don't have an account?{' '}
               <a href="/register" className="text-red-500 font-semibold hover:underline">Register</a>
             </div>
@@ -162,9 +163,9 @@ export default function Login() {
           initial={{ x: 60, opacity: 0 }}
           animate={{ x: 0, opacity: 1 }}
           transition={{ duration: 0.8, delay: 0.3 }}
-          className="flex flex-col items-center justify-center bg-gradient-to-br from-red-600 to-red-400 text-white p-19 w-full md:w-[500px] min-h-[600px] gap-8"
+          className="flex flex-col items-center justify-center bg-red-500 text-white p-19 w-full md:w-[500px] min-h-[600px] gap-8"
         >
-          <div className="text-4xl font-serif font-extrabold tracking-wide mb-2 drop-shadow-lg">EFFICIADMIN</div>
+          <div className="text-4xl font-bold tracking-wide mb-2 drop-shadow-lg">EFFICIADMIN</div>
           <img src="/images/logo.png" alt="Logo" className="w-36 h-auto drop-shadow-xl" />
           <div className="text-lg font-medium text-white/90 text-center mt-4">
             Welcome to Effici-Admin! <br /> Manage efficiently.

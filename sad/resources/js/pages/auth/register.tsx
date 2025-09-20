@@ -44,7 +44,7 @@ export default function Register() {
   return (
     <div className="relative flex items-center justify-center min-h-screen bg-gray-950 text-white [font-family:'Poppins',sans-serif]">
       {/* Background image with dark overlay */}
-      <div className="absolute inset-0 bg-[url('/images/uic-bg.png')] bg-cover bg-center" />
+      <div className="absolute inset-0 bg-[url('/images/uic-bg.png')] bg-cover bg-center blur-sm" />
       <div className="absolute inset-0 bg-black/70" />
 
       {/* Main container with motion */}
@@ -52,16 +52,16 @@ export default function Register() {
         initial={{ opacity: 0, scale: 0.95, y: 40 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         transition={{ duration: 0.7, ease: 'easeOut' }}
-        className="relative z-10 flex flex-col md:flex-row bg-white rounded-3xl shadow-2xl overflow-hidden w-full max-w-4xl min-h-[200px] text-black"
+        className="relative z-10 flex flex-col md:flex-row bg-white rounded-3xl shadow-2xl overflow-hidden w-full max-w-5xl min-h-[200px] text-black"
       >
         {/* Register Form Section */}
         <motion.div
           initial={{ x: -60, opacity: 0 }}
           animate={{ x: 0, opacity: 1 }}
           transition={{ duration: 0.8, delay: 0.2 }}
-          className="flex flex-col justify-center p-4 md:p-6 w-full md:w-[470px] min-h-[200px]"
+          className="flex flex-col justify-center p-4 md:p-8 w-full md:w-[520px] min-h-[200px]"
         >
-          <h2 className="text-2xl font-extrabold text-center text-red-600 mb-5 tracking-tight">Register</h2>
+          <h2 className="text-2xl font-extrabold text-center text-gray-800 mb-5 tracking-tight">Register</h2>
 
           {/* Error Message */}
           {error && (
@@ -74,7 +74,7 @@ export default function Register() {
             </motion.div>
           )}
 
-          <form onSubmit={handleRegister} className="space-y-4">
+          <form onSubmit={handleRegister} className="space-y-6">
             {/* Name Fields: Now vertically stacked */}
             <div>
               <label htmlFor="firstName" className="block text-sm font-semibold mb-1">First Name</label>
@@ -192,11 +192,11 @@ export default function Register() {
           initial={{ x: 60, opacity: 0 }}
           animate={{ x: 0, opacity: 1 }}
           transition={{ duration: 0.8, delay: 0.3 }}
-          className="hidden md:flex flex-col items-center justify-center bg-gradient-to-br from-red-600 to-red-400 text-white p-4 md:p-6 w-full md:w-[450px] min-h-[200px] gap-4"
+          className="hidden md:flex flex-col items-center justify-center bg-gradient-to-br from-red-600 to-red-400 text-white p-4 md:p-8 w-full md:w-[510px] min-h-[200px] gap-6"
         >
-          <div className="text-2xl font-serif font-extrabold tracking-wide mb-1 drop-shadow-lg">EFFICIADMIN</div>
-          <img src="/images/logo.png" alt="EFFICIADMIN Logo" className="w-20 h-auto drop-shadow-xl" />
-          <div className="text-base font-medium text-white/90 text-center mt-2">
+          <div className="text-2xl font-bold tracking-wide mb-3 drop-shadow-lg mt-4">EFFICIADMIN</div>
+          <img src="/images/logo.png" alt="EFFICIADMIN Logo" className="w-20 h-auto drop-shadow-xl mb-2" />
+          <div className="text-base font-medium text-white/90 text-center mt-4">
             Welcome! <br /> Create your account.
           </div>
         </motion.div>
