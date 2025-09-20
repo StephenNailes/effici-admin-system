@@ -10,7 +10,8 @@ interface Revision {
   id: number
   title: string
   comment: string
-  status: string // Add status field
+  status: string
+  request_type: string // 'activity' or 'equipment'
 }
 
 // Define props for the component
@@ -21,14 +22,19 @@ interface RevisionProps {
 const getStatusBadge = (status: string) => {
   const colors: Record<string, string> = {
     Revision: 'bg-blue-100 text-blue-700 border-blue-300',
+    under_revision: 'bg-orange-100 text-orange-700 border-orange-300',
   }
+  
+  // Normalize status display
+  const displayStatus = status === 'under_revision' ? 'Under Revision' : status
+  
   return (
     <span
       className={`px-3 py-1 rounded-full text-sm font-semibold border ${
-        colors[status] || 'bg-gray-100 text-gray-700 border-gray-300'
+        colors[status] || 'bg-red-100 text-red-700 border-red-300'
       }`}
     >
-      {status}
+      {displayStatus}
     </span>
   )
 }
@@ -42,8 +48,8 @@ export default function Revision({ revisions = [] }: RevisionProps) {
 
   // Filter logic
   const filteredRevisions = (revisions ?? []).filter((req) => {
-    // Only show revision requests
-    const isRevision = req.status === "Revision"
+    // Show requests that need revision (status is under_revision)
+    const isRevision = req.status === "under_revision"
     // Search filter
     const matchesSearch =
       req.title.toLowerCase().includes(search.toLowerCase()) ||
@@ -52,7 +58,7 @@ export default function Revision({ revisions = [] }: RevisionProps) {
     // Status filter
     const matchesStatus = filterStatus ? req.status === filterStatus : true
     // Type filter
-    const matchesType = filterType ? req.title === filterType : true
+    const matchesType = filterType ? req.request_type === filterType : true
 
     return isRevision && matchesSearch && matchesStatus && matchesType
   })
@@ -129,9 +135,7 @@ export default function Revision({ revisions = [] }: RevisionProps) {
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-red-400"
               >
                 <option value="">All</option>
-                <option value="Revision">Revision</option>
-                <option value="Pending">Pending</option>
-                {/* Add more statuses if needed */}
+                <option value="under_revision">Under Revision</option>
               </select>
             </div>
             <div>
@@ -144,12 +148,8 @@ export default function Revision({ revisions = [] }: RevisionProps) {
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-red-400"
               >
                 <option value="">All</option>
-                {/* Dynamically get unique types from revisions */}
-                {[...new Set(revisions.map((r) => r.title))].map((type) => (
-                  <option key={type} value={type}>
-                    {type}
-                  </option>
-                ))}
+                <option value="activity">Activity Plan</option>
+                <option value="equipment">Equipment Request</option>
               </select>
             </div>
           </motion.div>
@@ -213,7 +213,7 @@ export default function Revision({ revisions = [] }: RevisionProps) {
                           className="inline-block"
                         >
                           <Link
-                            href={route('student.revision.edit', req.id)}
+                            href={route('student.revision.edit', { id: req.id, type: req.request_type })}
                             className="bg-red-500 text-white px-4 py-2 rounded-xl text-sm shadow transition hover:bg-red-600"
                           >
                             Revise

@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import MainLayout from "@/layouts/mainlayout";
 import { useForm, usePage, router } from "@inertiajs/react";
 import { motion } from "framer-motion";
-import { FaInfoCircle, FaTimes } from "react-icons/fa";
+import { FaInfoCircle, FaTimes, FaPlus, FaTrash } from "react-icons/fa";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import "./datepicker-theme.css";
@@ -58,6 +58,30 @@ export default function BorrowEquipment() {
     items: [{ equipment_id: equipmentList[0]?.id ?? 0, quantity: 1 }],
     category: "normal", // <-- Default value
   });
+
+  // Functions to handle multiple equipment items
+  const addEquipmentItem = () => {
+    // Find the first equipment that's not already selected
+    const selectedIds = data.items.map(item => item.equipment_id);
+    const availableEquipment = equipmentList.find(eq => !selectedIds.includes(eq.id));
+    const equipmentId = availableEquipment?.id ?? equipmentList[0]?.id ?? 0;
+    
+    const newItem = { equipment_id: equipmentId, quantity: 1 };
+    setData("items", [...data.items, newItem]);
+  };
+
+  const removeEquipmentItem = (index: number) => {
+    if (data.items.length > 1) {
+      const newItems = data.items.filter((_, i) => i !== index);
+      setData("items", newItems);
+    }
+  };
+
+  const updateEquipmentItem = (index: number, field: "equipment_id" | "quantity", value: number) => {
+    const newItems = [...data.items];
+    newItems[index] = { ...newItems[index], [field]: value };
+    setData("items", newItems);
+  };
 
   const canCheck = useMemo(
     () => data.start_datetime && data.end_datetime,
@@ -322,60 +346,153 @@ export default function BorrowEquipment() {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-              <div>
-                <label className="block text-sm font-semibold mb-2 text-gray-700">Equipment</label>
-                <select
-                  className="w-full border border-red-200 rounded-lg px-4 py-2 focus:ring-2 focus:ring-red-500 outline-none text-black transition-all duration-150"
-                  value={data.items[0].equipment_id}
-                  onChange={(e) => {
-                    setData("items", [{ ...data.items[0], equipment_id: Number(e.target.value) }]);
-                  }}
+            {/* Equipment Items Section */}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-gray-800">Equipment Items</h3>
+                <motion.button
+                  type="button"
+                  onClick={addEquipmentItem}
+                  whileHover={{ scale: data.items.length < equipmentList.length ? 1.05 : 1 }}
+                  whileTap={{ scale: data.items.length < equipmentList.length ? 0.95 : 1 }}
+                  disabled={data.items.length >= equipmentList.length}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all duration-200 font-medium ${
+                    data.items.length < equipmentList.length
+                      ? "bg-green-500 hover:bg-green-600 text-white"
+                      : "bg-gray-300 text-gray-500 cursor-not-allowed"
+                  }`}
                 >
-                  {equipmentList.map((eq) => (
-                    <option key={eq.id} value={eq.id}>
-                      {eq.name}
-                    </option>
-                  ))}
-                </select>
+                  <FaPlus className="text-sm" />
+                  Add Equipment
+                  {data.items.length >= equipmentList.length && " (All Selected)"}
+                </motion.button>
               </div>
-              <div>
-                <label className="block text-sm font-semibold mb-2 text-gray-700">Quantity</label>
-                {(() => {
-                  const selectedId = data.items[0].equipment_id;
-                  const eq = equipmentList.find((e) => e.id === selectedId);
-                  const maxQty = canCheck
-                    ? availability[selectedId] ?? eq?.total_quantity ?? 1
-                    : eq?.total_quantity ?? 1;
-                  return (
-                    <input
-                      type="number"
-                      min={1}
-                      max={maxQty}
-                      placeholder="Quantity"
-                      value={data.items[0].quantity}
-                      onChange={(e) => {
-                        let val = Number(e.target.value);
-                        if (val > maxQty) val = maxQty;
-                        setData("items", [{ ...data.items[0], quantity: val }]);
-                      }}
-                      className="w-full border border-red-200 rounded-lg px-4 py-2 focus:ring-2 focus:ring-red-500 outline-none text-black transition-all duration-150"
-                    />
-                  );
-                })()}
-                <span className="text-xs text-gray-500 mt-1 block">
-                  Max: {(() => {
-                    const selectedId = data.items[0].equipment_id;
-                    const eq = equipmentList.find((e) => e.id === selectedId);
-                    return canCheck
-                      ? availability[selectedId] ?? eq?.total_quantity ?? 1
-                      : eq?.total_quantity ?? 1;
-                  })()}
-                </span>
-              </div>
-              <div>
-              </div>
+
+              {data.items.map((item, index) => (
+                <motion.div
+                  key={index}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -20 }}
+                  transition={{ duration: 0.3 }}
+                  className="border border-gray-200 rounded-lg p-4 bg-gray-50"
+                >
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    {/* Equipment Selection */}
+                    <div className="md:col-span-2">
+                      <label className="block text-sm font-semibold mb-2 text-gray-700">Equipment</label>
+                      <select
+                        className="w-full border border-red-200 rounded-lg px-4 py-2 focus:ring-2 focus:ring-red-500 outline-none text-black transition-all duration-150"
+                        value={item.equipment_id}
+                        onChange={(e) => updateEquipmentItem(index, "equipment_id", Number(e.target.value))}
+                      >
+                        {equipmentList.map((eq) => {
+                          // Check if this equipment is already selected in another item
+                          const isSelected = data.items.some((otherItem, otherIndex) => 
+                            otherIndex !== index && otherItem.equipment_id === eq.id
+                          );
+                          return (
+                            <option key={eq.id} value={eq.id} disabled={isSelected}>
+                              {eq.name} {isSelected ? "(Already selected)" : ""}
+                            </option>
+                          );
+                        })}
+                      </select>
+                    </div>
+
+                    {/* Quantity */}
+                    <div>
+                      <label className="block text-sm font-semibold mb-2 text-gray-700">Quantity</label>
+                      {(() => {
+                        const selectedId = item.equipment_id;
+                        const eq = equipmentList.find((e) => e.id === selectedId);
+                        const maxQty = canCheck
+                          ? availability[selectedId] ?? eq?.total_quantity ?? 1
+                          : eq?.total_quantity ?? 1;
+                        return (
+                          <div>
+                            <input
+                              type="number"
+                              min={1}
+                              max={maxQty}
+                              placeholder="Qty"
+                              value={item.quantity}
+                              onChange={(e) => {
+                                let val = Number(e.target.value);
+                                if (val > maxQty) val = maxQty;
+                                if (val < 1) val = 1;
+                                updateEquipmentItem(index, "quantity", val);
+                              }}
+                              className="w-full border border-red-200 rounded-lg px-4 py-2 focus:ring-2 focus:ring-red-500 outline-none text-black transition-all duration-150"
+                            />
+                            <span className="text-xs text-gray-500 mt-1 block">
+                              Max: {maxQty}
+                            </span>
+                          </div>
+                        );
+                      })()}
+                    </div>
+
+                    {/* Remove Button */}
+                    <div className="flex items-end">
+                      {data.items.length > 1 && (
+                        <motion.button
+                          type="button"
+                          onClick={() => removeEquipmentItem(index)}
+                          whileHover={{ scale: 1.1 }}
+                          whileTap={{ scale: 0.9 }}
+                          className="w-full md:w-auto bg-red-500 hover:bg-red-600 text-white p-2 rounded-lg transition-all duration-200"
+                          title="Remove this equipment"
+                        >
+                          <FaTrash />
+                        </motion.button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Equipment Info - At same level as Max text */}
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-1">
+                    <div className="md:col-span-2">
+                      {(() => {
+                        const eq = equipmentList.find((e) => e.id === item.equipment_id);
+                        return eq ? (
+                          <div className="text-xs text-gray-600">
+                            <strong>Selected:</strong> {eq.name}
+                            {eq.description && ` - ${eq.description}`}
+                            {eq.category && ` | Category: ${eq.category}`}
+                          </div>
+                        ) : null;
+                      })()}
+                    </div>
+                  </div>
+                </motion.div>
+              ))}
             </div>
+
+            {/* Request Summary */}
+            {data.items.length > 1 && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg"
+              >
+                <h4 className="font-semibold text-blue-800 mb-2">Request Summary</h4>
+                <p className="text-blue-700 text-sm">
+                  You are requesting <span className="font-bold">{data.items.length}</span> different equipment items:
+                </p>
+                <ul className="mt-2 space-y-1">
+                  {data.items.map((item, index) => {
+                    const eq = equipmentList.find((e) => e.id === item.equipment_id);
+                    return (
+                      <li key={index} className="text-sm text-blue-600">
+                        • {eq?.name} (Qty: {item.quantity})
+                      </li>
+                    );
+                  })}
+                </ul>
+              </motion.div>
+            )}
+
             <div className="flex justify-end mt-8">
               <motion.button
                 whileHover={{ scale: 1.04 }}
@@ -385,7 +502,7 @@ export default function BorrowEquipment() {
                 type="submit"
                 disabled={processing}
               >
-                {processing ? "Submitting…" : "Book Equipment"}
+                {processing ? "Submitting…" : `Book ${data.items.length > 1 ? `${data.items.length} Equipment Items` : "Equipment"}`}
               </motion.button>
             </div>
           </form>

@@ -2,9 +2,10 @@ import React, { useState, useEffect } from "react";
 import MainLayout from "@/layouts/mainlayout";
 import { Search, Filter, Eye, FileText, Clock, CheckCircle, Edit } from "lucide-react";
 import axios from "axios";
-import RequestModal from "@/components/RequestModal";
+import EquipmentModal from "@/components/EquipmentModal";
 import FilterModal from "@/components/FilterModal";
 import { motion } from "framer-motion";
+import { router } from "@inertiajs/react";
 
 // Add pagination state
 const PAGE_SIZE = 8;
@@ -28,8 +29,41 @@ export default function Request() {
 
   const fetchRequests = () => {
     axios.get(`/api/approvals?role=admin_assistant`).then((res) => {
-      setRequests(res.data.requests);
-      setStats(res.data.stats);
+      // Add dummy activity plan data for testing
+      const dummyActivityPlan = {
+        approval_id: 999,
+        student_name: "Stephen Nailes",
+        request_type: "activity",
+        title: "Tech Summit 2025",
+        priority: "normal",
+        approval_status: "pending",
+        submitted_at: "2025-05-02T10:30:00Z"
+      };
+      
+      const requestsWithDummy = [dummyActivityPlan, ...(res.data.requests || [])];
+      setRequests(requestsWithDummy);
+      
+      // Update stats to include the dummy activity plan
+      const originalStats = res.data.stats || { total: 0, pending: 0, approved: 0, underRevision: 0 };
+      setStats({
+        ...originalStats,
+        total: originalStats.total + 1,
+        pending: originalStats.pending + 1
+      });
+    }).catch(err => {
+      console.error('Error fetching requests:', err);
+      // Fallback to dummy data if API fails
+      const dummyActivityPlan = {
+        approval_id: 999,
+        student_name: "Stephen Nailes",
+        request_type: "activity",
+        title: "Tech Summit 2025",
+        priority: "normal",
+        approval_status: "pending",
+        submitted_at: "2025-05-02T10:30:00Z"
+      };
+      setRequests([dummyActivityPlan]);
+      setStats({ total: 1, pending: 1, approved: 0, underRevision: 0 });
     });
   };
 
@@ -85,18 +119,18 @@ export default function Request() {
     }
   };
 
-  // Enhanced filtering logic for search
+  // Enhanced filtering logic for search - Show both equipment and activity plan requests
   const filteredRequests = requests
-    // Remove equipment requests that are approved
     .filter((r) => {
-      // If request_type is 'equipment' and approval_status is 'approved', exclude it
-      if (
-        r.request_type?.toLowerCase() === "equipment" &&
-        r.approval_status?.toLowerCase() === "approved"
-      ) {
+      // Show both equipment and activity plan requests
+      const requestType = r.request_type?.toLowerCase();
+      
+      // Hide approved equipment requests (they've been processed)
+      if (requestType === "equipment" && r.approval_status?.toLowerCase() === "approved") {
         return false;
       }
-      return true;
+      
+      return requestType === "equipment" || requestType === "activity" || requestType === "activity_plan";
     })
     .filter((r) => {
       const term = searchTerm.toLowerCase();
@@ -159,7 +193,7 @@ export default function Request() {
         <div className="mb-6">
           <h1 className="text-2xl font-bold text-red-600">Request Management</h1>
           <p className="text-gray-600">
-            Review and manage student equipment/activity requests.
+            Review and manage student equipment and activity plan requests.
           </p>
         </div>
 
@@ -340,7 +374,15 @@ export default function Request() {
                     <td className="px-6 py-4 text-sm flex gap-2">
                       <button
                         className="text-blue-600 hover:underline flex items-center gap-1"
-                        onClick={() => setSelected(req)}
+                        onClick={() => {
+                          if (req.request_type?.toLowerCase() === "activity" || req.request_type?.toLowerCase() === "activity_plan") {
+                            // Navigate to activity plan approval page
+                            router.visit(`/admin/activity-plan-approval/${req.approval_id}`);
+                          } else {
+                            // Show equipment modal
+                            setSelected(req);
+                          }
+                        }}
                       >
                         <Eye className="w-4 h-4" /> View
                       </button>
@@ -381,9 +423,9 @@ export default function Request() {
           </button>
         </div>
 
-        {/* Modal */}
+        {/* Modal - Only for equipment requests */}
         {selected && (
-          <RequestModal
+          <EquipmentModal
             request={selected}
             onClose={() => setSelected(null)}
             onApprove={handleApprove}

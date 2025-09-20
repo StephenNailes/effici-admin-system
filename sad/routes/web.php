@@ -17,6 +17,7 @@ use App\Http\Controllers\EquipmentRequestController;
 use App\Http\Controllers\DocumentController;
 use App\Http\Controllers\CommentController;
 use App\Http\Controllers\ApprovalController;
+use App\Http\Controllers\RevisionController;
 
 use App\Models\Event;
 use App\Models\Announcement;
@@ -131,17 +132,11 @@ Route::middleware(['auth', 'verified'])->prefix('student')->group(function () {
         ->name('activity-log.index');
 
     // Revision routes (student side)
-    Route::get('/revision', fn () => Inertia::render('student/Revision'))
+    Route::get('/revision', [RevisionController::class, 'index'])
         ->name('student.revision');
-    Route::get('/revision/{id}', fn ($id) => Inertia::render('student/RevisionEdit', [
-        'revision' => [
-            'id' => $id,
-            'title' => 'Sample Title',
-            'details' => 'Sample details...',
-            'comment' => 'Please revise this request',
-        ]
-    ]))->name('student.revision.edit');
-    Route::post('/revision/{id}/update', fn ($id) => 'Handle revision update here')
+    Route::get('/revision/{id}', [RevisionController::class, 'show'])
+        ->name('student.revision.edit');
+    Route::post('/revision/{id}/update', [RevisionController::class, 'update'])
         ->name('student.revision.update');
 });
 
@@ -154,6 +149,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/equipment/availability', [EquipmentController::class, 'availability'])
         ->name('equipment.availability');
     Route::get('/api/equipment/all', [EquipmentController::class, 'all']);
+    Route::get('/api/equipment/availableForStudent', [EquipmentController::class, 'availableForStudent']);
 
     // Equipment Management API for admin
     Route::get('/api/equipment-requests/manage', [EquipmentRequestController::class, 'manage']);
@@ -163,6 +159,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 // 🟩 Admin + Dean Request Pages
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/admin/requests', fn () => Inertia::render('admin_assistant/request'))->name('admin.requests');
+    Route::get('/admin/activity-plan-approval/{id}', fn ($id) => Inertia::render('admin_assistant/ActivityPlanApproval', ['id' => $id]))->name('admin.activity-plan-approval');
     Route::get('/admin/equipment-management', fn () => Inertia::render('admin_assistant/EquipmentManagement'))->name('admin.equipment-management');
     Route::get('/dean/requests', fn () => Inertia::render('dean/request'))->name('dean.requests');
 
