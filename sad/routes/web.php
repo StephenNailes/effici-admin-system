@@ -43,6 +43,22 @@ Route::get('/db-check', function () {
     }
 });
 
+// ✅ Resend Email Test Route
+Route::get('/test-resend', function () {
+    try {
+        $start = microtime(true);
+        \Illuminate\Support\Facades\Mail::raw('Test email from Resend API - EFFICIADMIN System', function($message) {
+            $message->to('snailes_230000001146@uic.edu.ph')  // Your verified email
+                   ->subject('Resend Test - EFFICIADMIN System');
+        });
+        $end = microtime(true);
+        $time = round(($end - $start), 3);
+        return "✅ SUCCESS: Email sent via Resend in {$time} seconds<br>Current mailer: " . config('mail.default');
+    } catch (\Exception $e) {
+        return "❌ ERROR: " . $e->getMessage();
+    }
+});
+
 // ✅ Email Verification Routes
 Route::get('/email/verify', function () {
     return Inertia::render('auth/verifyemail', [
@@ -77,7 +93,14 @@ Route::middleware(['auth', 'verified'])->group(function () {
     ]))->name('dean.dashboard');
 
     // Profile page
-    Route::get('/profile', fn () => Inertia::render('Profile'))->name('profile');
+    Route::get('/profile', [App\Http\Controllers\ProfileController::class, 'show'])->name('profile');
+    
+    // Profile update routes
+    Route::post('/profile/update-picture', [App\Http\Controllers\ProfileController::class, 'updateProfilePicture'])->name('profile.update-picture');
+    Route::delete('/profile/remove-picture', [App\Http\Controllers\ProfileController::class, 'removeProfilePicture'])->name('profile.remove-picture');
+    Route::put('/profile/update-name', [App\Http\Controllers\ProfileController::class, 'updateName'])->name('profile.update-name');
+    Route::put('/profile/update-email', [App\Http\Controllers\ProfileController::class, 'updateEmail'])->name('profile.update-email');
+    Route::put('/profile/update-password', [App\Http\Controllers\ProfileController::class, 'updatePassword'])->name('profile.update-password');
 });
 
 // 🟩 Student Routes

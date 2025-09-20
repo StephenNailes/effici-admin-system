@@ -35,11 +35,14 @@ class AppServiceProvider extends ServiceProvider
             $user = Auth::user();
             return [
                 'user' => $user ? [
-                    'id'         => $user->id,
-                    'first_name' => $user->first_name, // 👈 ensures React gets this
-                    'role'       => $user->role,
-                    'email'      => $user->email,
-                    'avatarUrl'  => $user->avatarUrl ?? null, // optional
+                    'id'             => $user->id,
+                    'first_name'     => $user->first_name,
+                    'middle_name'    => $user->middle_name,
+                    'last_name'      => $user->last_name,
+                    'role'           => $user->role,
+                    'email'          => $user->email,
+                    'profile_picture' => $user->profile_picture,
+                    'avatarUrl'      => $user->avatarUrl ?? null, // optional
                 ] : null,
             ];
         });

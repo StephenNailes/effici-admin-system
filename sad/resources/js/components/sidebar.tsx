@@ -31,6 +31,19 @@ export default function Sidebar() {
   const user = auth?.user ?? { first_name: 'Guest', role: 'student' };
   const currentPath = url ?? '';
 
+  // Helper function to get correct profile picture URL
+  const getProfilePictureUrl = (profilePicture: string | null) => {
+    if (!profilePicture) return null;
+    
+    // If it already starts with /storage/, use as is
+    if (profilePicture.startsWith('/storage/')) {
+      return profilePicture;
+    }
+    
+    // Otherwise, add /storage/ prefix
+    return `/storage/${profilePicture}`;
+  };
+
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
 
@@ -216,11 +229,25 @@ export default function Sidebar() {
             onClick={() => setDropdownOpen((prev) => !prev)}
           >
             <div className="flex items-center gap-3">
-              <img
-                src="/images/profile.png"
-                alt="Profile"
-                className="w-11 h-11 rounded-full object-cover border-2 border-[#e6232a]"
-              />
+              <div className="w-11 h-11 rounded-full border-2 border-[#e6232a] overflow-hidden bg-[#e6232a] flex items-center justify-center">
+                {user.profile_picture ? (
+                  <img
+                    src={getProfilePictureUrl(user.profile_picture) || '/images/profile.png'}
+                    alt="Profile"
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      // Replace failed image with user initials
+                      const img = e.target as HTMLImageElement;
+                      const parent = img.parentElement!;
+                      parent.innerHTML = `<div class="w-full h-full bg-[#e6232a] flex items-center justify-center text-white font-bold text-lg">${user.first_name?.charAt(0).toUpperCase() || 'U'}</div>`;
+                    }}
+                  />
+                ) : (
+                  <div className="w-full h-full bg-[#e6232a] flex items-center justify-center text-white font-bold text-lg">
+                    {user.first_name?.charAt(0).toUpperCase() || 'U'}
+                  </div>
+                )}
+              </div>
               <div>
                 <p className="text-base font-semibold leading-tight">{user.first_name}</p>
                 <p className="text-xs opacity-80 capitalize">{user.role.replace('_', ' ')}</p>

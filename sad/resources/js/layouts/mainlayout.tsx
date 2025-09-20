@@ -1,5 +1,7 @@
 import Sidebar from '@/components/sidebar'
 import { AnimatePresence, motion } from 'framer-motion'
+import { ToastContainer } from 'react-toastify'
+import 'react-toastify/dist/ReactToastify.css'
 
 export default function MainLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -18,6 +20,18 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
           </motion.div>
         </AnimatePresence>
       </main>
+      <ToastContainer
+        position="top-right"
+        autoClose={3000}
+        hideProgressBar={false}
+        newestOnTop={false}
+        closeOnClick
+        rtl={false}
+        pauseOnFocusLoss
+        draggable
+        pauseOnHover
+        theme="light"
+      />
     </div>
   )
 }

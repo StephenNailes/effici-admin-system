@@ -48,6 +48,7 @@ export default function ActivityLog() {
       Approved: "bg-green-100 text-green-700 border-green-300",
       Pending: "bg-yellow-100 text-yellow-700 border-yellow-300",
       Cancelled: "bg-red-100 text-red-700 border-red-300",
+      Completed: "bg-green-100 text-green-800 border-green-400",
     };
     return (
       <span

@@ -23,6 +23,14 @@ class User extends Authenticatable implements MustVerifyEmail
         'email',
         'password',
         'role', // student | admin_assistant | dean
+        'profile_picture',
+        'school_id_number',
+        'date_of_birth',
+        'address',
+        'city',
+        'province',
+        'region',
+        'contact_number',
     ];
 
     /**
@@ -43,22 +51,35 @@ class User extends Authenticatable implements MustVerifyEmail
     protected $casts = [
         'email_verified_at' => 'datetime',
         'password' => 'hashed',
+        'date_of_birth' => 'date',
     ];
 
     /**
      * Relationships
      */
 
-    // A user can have many activity requests
-    public function activityRequests()
+    // A user can have many activity plans
+    public function activityPlans()
     {
-        return $this->hasMany(ActivityRequest::class);
+        return $this->hasMany(ActivityPlan::class);
+    }
+
+    // A user can have many equipment requests
+    public function equipmentRequests()
+    {
+        return $this->hasMany(EquipmentRequest::class);
     }
 
     // A user can be an approver in many approvals (admin_assistant or dean)
     public function approvals()
     {
-        return $this->hasMany(Approval::class, 'approver_id');
+        return $this->hasMany(RequestApproval::class, 'approver_id');
+    }
+
+    // A user can have many comments
+    public function comments()
+    {
+        return $this->hasMany(Comment::class);
     }
 
     /**
@@ -67,7 +88,12 @@ class User extends Authenticatable implements MustVerifyEmail
 
     public function getFullNameAttribute(): string
     {
-        return "{$this->first_name} {$this->last_name}";
+        $name = $this->first_name;
+        if ($this->middle_name) {
+            $name .= " {$this->middle_name}";
+        }
+        $name .= " {$this->last_name}";
+        return $name;
     }
 
     public function isStudent(): bool
