@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { router } from '@inertiajs/react'
-import { FiEye, FiEyeOff } from 'react-icons/fi'
+import { FiEye, FiEyeOff, FiUserPlus } from 'react-icons/fi'
 import { motion } from 'framer-motion'
 
 export default function Register() {
@@ -175,8 +175,9 @@ export default function Register() {
               whileHover={{ scale: 1.04 }}
               whileTap={{ scale: 0.98 }}
               type="submit"
-              className="w-full py-2 rounded-md bg-red-500 text-white font-bold text-base hover:bg-red-600 transition duration-150 shadow"
+              className="w-full py-2 rounded-md bg-red-500 text-white font-bold text-base hover:bg-red-600 transition duration-150 shadow flex items-center justify-center gap-2"
             >
+              <FiUserPlus className="w-5 h-5" />
               Register
             </motion.button>
 
@@ -192,7 +193,7 @@ export default function Register() {
           initial={{ x: 60, opacity: 0 }}
           animate={{ x: 0, opacity: 1 }}
           transition={{ duration: 0.8, delay: 0.3 }}
-          className="hidden md:flex flex-col items-center justify-center bg-gradient-to-br from-red-600 to-red-400 text-white p-4 md:p-8 w-full md:w-[510px] min-h-[200px] gap-6"
+          className="hidden md:flex flex-col items-center justify-center bg-red-500 text-white p-4 md:p-8 w-full md:w-[510px] min-h-[200px] gap-6"
         >
           <div className="text-2xl font-bold tracking-wide mb-3 drop-shadow-lg mt-4">EFFICIADMIN</div>
           <img src="/images/logo.png" alt="EFFICIADMIN Logo" className="w-20 h-auto drop-shadow-xl mb-2" />
