@@ -1,10 +1,181 @@
 import React, { useState, useEffect } from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import MainLayout from "@/layouts/mainlayout";
-import { Eye, Check, Search } from "lucide-react";
+import { Eye, Check, Search, ChevronDown, Filter, X, CheckCircle } from "lucide-react";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import "./datepicker-theme.css"; // keep if you have overrides
+
+// Filter Modal Component
+const FilterModal = ({
+  isOpen,
+  onClose,
+  typeFilter,
+  statusFilter,
+  onApply,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  typeFilter: string;
+  statusFilter: string;
+  onApply: (type: string, status: string) => void;
+}) => {
+  const [tempTypeFilter, setTempTypeFilter] = useState(typeFilter);
+  const [tempStatusFilter, setTempStatusFilter] = useState(statusFilter);
+
+  const typeOptions = ["All Types", "Activity Plan", "Equipment"];
+  const statusOptions = [
+    "All Status", "Pending", "Approved", "Completed", 
+    "Under Revision", "Cancelled", "Checked Out", 
+    "Returned", "Overdue"
+  ];
+
+  const handleApply = () => {
+    onApply(tempTypeFilter, tempStatusFilter);
+    onClose();
+  };
+
+  const handleReset = () => {
+    setTempTypeFilter("All Types");
+    setTempStatusFilter("All Status");
+  };
+
+  const FilterSection = ({ 
+    title, 
+    options, 
+    selected, 
+    onSelect 
+  }: { 
+    title: string; 
+    options: string[]; 
+    selected: string; 
+    onSelect: (value: string) => void 
+  }) => (
+    <div className="space-y-3">
+      <h4 className="font-semibold text-gray-700 text-sm uppercase tracking-wide">
+        {title}
+      </h4>
+      <div className="space-y-2">
+        {options.map((option) => (
+          <button
+            key={option}
+            onClick={() => onSelect(option)}
+            className={`w-full px-4 py-3 text-left rounded-lg border transition-all duration-150
+                       hover:border-red-300 hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-red-200 ${
+              selected === option
+                ? "border-red-300 bg-red-50 text-red-700 font-semibold"
+                : "border-gray-200 text-gray-700 hover:text-red-700"
+            }`}
+          >
+            <div className="flex items-center justify-between">
+              <span>{option}</span>
+              {selected === option && (
+                <CheckCircle className="w-4 h-4 text-red-500" />
+              )}
+            </div>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+
+  return (
+    <AnimatePresence>
+      {isOpen && (
+        <>
+          {/* Backdrop */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={onClose}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4"
+            style={{
+              backdropFilter: 'blur(8px)',
+              WebkitBackdropFilter: 'blur(8px)',
+              backgroundColor: 'rgba(0, 0, 0, 0.1)'
+            }}
+          >
+            {/* Modal */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-white rounded-xl shadow-xl max-w-md w-full max-h-[80vh] overflow-hidden"
+            >
+              {/* Header */}
+              <div className="flex items-center justify-between p-6 border-b border-gray-200">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-red-100 rounded-lg">
+                    <Filter className="w-5 h-5 text-red-600" />
+                  </div>
+                  <h3 className="text-lg font-semibold text-gray-900">
+                    Filter Options
+                  </h3>
+                </div>
+                <button
+                  onClick={onClose}
+                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                >
+                  <X className="w-5 h-5 text-gray-400" />
+                </button>
+              </div>
+
+              {/* Content */}
+              <div className="p-6 max-h-[50vh] overflow-y-auto">
+                <div className="space-y-6">
+                  <FilterSection
+                    title="Request Type"
+                    options={typeOptions}
+                    selected={tempTypeFilter}
+                    onSelect={setTempTypeFilter}
+                  />
+                  <FilterSection
+                    title="Status"
+                    options={statusOptions}
+                    selected={tempStatusFilter}
+                    onSelect={setTempStatusFilter}
+                  />
+                </div>
+              </div>
+
+              {/* Footer */}
+              <div className="flex items-center justify-between p-6 border-t border-gray-200 bg-gray-50">
+                <button
+                  onClick={handleReset}
+                  className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-700 
+                           border border-gray-300 hover:border-gray-400 rounded-lg 
+                           hover:bg-gray-100 transition-colors duration-150"
+                >
+                  Reset All
+                </button>
+                <div className="flex gap-3">
+                  <button
+                    onClick={onClose}
+                    className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-700 
+                             border border-gray-300 hover:border-gray-400 rounded-lg 
+                             hover:bg-gray-100 transition-colors duration-150"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleApply}
+                    className="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 
+                             rounded-lg transition-colors duration-150 focus:outline-none 
+                             focus:ring-2 focus:ring-red-200"
+                  >
+                    Apply Filters
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        </>
+      )}
+    </AnimatePresence>
+  );
+};
 
 export default function ActivityHistory() {
   const [activities, setActivities] = useState<any[]>([]);
@@ -32,19 +203,19 @@ export default function ActivityHistory() {
               item.approval_status
             ];
             status = possibleStatuses.find(s => s && typeof s === "string" && s.trim() !== "") || "-";
+            
             // Normalize status to match frontend display
-            const statusMap: Record<string, string> = {
-              completed: "completed",
-              cancelled: "cancelled",
-              returned: "returned",
-              checked_out: "checked out",
-              checkedout: "checked out",
-              overdue: "overdue",
-              pending: "pending",
-              approved: "approved"
-            };
-            const normalized = status.replace(/_/g, " ").toLowerCase();
-            status = statusMap[normalized] || status;
+            if (status === "under_revision") {
+              status = "Under Revision";
+            } else if (status === "checked_out" || status === "checkedout") {
+              status = "Checked Out";
+            } else if (status !== "-") {
+              // Capitalize first letter of each word and replace underscores with spaces
+              status = status.replace(/_/g, " ").toLowerCase()
+                .split(' ')
+                .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+                .join(' ');
+            }
           } else {
             // For activity plans, prioritize activity_status, fallback to approval_status
             const possibleStatuses = [
@@ -53,20 +224,21 @@ export default function ActivityHistory() {
               item.approval_status
             ];
             status = possibleStatuses.find(s => s && typeof s === "string" && s.trim() !== "") || "-";
-            // Normalize status
-            const statusMap: Record<string, string> = {
-              completed: "completed",
-              cancelled: "cancelled",
-              returned: "returned",
-              checked_out: "checked out",
-              checkedout: "checked out",
-              overdue: "overdue",
-              pending: "pending",
-              approved: "approved",
-              "under revision": "under revision"
-            };
-            const normalized = status.replace(/_/g, " ").toLowerCase();
-            status = statusMap[normalized] || status;
+            
+            // Normalize status to match frontend display
+            console.log("Original activity status:", status);
+            if (status === "under_revision") {
+              status = "Under Revision";
+            } else if (status === "checked_out" || status === "checkedout") {
+              status = "Checked Out";
+            } else if (status !== "-") {
+              // Capitalize first letter of each word and replace underscores with spaces
+              status = status.replace(/_/g, " ").toLowerCase()
+                .split(' ')
+                .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+                .join(' ');
+            }
+            console.log("Normalized activity status:", status);
           }
           return {
             id: item.approval_id || item.id,
@@ -92,6 +264,18 @@ export default function ActivityHistory() {
   const [statusFilter, setStatusFilter] = useState("All Status");
   const [searchTerm, setSearchTerm] = useState("");
   const [dateFilter, setDateFilter] = useState<Date | null>(null);
+  const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
+
+  // Function to handle applying filters from modal
+  const handleApplyFilters = (type: string, status: string) => {
+    setTypeFilter(type);
+    setStatusFilter(status);
+  };
+
+  // Count active filters
+  const activeFiltersCount = 
+    (typeFilter !== "All Types" ? 1 : 0) + 
+    (statusFilter !== "All Status" ? 1 : 0);
 
   // ✅ Styled DatePicker (same as ActivityPlan.tsx)
   const DatePickerNoIcon = ({
@@ -126,9 +310,17 @@ export default function ActivityHistory() {
     const matchesStatus =
       statusFilter === "All Status" ||
       activity.status?.toLowerCase() === statusFilter.toLowerCase();
-    const matchesSearch =
-      (activity.student?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        String(activity.id).toLowerCase().includes(searchTerm.toLowerCase()));
+    
+    // Enhanced search functionality - search in multiple fields
+    const matchesSearch = searchTerm.trim() === "" || [
+      activity.student || "",
+      String(activity.id || ""),
+      activity.purpose || "",
+      activity.type || ""
+    ].some(field => 
+      field.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+    
     let matchesDate = true;
     if (dateFilter instanceof Date) {
       const selectedDate = dateFilter.toISOString().slice(0, 10);
@@ -147,63 +339,106 @@ export default function ActivityHistory() {
         </div>
 
         {/* Filters */}
-        <div className="bg-white shadow-sm rounded-xl p-4 flex flex-col sm:flex-row gap-4 border border-gray-100">
-          {/* Type Filter */}
-          <div className="relative min-w-[140px]">
-            <select
-              className="appearance-none px-4 h-[44px] rounded-lg border border-gray-300 text-black 
-                         focus:ring-2 focus:ring-red-200 focus:outline-none transition-all pr-10 bg-gray-50 font-medium"
-              value={typeFilter}
-              onChange={(e) => setTypeFilter(e.target.value)}
-            >
-              <option>All Types</option>
-              <option>Activity Plan</option>
-              <option>Equipment</option>
-            </select>
-          </div>
+        <motion.div 
+          className="bg-white shadow-sm rounded-xl p-6 border border-gray-100"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3 }}
+        >
+          <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center">
 
-          {/* Date Filter - ✅ Fixed design */}
-          <div className="min-w-[220px]">
-            <DatePickerNoIcon
-              selected={dateFilter}
-              onChange={(date) => setDateFilter(date)}
-              placeholder="Select date & time"
-            />
-          </div>
+            <div className="flex flex-col sm:flex-row gap-4 flex-1 w-full">
+              {/* Filter Button */}
+              <div className="flex flex-col gap-2">
+                <label className="text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                  Type & Status
+                </label>
+                <button
+                  onClick={() => setIsFilterModalOpen(true)}
+                  className="relative min-w-[180px] h-[44px] px-4 pr-12 text-left bg-gray-50 border border-gray-300 
+                             rounded-lg hover:border-gray-400 hover:bg-gray-100 
+                             focus:outline-none focus:ring-2 focus:ring-red-200 focus:border-red-300
+                             transition-all duration-150 font-medium text-black flex items-center justify-between"
+                >
+                  <span className="flex items-center gap-2">
+                    <Filter className="w-4 h-4 text-gray-500" />
+                    <span>
+                      {activeFiltersCount > 0 
+                        ? `Filter${activeFiltersCount > 1 ? 's' : ''} Applied` 
+                        : "Filter Options"
+                      }
+                    </span>
+                    {activeFiltersCount > 0 && (
+                      <motion.span
+                        initial={{ scale: 0 }}
+                        animate={{ scale: 1 }}
+                        className="inline-flex items-center justify-center w-5 h-5 text-xs font-bold 
+                                   text-white bg-red-500 rounded-full ml-2"
+                      >
+                        {activeFiltersCount}
+                      </motion.span>
+                    )}
+                  </span>
+                  <ChevronDown className="w-4 h-4 text-gray-400 absolute right-3 top-1/2 transform -translate-y-1/2" />
+                </button>
+              </div>
 
-          {/* Search Bar */}
-          <div className="relative min-w-[320px]">
-            <input
-              type="text"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Search by student name or ID..."
-              className="appearance-none pl-11 pr-4 h-[44px] rounded-lg border border-gray-300 text-black 
-                         focus:ring-2 focus:ring-gray-200 focus:outline-none transition-all bg-gray-50 font-medium w-full"
-            />
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5 pointer-events-none" />
-          </div>
+              {/* Date Filter */}
+              <div className="flex flex-col gap-2">
+                <label className="text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                  Date Submitted
+                </label>
+                <div className="min-w-[220px]">
+                  <DatePickerNoIcon
+                    selected={dateFilter}
+                    onChange={(date) => setDateFilter(date)}
+                    placeholder="Select date & time"
+                  />
+                </div>
+              </div>
 
-          {/* Status Filter */}
-          <div className="relative min-w-[140px]">
-            <select
-              className="appearance-none px-4 h-[44px] rounded-lg border border-gray-300 text-black 
-                         focus:ring-2 focus:ring-red-200 focus:outline-none transition-all pr-10 bg-gray-50 font-medium"
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-            >
-              <option>All Status</option>
-              <option>Pending</option>
-              <option>Approved</option>
-              <option>Completed</option>
-              <option>Under Revision</option>
-              <option>Cancelled</option>
-              <option>Checked Out</option>
-              <option>Returned</option>
-              <option>Overdue</option>
-            </select>
+              {/* Search Bar */}
+              <div className="flex flex-col gap-2 flex-1">
+                <label className="text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                  Search
+                </label>
+                <div className="relative min-w-[280px]">
+                  <input
+                    type="text"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    placeholder="Search by student, ID, purpose, or type..."
+                    className="w-full pl-11 pr-4 h-[44px] rounded-lg border border-gray-300 text-black 
+                               hover:border-gray-400 hover:bg-gray-100
+                               focus:ring-2 focus:ring-red-200 focus:border-red-300 focus:outline-none 
+                               transition-all duration-150 bg-gray-50 font-medium"
+                  />
+                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5 pointer-events-none" />
+                </div>
+              </div>
+            </div>
+
+            {/* Clear Filters Button */}
+            {(typeFilter !== "All Types" || statusFilter !== "All Status" || dateFilter || searchTerm) && (
+              <motion.button
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ duration: 0.2 }}
+                onClick={() => {
+                  setTypeFilter("All Types");
+                  setStatusFilter("All Status");
+                  setDateFilter(null);
+                  setSearchTerm("");
+                }}
+                className="px-4 py-2 text-sm font-medium text-red-600 hover:text-red-700 
+                           border border-red-200 hover:border-red-300 rounded-lg 
+                           hover:bg-red-50 transition-colors duration-150 min-w-fit"
+              >
+                Clear All
+              </motion.button>
+            )}
           </div>
-        </div>
+        </motion.div>
 
         {/* Table */}
         <div className="bg-white shadow-sm rounded-xl overflow-hidden border border-gray-100">
@@ -279,56 +514,58 @@ export default function ActivityHistory() {
                           const status = activity.status?.toLowerCase();
                           if (status === "completed") {
                             return (
-                              <span className="inline-flex items-center gap-1 px-2 py-1 rounded bg-green-100 text-green-700 text-xs font-semibold">
-                                <Check className="w-4 h-4" /> Completed
+                              <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-green-100 text-green-700 text-xs font-semibold">
+                                <Check className="w-3 h-3" /> Completed
                               </span>
                             );
                           } else if (status === "pending") {
                             return (
-                              <span className="inline-flex items-center gap-1 px-2 py-1 rounded bg-yellow-100 text-yellow-700 text-xs font-semibold">
-                                <Eye className="w-4 h-4" /> Pending
+                              <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-yellow-100 text-yellow-700 text-xs font-semibold">
+                                <Eye className="w-3 h-3" /> Pending
                               </span>
                             );
                           } else if (status === "approved") {
                             return (
-                              <span className="inline-flex items-center gap-1 px-2 py-1 rounded bg-blue-100 text-blue-700 text-xs font-semibold">
+                              <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-emerald-100 text-emerald-700 text-xs font-semibold">
                                 Approved
                               </span>
                             );
                           } else if (status === "under revision") {
                             return (
-                              <span className="inline-flex items-center gap-1 px-2 py-1 rounded bg-purple-100 text-purple-700 text-xs font-semibold">
+                              <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-blue-100 text-blue-700 text-xs font-semibold">
                                 Under Revision
                               </span>
                             );
                           } else if (status === "cancelled") {
                             return (
-                              <span className="inline-flex items-center gap-1 px-2 py-1 rounded bg-red-200 text-red-700 text-xs font-semibold">
+                              <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-red-100 text-red-700 text-xs font-semibold">
                                 Cancelled
                               </span>
                             );
                           } else if (status === "checked out") {
                             return (
-                              <span className="inline-flex items-center gap-1 px-2 py-1 rounded bg-indigo-100 text-indigo-700 text-xs font-semibold">
+                              <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-indigo-100 text-indigo-700 text-xs font-semibold">
                                 Checked Out
                               </span>
                             );
                           } else if (status === "returned") {
                             return (
-                              <span className="inline-flex items-center gap-1 px-2 py-1 rounded bg-gray-200 text-gray-700 text-xs font-semibold">
+                              <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-gray-100 text-gray-700 text-xs font-semibold">
                                 Returned
                               </span>
                             );
                           } else if (status === "overdue") {
                             return (
-                              <span className="inline-flex items-center gap-1 px-2 py-1 rounded bg-red-100 text-red-700 text-xs font-semibold">
+                              <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-red-100 text-red-700 text-xs font-semibold">
                                 Overdue
                               </span>
                             );
                           } else {
+                            // Handle any unmapped status by showing it in a default style
+                            const displayStatus = activity.status === "under_revision" ? "Under Revision" : activity.status;
                             return (
-                              <span className="inline-flex items-center gap-1 px-2 py-1 rounded bg-gray-100 text-gray-700 text-xs font-semibold">
-                                {activity.status}
+                              <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-gray-100 text-gray-700 text-xs font-semibold">
+                                {displayStatus}
                               </span>
                             );
                           }
@@ -366,6 +603,15 @@ export default function ActivityHistory() {
           </motion.div>
         </div>
       </div>
+
+      {/* Filter Modal */}
+      <FilterModal
+        isOpen={isFilterModalOpen}
+        onClose={() => setIsFilterModalOpen(false)}
+        typeFilter={typeFilter}
+        statusFilter={statusFilter}
+        onApply={handleApplyFilters}
+      />
     </MainLayout>
   );
 }

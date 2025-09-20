@@ -47,7 +47,11 @@ export default function EquipmentManagement() {
     axios
       .get("/api/equipment-requests/manage")
       .then((res) => {
-        setRequests(res.data);
+        // Filter out completed and cancelled requests
+        const activeRequests = res.data.filter((req: any) => 
+          req.status !== "completed" && req.status !== "cancelled"
+        );
+        setRequests(activeRequests);
         setLoading(false);
       })
       .catch(() => {
@@ -82,9 +86,16 @@ export default function EquipmentManagement() {
       await axios.patch(`/api/equipment-requests/${id}/status`, {
         status: newStatus,
       });
-      setRequests((prev) =>
-        prev.map((r) => (r.id === id ? { ...r, status: newStatus } : r))
-      );
+      
+      // If the status is completed or cancelled, remove from the list
+      if (newStatus === "completed" || newStatus === "cancelled") {
+        setRequests((prev) => prev.filter((r) => r.id !== id));
+      } else {
+        // Otherwise, update the status
+        setRequests((prev) =>
+          prev.map((r) => (r.id === id ? { ...r, status: newStatus } : r))
+        );
+      }
     } catch {
       setError("Failed to update status.");
     }
@@ -108,26 +119,24 @@ export default function EquipmentManagement() {
           </p>
         </div>
 
-        <div className="bg-white shadow-md rounded-xl border border-gray-100">
-          {/* Fixed Table */}
-          <div className="overflow-x-auto">
-            <table className="min-w-full table-fixed border-collapse">
-              <thead className="bg-gray-100 text-gray-700 text-sm uppercase">
-                <tr>
-                  <th className="py-2 px-3 w-[10%] text-left">Request ID</th>
-                  <th className="py-2 px-3 w-[20%] text-left">Student Name</th>
-                  <th className="py-2 px-3 w-[20%] text-left">Purpose</th>
-                  <th className="py-2 px-3 w-[25%] text-left">Requested Items</th>
-                  <th className="py-2 px-3 w-[12%] text-center">Status</th>
-                  <th className="py-2 px-3 w-[13%] text-center">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="text-black text-sm divide-y divide-gray-100">
+        <div className="bg-white shadow-sm rounded-xl overflow-hidden border border-gray-100">
+          <table className="w-full text-left border-collapse">
+            <thead className="bg-gray-50 text-black text-sm uppercase">
+              <tr>
+                <th className="py-3 px-6">Request ID</th>
+                <th className="py-3 px-6">Student Name</th>
+                <th className="py-3 px-6">Purpose</th>
+                <th className="py-3 px-6">Requested Items</th>
+                <th className="py-3 px-6">Status</th>
+                <th className="py-3 px-6">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="text-black text-sm divide-y divide-gray-100">
                 {loading ? (
                   <tr>
                     <td
                       colSpan={6}
-                      className="py-6 px-3 text-center text-gray-400"
+                      className="py-8 px-6 text-center text-gray-400"
                     >
                       Loading...
                     </td>
@@ -136,7 +145,7 @@ export default function EquipmentManagement() {
                   <tr>
                     <td
                       colSpan={6}
-                      className="py-6 px-3 text-center text-red-400"
+                      className="py-8 px-6 text-center text-red-400"
                     >
                       {error}
                     </td>
@@ -145,7 +154,7 @@ export default function EquipmentManagement() {
                   <tr>
                     <td
                       colSpan={6}
-                      className="py-6 px-3 text-center text-gray-400"
+                      className="py-8 px-6 text-center text-gray-400"
                     >
                       No equipment requests found.
                     </td>
@@ -154,14 +163,14 @@ export default function EquipmentManagement() {
                   paginatedData.map((req) => (
                     <tr
                       key={req.id}
-                      className="hover:bg-gray-50 transition duration-150"
+                      className="hover:bg-red-50 transition"
                     >
-                      <td className="py-2 px-3 font-semibold text-left">
+                      <td className="py-3 px-6 font-semibold">
                         {req.id}
                       </td>
-                      <td className="py-2 px-3 text-left">{req.student_name}</td>
-                      <td className="py-2 px-3 text-left">{req.purpose}</td>
-                      <td className="py-2 px-3 text-left">
+                      <td className="py-3 px-6">{req.student_name}</td>
+                      <td className="py-3 px-6">{req.purpose}</td>
+                      <td className="py-3 px-6">
                         {req.items?.map((item: any) => (
                           <div key={item.id} className="mb-1">
                             <span className="font-medium">
@@ -173,14 +182,14 @@ export default function EquipmentManagement() {
                           </div>
                         ))}
                       </td>
-                      <td className="py-2 px-3 text-center">
+                      <td className="py-3 px-6">
                         <span
-                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded font-semibold text-xs shadow-sm ${STATUS_COLORS[req.status] || "bg-gray-100 text-gray-700"}`}
+                          className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-semibold ${STATUS_COLORS[req.status] || "bg-gray-100 text-gray-700"}`}
                         >
                           {STATUS_LABELS[req.status] || req.status}
                         </span>
                       </td>
-                      <td className="py-2 px-3 space-x-1 text-center">
+                      <td className="py-3 px-6 space-x-1">
                         {getValidActions(req.status).map((action) => (
                           <button
                             key={action}
@@ -201,30 +210,27 @@ export default function EquipmentManagement() {
                 )}
               </tbody>
             </table>
-          </div>
 
-          {/* ✅ Pagination Controls */}
+          {/* Pagination */}
           {totalPages > 1 && (
-            <div className="flex justify-between items-center px-6 py-4 border-t bg-gray-50">
-              <p className="text-sm text-gray-600">
+            <div className="flex justify-end items-center px-6 py-3 bg-white border-t border-gray-200 rounded-b-lg" style={{ marginTop: "-1px" }}>
+              <button
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={page === 1}
+                className="px-3 py-1 mr-2 rounded bg-gray-100 text-gray-600 disabled:opacity-50"
+              >
+                Prev
+              </button>
+              <span className="text-sm text-gray-700">
                 Page {page} of {totalPages}
-              </p>
-              <div className="space-x-2">
-                <button
-                  onClick={() => setPage((p) => Math.max(1, p - 1))}
-                  disabled={page === 1}
-                  className="px-3 py-1 rounded-full bg-gray-200 text-sm font-medium hover:bg-gray-300 disabled:opacity-50"
-                >
-                  Prev
-                </button>
-                <button
-                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                  disabled={page === totalPages}
-                  className="px-3 py-1 rounded-full bg-gray-200 text-sm font-medium hover:bg-gray-300 disabled:opacity-50"
-                >
-                  Next
-                </button>
-              </div>
+              </span>
+              <button
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                disabled={page === totalPages}
+                className="px-3 py-1 ml-2 rounded bg-gray-100 text-gray-600 disabled:opacity-50"
+              >
+                Next
+              </button>
             </div>
           )}
         </div>
