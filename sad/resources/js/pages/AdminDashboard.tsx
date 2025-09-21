@@ -60,7 +60,7 @@ function DashboardCalendar() {
 
   return (
     <div
-      className="rounded-2xl bg-white shadow p-6 mx-auto"
+      className="rounded-2xl bg-white shadow-md p-6 mx-auto"
       style={{
         width: '370px',
         minWidth: '370px',
@@ -170,7 +170,7 @@ export default function AdminDashboard({ events = [], announcements = [] }: Admi
               initial={{ opacity: 0, y: 30 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: 0.3 }}
-              className="bg-white rounded-xl shadow p-6 space-y-4"
+              className="bg-white rounded-xl shadow-md p-6 space-y-4"
             >
               <div className="flex justify-between items-center">
                 <h2 className="text-lg font-semibold text-red-600 flex items-center gap-2">
@@ -208,7 +208,7 @@ export default function AdminDashboard({ events = [], announcements = [] }: Admi
               initial={{ opacity: 0, y: 30 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: 0.4 }}
-              className="bg-white rounded-xl shadow p-6 space-y-4"
+              className="bg-white rounded-xl shadow-md p-6 space-y-4"
             >
               <div className="flex justify-between items-center">
                 <h2 className="text-lg font-semibold text-red-600 flex items-center gap-2">

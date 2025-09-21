@@ -63,7 +63,7 @@ export default function ActivityLog() {
 
   return (
     <MainLayout>
-      <div className="p-8 font-poppins min-h-screen text-black bg-gradient-to-br from-red-50 via-white to-red-100">
+      <div className="p-8 font-poppins min-h-screen text-black bg-white">
         {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: -20 }}

@@ -2,10 +2,155 @@ import React, { useEffect, useMemo, useState } from "react";
 import MainLayout from "@/layouts/mainlayout";
 import { useForm, usePage, router } from "@inertiajs/react";
 import { motion } from "framer-motion";
-import { FaInfoCircle, FaTimes, FaPlus, FaTrash } from "react-icons/fa";
+import { FaInfoCircle, FaTimes, FaPlus, FaTrash, FaPaperPlane, FaChevronDown, FaCheck } from "react-icons/fa";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import "./datepicker-theme.css";
+
+// Themed minimal Select component (keyboard + mouse)
+type SelectOption<V extends string | number | null = string | number | null> = {
+  value: V;
+  label: string;
+  disabled?: boolean;
+};
+
+type MinimalSelectProps<V extends string | number | null = string | number | null> = {
+  value: V;
+  onChange: (value: V) => void;
+  options: SelectOption<V>[];
+  placeholder?: string;
+  className?: string;
+  menuClassName?: string;
+};
+
+function MinimalSelect<V extends string | number | null = string | number | null>(props: MinimalSelectProps<V>) {
+  const { value, onChange, options, placeholder = "Select…", className = "", menuClassName = "" } = props;
+  const [open, setOpen] = useState(false);
+  const [highlight, setHighlight] = useState<number>(() => Math.max(0, options.findIndex(o => o.value === value)));
+  const ref = React.useRef<HTMLDivElement | null>(null);
+
+  const selected = options.find((o) => o.value === value) || null;
+
+  useEffect(() => {
+    function onDocClick(e: MouseEvent) {
+      if (!ref.current) return;
+      if (!ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener("mousedown", onDocClick);
+    return () => document.removeEventListener("mousedown", onDocClick);
+  }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    // Ensure highlight is on a non-disabled option
+    let idx = options.findIndex((o) => o.value === value && !o.disabled);
+    if (idx === -1) {
+      idx = options.findIndex((o) => !o.disabled);
+    }
+    setHighlight(Math.max(0, idx));
+  }, [open]);
+
+  function move(delta: number) {
+    if (!options.length) return;
+    let idx = highlight;
+    for (let i = 0; i < options.length; i++) {
+      idx = (idx + delta + options.length) % options.length;
+      if (!options[idx]?.disabled) break;
+    }
+    setHighlight(idx);
+  }
+
+  function handleKeyDown(e: React.KeyboardEvent) {
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      if (!open) setOpen(true);
+      else move(1);
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      if (!open) setOpen(true);
+      else move(-1);
+    } else if (e.key === "Home") {
+      e.preventDefault();
+      const first = options.findIndex((o) => !o.disabled);
+      if (first >= 0) setHighlight(first);
+    } else if (e.key === "End") {
+      e.preventDefault();
+      for (let i = options.length - 1; i >= 0; i--) {
+        if (!options[i].disabled) {
+          setHighlight(i);
+          break;
+        }
+      }
+    } else if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      if (!open) setOpen(true);
+      else if (options[highlight] && !options[highlight].disabled) {
+        onChange(options[highlight].value);
+        setOpen(false);
+      }
+    } else if (e.key === "Escape") {
+      setOpen(false);
+    }
+  }
+
+  return (
+    <div ref={ref} className={`relative ${className}`} onKeyDown={handleKeyDown}>
+      <button
+        type="button"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        onClick={() => setOpen((o) => !o)}
+        className="w-full rounded-xl bg-gray-50 border border-black/20 hover:border-black/40 focus:border-black focus:ring-2 focus:ring-black/10 outline-none transition-all duration-200 text-left text-black px-4 py-3 shadow-sm flex items-center justify-between"
+      >
+        <span className={selected ? "text-black" : "text-gray-400"}>
+          {selected ? selected.label : placeholder}
+        </span>
+        <FaChevronDown className={`ml-2 transition-transform ${open ? "rotate-180" : "rotate-0"}`} />
+      </button>
+
+      {open && (
+        <motion.ul
+          initial={{ opacity: 0, y: 6 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.12 }}
+          role="listbox"
+          className={`absolute z-20 mt-2 w-full max-h-64 overflow-auto rounded-xl border border-gray-200 bg-white shadow-xl ${menuClassName}`}
+        >
+          {options.map((opt, idx) => {
+            const isSelected = selected?.value === opt.value;
+            const isDisabled = !!opt.disabled;
+            return (
+              <li key={String(opt.value) + idx} role="option" aria-selected={isSelected}>
+                <button
+                  type="button"
+                  disabled={isDisabled}
+                  onClick={() => {
+                    if (isDisabled) return;
+                    onChange(opt.value);
+                    setOpen(false);
+                  }}
+                  onMouseEnter={() => setHighlight(idx)}
+                  className={`w-full flex items-center gap-2 px-3 py-2.5 text-sm text-left transition-colors ${
+                    isDisabled
+                      ? "text-gray-400 cursor-not-allowed"
+                      : idx === highlight
+                      ? "bg-red-50 text-black"
+                      : "text-gray-700 hover:bg-red-50"
+                  }`}
+                >
+                  <span className={`inline-flex items-center justify-center w-4 ${isSelected ? "text-red-600" : "text-transparent"}`}>
+                    <FaCheck className="w-3 h-3" />
+                  </span>
+                  <span className="flex-1">{opt.label}</span>
+                </button>
+              </li>
+            );
+          })}
+        </motion.ul>
+      )}
+    </div>
+  );
+}
 
 type Equipment = {
   id: number;
@@ -19,14 +164,14 @@ type ActivityPlan = {
   id: number;
   activity_name: string;
   start_datetime: string;
-  end_datetime: string;
+  end_datetime: string;         
   status: string;
 };
 
 type PageProps = {
   equipment: Equipment[];
   activityPlans: ActivityPlan[]; // ✅ passed from backend
-  flash?: { success?: string; error?: string };
+  flash?: { success?: string; error?: string };         
 };
 
 export default function BorrowEquipment() {
@@ -188,7 +333,7 @@ export default function BorrowEquipment() {
         </div>
       )}
 
-      <div className="p-6 font-poppins min-h-screen text-black bg-gradient-to-br from-red-50 via-white to-red-100">
+      <div className="p-6 font-poppins min-h-screen text-black bg-white">
         {/* Header */}
         <div className="mb-8 flex flex-col gap-1">
           <h1 className="text-3xl font-bold text-red-600 tracking-tight">Equipment Request</h1>
@@ -206,7 +351,7 @@ export default function BorrowEquipment() {
           <div className="overflow-x-auto">
             <table className="min-w-full border-collapse">
               <thead>
-                <tr className="bg-gradient-to-r from-red-50 to-red-100 text-left border-b border-gray-200">
+                <tr className="bg-white text-left border-b border-gray-200">
                   <th className="p-4 font-semibold text-gray-700">Equipment</th>
                   <th className="p-4 font-semibold text-gray-700">Description</th>
                   <th className="p-4 font-semibold text-gray-700">Category</th>
@@ -246,8 +391,24 @@ export default function BorrowEquipment() {
                           {eq.category ?? "Uncategorized"}
                         </span>
                       </td>
-                      <td className="p-4 text-center font-bold text-green-600">
-                        {canCheck ? (availability[eq.id] ?? eq.total_quantity) : eq.total_quantity}
+                      <td className="p-4 text-center">
+                        {(() => {
+                          const availableQty = canCheck ? (availability[eq.id] ?? eq.total_quantity) : eq.total_quantity;
+                          const isUnavailable = canCheck && availableQty === 0;
+                          
+                          return (
+                            <div className="flex flex-col items-center gap-1">
+                              <span className={`font-bold ${isUnavailable ? "text-red-500" : "text-green-600"}`}>
+                                {availableQty}
+                              </span>
+                              {isUnavailable && (
+                                <span className="text-xs text-red-500 bg-red-50 px-2 py-0.5 rounded">
+                                  Unavailable
+                                </span>
+                              )}
+                            </div>
+                          );
+                        })()}
                       </td>
                     </motion.tr>
                   ))
@@ -275,27 +436,25 @@ export default function BorrowEquipment() {
                   placeholder="Purpose"
                   value={data.purpose}
                   onChange={(e) => setData("purpose", e.target.value)}
-                  className="w-full border border-red-200 rounded-lg px-4 py-2 focus:ring-2 focus:ring-red-500 outline-none text-black"
+                  className="w-full rounded-xl bg-gray-50 border border-black/20 hover:border-black/40 focus:border-black focus:ring-2 focus:ring-black/10 outline-none transition-all duration-200 placeholder:text-gray-400 text-black px-4 py-3"
                 />
               </div>
 
               {/* Activity Plan Selector */}
               <div>
                 <label className="block text-sm font-semibold mb-2 text-gray-700">Link to Activity Plan (optional)</label>
-                <select
-                  className="w-full border border-red-200 rounded-lg px-4 py-2 focus:ring-2 focus:ring-red-500 outline-none text-black"
-                  value={data.activity_plan_id ?? ""}
-                  onChange={(e) =>
-                    setData("activity_plan_id", e.target.value ? Number(e.target.value) : null)
-                  }
-                >
-                  <option value="">— None —</option>
-                  {activityPlans.map((plan) => (
-                    <option key={plan.id} value={plan.id}>
-                      {plan.activity_name} ({plan.start_datetime} → {plan.end_datetime})
-                    </option>
-                  ))}
-                </select>
+                <MinimalSelect<number | null>
+                  value={data.activity_plan_id ?? null}
+                  onChange={(val) => setData("activity_plan_id", val)}
+                  options={[
+                    { value: null, label: "— None —" },
+                    ...activityPlans.map((plan) => ({
+                      value: plan.id,
+                      label: `${plan.activity_name} (${plan.start_datetime} → ${plan.end_datetime})`,
+                    })),
+                  ]}
+                  className="w-full"
+                />
               </div>
             </div>
 
@@ -303,15 +462,16 @@ export default function BorrowEquipment() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-semibold mb-2 text-gray-700">Request Category</label>
-                <select
-                  className="w-full border border-red-200 rounded-lg px-4 py-2 focus:ring-2 focus:ring-red-500 outline-none text-black"
+                <MinimalSelect<"minor" | "normal" | "urgent">
                   value={data.category}
-                  onChange={(e) => setData("category", e.target.value as "minor" | "normal" | "urgent")}
-                >
-                  <option value="minor">Minor</option>
-                  <option value="normal">Normal</option>
-                  <option value="urgent">Urgent</option>
-                </select>
+                  onChange={(val) => setData("category", val)}
+                  options={[
+                    { value: "minor", label: "Minor" },
+                    { value: "normal", label: "Normal" },
+                    { value: "urgent", label: "Urgent" },
+                  ]}
+                  className="w-full"
+                />
               </div>
             </div>
 
@@ -327,7 +487,7 @@ export default function BorrowEquipment() {
                     timeIntervals={30}
                     dateFormat="Pp"
                     placeholderText="Select start date & time"
-                    className="w-full border border-red-200 rounded-lg px-4 py-2 focus:ring-2 focus:ring-red-500 outline-none text-black transition-all duration-150"
+                    className="w-full rounded-xl bg-gray-50 border border-black/20 hover:border-black/40 focus:border-black focus:ring-2 focus:ring-black/10 outline-none transition-all duration-200 placeholder:text-gray-400 text-black px-4 py-3"
                   />
                 </div>
                 <div className="flex-2">
@@ -340,11 +500,28 @@ export default function BorrowEquipment() {
                     dateFormat="Pp"
                     minDate={startDateTime ?? undefined}
                     placeholderText="Select end date & time"
-                    className="w-full border border-red-200 rounded-lg px-4 py-2 focus:ring-2 focus:ring-red-500 outline-none text-black transition-all duration-150"
+                    className="w-full rounded-xl bg-gray-50 border border-black/20 hover:border-black/40 focus:border-black focus:ring-2 focus:ring-black/10 outline-none transition-all duration-200 placeholder:text-gray-400 text-black px-4 py-3"
                   />
                 </div>
               </div>
             </div>
+
+            {/* Availability Warning */}
+            {canCheck && Object.values(availability).some(avail => avail === 0) && (
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg flex items-start gap-3"
+              >
+                <div className="text-yellow-600 text-lg mt-0.5">⚠️</div>
+                <div>
+                  <h4 className="font-semibold text-yellow-800 mb-1">Equipment Unavailable</h4>
+                  <p className="text-yellow-700 text-sm">
+                    Some equipment is not available during your selected time window because it's already booked or checked out by other students.
+                  </p>
+                </div>
+              </motion.div>
+            )}
 
             {/* Equipment Items Section */}
             <div className="space-y-4">
@@ -381,23 +558,21 @@ export default function BorrowEquipment() {
                     {/* Equipment Selection */}
                     <div className="md:col-span-2">
                       <label className="block text-sm font-semibold mb-2 text-gray-700">Equipment</label>
-                      <select
-                        className="w-full border border-red-200 rounded-lg px-4 py-2 focus:ring-2 focus:ring-red-500 outline-none text-black transition-all duration-150"
+                      <MinimalSelect<number>
                         value={item.equipment_id}
-                        onChange={(e) => updateEquipmentItem(index, "equipment_id", Number(e.target.value))}
-                      >
-                        {equipmentList.map((eq) => {
-                          // Check if this equipment is already selected in another item
-                          const isSelected = data.items.some((otherItem, otherIndex) => 
+                        onChange={(val) => updateEquipmentItem(index, "equipment_id", Number(val))}
+                        options={equipmentList.map((eq) => {
+                          const isSelectedElsewhere = data.items.some((otherItem, otherIndex) =>
                             otherIndex !== index && otherItem.equipment_id === eq.id
                           );
-                          return (
-                            <option key={eq.id} value={eq.id} disabled={isSelected}>
-                              {eq.name} {isSelected ? "(Already selected)" : ""}
-                            </option>
-                          );
+                          return {
+                            value: eq.id,
+                            label: `${eq.name}${isSelectedElsewhere ? " (Already selected)" : ""}`,
+                            disabled: isSelectedElsewhere,
+                          } as SelectOption<number>;
                         })}
-                      </select>
+                        className="w-full"
+                      />
                     </div>
 
                     {/* Quantity */}
@@ -423,11 +598,23 @@ export default function BorrowEquipment() {
                                 if (val < 1) val = 1;
                                 updateEquipmentItem(index, "quantity", val);
                               }}
-                              className="w-full border border-red-200 rounded-lg px-4 py-2 focus:ring-2 focus:ring-red-500 outline-none text-black transition-all duration-150"
+                              className={`w-full rounded-xl border focus:ring-2 outline-none transition-all duration-200 placeholder:text-gray-400 px-4 py-3 ${
+                                maxQty === 0 
+                                  ? "bg-red-50 border-red-200 text-red-600 cursor-not-allowed" 
+                                  : "bg-gray-50 border-black/20 hover:border-black/40 focus:border-black focus:ring-black/10 text-black"
+                              }`}
+                              disabled={maxQty === 0}
                             />
-                            <span className="text-xs text-gray-500 mt-1 block">
-                              Max: {maxQty}
-                            </span>
+                            <div className="flex items-center justify-between mt-1">
+                              <span className={`text-xs ${maxQty === 0 ? "text-red-500" : "text-gray-500"}`}>
+                                Max: {maxQty}
+                              </span>
+                              {maxQty === 0 && (
+                                <span className="text-xs text-red-600 font-medium">
+                                  Not available during selected time
+                                </span>
+                              )}
+                            </div>
                           </div>
                         );
                       })()}
@@ -502,6 +689,7 @@ export default function BorrowEquipment() {
                 type="submit"
                 disabled={processing}
               >
+                <FaPaperPlane className="w-4 h-4" />
                 {processing ? "Submitting…" : `Book ${data.items.length > 1 ? `${data.items.length} Equipment Items` : "Equipment"}`}
               </motion.button>
             </div>

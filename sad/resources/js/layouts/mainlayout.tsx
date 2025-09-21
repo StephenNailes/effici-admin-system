@@ -7,7 +7,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
   return (
     <div className="min-h-screen flex">
       <Sidebar />
-      <main className="flex-1 bg-gradient-to-br from-red-50 via-white to-red-100 p-6 ml-64">
+      <main className="flex-1 bg-white p-6 ml-64">
         <AnimatePresence mode="wait">
           <motion.div
             key={window.location.pathname}

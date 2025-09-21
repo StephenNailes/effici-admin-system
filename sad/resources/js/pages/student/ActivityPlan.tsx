@@ -18,6 +18,95 @@ import "./datepicker-theme.css"; // Import your custom theme
 
 type Category = "minor" | "normal" | "urgent";
 
+// Hoisted minimalist input components to avoid remounting on each render
+const InputWithIcon: React.FC<
+  React.InputHTMLAttributes<HTMLInputElement> & { icon: React.ReactNode }
+> = ({ icon, ...props }) => (
+  <div className="relative">
+    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-red-400">{icon}</span>
+    <input
+      {...props}
+      className="w-full pl-10 p-3 rounded-xl bg-gray-50 border border-black/20 hover:border-black/40 focus:border-black focus:ring-2 focus:ring-black/10 outline-none transition-all duration-200 placeholder:text-gray-400 text-black"
+      style={{ boxShadow: "none" }}
+    />
+  </div>
+);
+
+const TextareaWithIcon: React.FC<
+  React.TextareaHTMLAttributes<HTMLTextAreaElement> & { icon: React.ReactNode }
+> = ({ icon, ...props }) => (
+  <div className="relative">
+    <span className="absolute left-3 top-3 text-red-400">{icon}</span>
+    <textarea
+      {...props}
+      className="w-full pl-10 p-3 rounded-xl bg-gray-50 border border-black/20 hover:border-black/40 focus:border-black focus:ring-2 focus:ring-black/10 outline-none transition-all duration-200 placeholder:text-gray-400 text-black"
+      style={{ boxShadow: "none" }}
+    />
+  </div>
+);
+
+const DatePickerWithIcon: React.FC<{
+  icon: React.ReactNode;
+  selected: Date | null;
+  onChange: (date: Date | null) => void;
+  placeholder: string;
+  required?: boolean;
+}> = ({ icon, selected, onChange, placeholder, required }) => (
+  <div className="relative">
+    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-red-400 pointer-events-none">{icon}</span>
+    <DatePicker
+      selected={selected}
+      onChange={onChange}
+      showTimeSelect
+      timeFormat="HH:mm"
+      timeIntervals={15}
+      dateFormat="yyyy-MM-dd HH:mm"
+      placeholderText={placeholder}
+      className="w-full pl-10 p-3 rounded-xl bg-gray-50 border border-black/20 hover:border-black/40 focus:border-black focus:ring-2 focus:ring-black/10 outline-none transition-all duration-200 placeholder:text-gray-400 text-black"
+      required={required}
+    />
+  </div>
+);
+
+const InputNoIcon: React.FC<React.InputHTMLAttributes<HTMLInputElement>> = (
+  props
+) => (
+  <input
+    {...props}
+    className="w-full p-3 rounded-xl bg-gray-50 border border-black/20 hover:border-black/40 focus:border-black focus:ring-2 focus:ring-black/10 outline-none transition-all duration-200 placeholder:text-gray-400 text-black"
+    style={{ boxShadow: "none" }}
+  />
+);
+
+const TextareaNoIcon: React.FC<
+  React.TextareaHTMLAttributes<HTMLTextAreaElement>
+> = (props) => (
+  <textarea
+    {...props}
+    className="w-full p-3 rounded-xl bg-gray-50 border border-black/20 hover:border-black/40 focus:border-black focus:ring-2 focus:ring-black/10 outline-none transition-all duration-200 placeholder:text-gray-400 text-black"
+    style={{ boxShadow: "none" }}
+  />
+);
+
+const DatePickerNoIcon: React.FC<{
+  selected: Date | null;
+  onChange: (date: Date | null) => void;
+  placeholder: string;
+  required?: boolean;
+}> = ({ selected, onChange, placeholder, required }) => (
+  <DatePicker
+    selected={selected}
+    onChange={onChange}
+    showTimeSelect
+    timeFormat="HH:mm"
+    timeIntervals={15}
+    dateFormat="yyyy-MM-dd HH:mm"
+    placeholderText={placeholder}
+    className="w-full p-3 rounded-xl bg-gray-50 border border-black/20 hover:border-black/40 focus:border-black focus:ring-2 focus:ring-black/10 outline-none transition-all duration-200 placeholder:text-gray-400 text-black"
+    required={required}
+  />
+);
+
 export default function ActivityPlan() {
   const { data, setData, post, processing, errors } = useForm({
     activity_name: "",
@@ -41,116 +130,10 @@ export default function ActivityPlan() {
     post("/activity-plans", { preserveScroll: true });
   };
 
-  // Helper for input with icon
-  const InputWithIcon = ({
-    icon,
-    ...props
-  }: React.InputHTMLAttributes<HTMLInputElement> & { icon: React.ReactNode }) => (
-    <div className="relative">
-      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-red-400">{icon}</span>
-      <input
-        {...props}
-        className="w-full pl-10 p-3 border border-red-300 rounded-lg focus:border-red-500 focus:ring-0 outline-none transition-all duration-150 hover:border-red-400"
-        style={{ boxShadow: "none" }}
-      />
-    </div>
-  );
-
-  // Helper for textarea with icon
-  const TextareaWithIcon = ({
-    icon,
-    ...props
-  }: React.TextareaHTMLAttributes<HTMLTextAreaElement> & { icon: React.ReactNode }) => (
-    <div className="relative">
-      <span className="absolute left-3 top-3 text-red-400">{icon}</span>
-      <textarea
-        {...props}
-        className="w-full pl-10 p-3 border border-red-300 rounded-lg focus:border-red-500 focus:ring-0 outline-none transition-all duration-150 hover:border-red-400"
-        style={{ boxShadow: "none" }}
-      />
-    </div>
-  );
-
-  // Helper for datepicker with icon
-  const DatePickerWithIcon = ({
-    icon,
-    selected,
-    onChange,
-    placeholder,
-    required,
-  }: {
-    icon: React.ReactNode;
-    selected: Date | null;
-    onChange: (date: Date | null) => void;
-    placeholder: string;
-    required?: boolean;
-  }) => (
-    <div className="relative">
-      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-red-400 pointer-events-none">{icon}</span>
-      <DatePicker
-        selected={selected}
-        onChange={onChange}
-        showTimeSelect
-        timeFormat="HH:mm"
-        timeIntervals={15}
-        dateFormat="yyyy-MM-dd HH:mm"
-        placeholderText={placeholder}
-        className="w-full pl-10 p-3 border border-red-300 rounded-lg focus:border-red-500 focus:ring-0 outline-none transition-all duration-150 hover:border-red-400"
-        required={required}
-      />
-    </div>
-  );
-
-  // Helper for input without icon
-  const InputNoIcon = (
-    props: React.InputHTMLAttributes<HTMLInputElement>
-  ) => (
-    <input
-      {...props}
-      className="w-full p-3 border border-red-300 rounded-lg focus:border-red-500 focus:ring-0 outline-none transition-all duration-150 hover:border-red-400"
-      style={{ boxShadow: "none" }}
-    />
-  );
-
-  // Helper for textarea without icon
-  const TextareaNoIcon = (
-    props: React.TextareaHTMLAttributes<HTMLTextAreaElement>
-  ) => (
-    <textarea
-      {...props}
-      className="w-full p-3 border border-red-300 rounded-lg focus:border-red-500 focus:ring-0 outline-none transition-all duration-150 hover:border-red-400"
-      style={{ boxShadow: "none" }}
-    />
-  );
-
-  // Helper for datepicker without icon
-  const DatePickerNoIcon = ({
-    selected,
-    onChange,
-    placeholder,
-    required,
-  }: {
-    selected: Date | null;
-    onChange: (date: Date | null) => void;
-    placeholder: string;
-    required?: boolean;
-  }) => (
-    <DatePicker
-      selected={selected}
-      onChange={onChange}
-      showTimeSelect
-      timeFormat="HH:mm"
-      timeIntervals={15}
-      dateFormat="yyyy-MM-dd HH:mm"
-      placeholderText={placeholder}
-      className="w-full p-3 border border-red-300 rounded-lg focus:border-red-500 focus:ring-0 outline-none transition-all duration-150 hover:border-red-400"
-      required={required}
-    />
-  );
 
   return (
     <MainLayout>
-      <div className="p-6 font-poppins min-h-screen text-black bg-gradient-to-br from-red-50 via-white to-red-100">
+      <div className="p-6 font-poppins min-h-screen text-black bg-white">
         {/* Header */}
         <div className="mb-8 flex flex-col gap-1">
           <h1 className="text-3xl font-bold text-red-600 tracking-tight">
@@ -262,7 +245,7 @@ export default function ActivityPlan() {
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
               type="button"
-              className="px-6 py-3 rounded-xl font-semibold text-white bg-blue-600 hover:bg-blue-700 flex items-center gap-2 border border-blue-700"
+              className="px-6 py-3 rounded-xl font-semibold text-white bg-blue-600 hover:bg-blue-700 flex items-center gap-2"
               onClick={() => {
                 // Add your preview logic here
                 alert("Preview document feature coming soon!");

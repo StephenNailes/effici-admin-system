@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
+import { motion } from "framer-motion";
 import MainLayout from "@/layouts/mainlayout";
-import { Download, FileText, Check, X, ArrowLeft, Calendar, Users, MapPin } from "lucide-react";
+import { Download, Maximize2, Check, X, ArrowLeft, Calendar, Users, MapPin } from "lucide-react";
 import axios from "axios";
 import { router } from "@inertiajs/react";
 
@@ -22,7 +23,8 @@ export default function ActivityPlanApproval({ id }: Props) {
       student_name: "Stephen Nailes",
       organization: "Computer Science Society",
       event_date: "July 15, 2025 • 9:00 AM - 5:00 PM",
-      description: "To bring together tech enthusiasts, industry experts, and students for a day of learning, networking, and innovation sharing.",
+      description:
+        "To bring together tech enthusiasts, industry experts, and students for a day of learning, networking, and innovation sharing.",
       priority: "Normal",
       approval_status: "pending",
       submitted_at: "2025-05-02T10:30:00Z",
@@ -30,11 +32,12 @@ export default function ActivityPlanApproval({ id }: Props) {
         {
           author: "Sarah Admin",
           date: "2 days ago",
-          text: "Please provide more details about the technical workshop speakers and their topics."
-        }
-      ]
+          text:
+            "Please provide more details about the technical workshop speakers and their topics.",
+        },
+      ],
     };
-    
+
     setActivityPlan(dummyData);
     setLoading(false);
 
@@ -96,10 +99,25 @@ export default function ActivityPlanApproval({ id }: Props) {
 
   return (
     <MainLayout>
-      <div className="min-h-screen bg-gray-50 font-poppins">
+      <motion.div
+        className="min-h-screen font-poppins"
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.35, ease: "easeOut" }}
+      >
         {/* Header */}
-        <div className="bg-white border-b border-gray-200 px-6 py-4">
-          <div className="flex items-center gap-4">
+        <motion.div
+          className="px-6 py-4"
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, ease: "easeOut" }}
+        >
+          <motion.div
+            className="rounded-xl shadow-lg bg-white border border-gray-200 p-6 flex items-center gap-4"
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4, ease: "easeOut" }}
+          >
             <button
               onClick={() => router.visit('/admin/requests')}
               className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
@@ -107,36 +125,60 @@ export default function ActivityPlanApproval({ id }: Props) {
               <ArrowLeft className="w-5 h-5 text-gray-600" />
             </button>
             <div className="flex-1">
-              <h1 className="text-2xl font-bold text-gray-900">{activityPlan.title}</h1>
-              <p className="text-sm text-gray-600 mt-1">
-                Submitted by {activityPlan.student_name} • 
-                <span className={`ml-2 inline-flex px-2 py-1 rounded-full text-xs font-semibold ${
-                  activityPlan.approval_status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                  activityPlan.approval_status === 'approved' ? 'bg-green-100 text-green-800' :
-                  'bg-red-100 text-red-800'
-                }`}>
-                  {activityPlan.approval_status === "revision_requested" ? "Under Revision" : activityPlan.approval_status}
+              <h1 className="text-2xl font-bold text-gray-900 mb-1">{activityPlan.title}</h1>
+              <div className="flex items-center gap-2 text-sm text-gray-600">
+                <span>Submitted by {activityPlan.student_name}</span>
+                <span
+                  className={`inline-flex px-2 py-1 rounded-full text-xs font-semibold ${
+                    activityPlan.approval_status === 'pending'
+                      ? 'bg-yellow-100 text-yellow-800'
+                      : activityPlan.approval_status === 'approved'
+                      ? 'bg-green-100 text-green-800'
+                      : 'bg-red-100 text-red-800'
+                  }`}
+                >
+                  {activityPlan.approval_status === 'revision_requested'
+                    ? 'Under Revision'
+                    : activityPlan.approval_status}
                 </span>
-                <span className="ml-2 text-gray-500">{activityPlan.submitted_at ? new Date(activityPlan.submitted_at).toLocaleDateString() : 'May 2, 2025'}</span>
-              </p>
+                <span className="text-gray-500">
+                  {activityPlan.submitted_at
+                    ? new Date(activityPlan.submitted_at).toLocaleDateString()
+                    : 'May 2, 2025'}
+                </span>
+              </div>
             </div>
-            <div className={`px-3 py-1 rounded-full text-sm font-semibold ${
-              activityPlan.priority?.toLowerCase() === 'urgent' ? 'bg-red-100 text-red-800' :
-              activityPlan.priority?.toLowerCase() === 'normal' ? 'bg-blue-100 text-blue-800' :
-              'bg-green-100 text-green-800'
-            }`}>
+            <div
+              className={`px-3 py-1 rounded-full text-sm font-semibold ${
+                activityPlan.priority?.toLowerCase() === 'urgent'
+                  ? 'bg-red-100 text-red-800'
+                  : activityPlan.priority?.toLowerCase() === 'normal'
+                  ? 'bg-blue-100 text-blue-800'
+                  : 'bg-green-100 text-green-800'
+              }`}
+            >
               {activityPlan.priority}
             </div>
-          </div>
-        </div>
+          </motion.div>
+        </motion.div>
 
         {/* Main Content */}
-        <div className="flex flex-1">
+        <div className="flex flex-1 pb-8">
           {/* Left Side - Document Viewer */}
           <div className="flex-1 p-6">
-            <div className="bg-white rounded-lg shadow-sm h-full">
+            <motion.div
+              className="bg-white rounded-lg shadow-xl h-full min-h-[800px]"
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4, ease: "easeOut" }}
+            >
               {/* Document Header */}
-              <div className="border-b border-gray-200 p-4">
+              <motion.div
+                className="border-b border-gray-200 p-4"
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.4, ease: "easeOut" }}
+              >
                 <div className="flex items-center justify-between">
                   <h2 className="text-lg font-semibold text-gray-900">Activity Plan Request</h2>
                   <div className="flex items-center gap-2">
@@ -144,23 +186,32 @@ export default function ActivityPlanApproval({ id }: Props) {
                       <Download className="w-4 h-4" />
                       Download
                     </button>
-                    <button className="flex items-center gap-1 text-sm text-gray-600 hover:text-gray-800 transition-colors">
-                      <FileText className="w-4 h-4" />
-                      Fullscreen
+                    <button
+                      className="flex items-center gap-1 text-sm text-gray-600 hover:text-gray-800 transition-colors"
+                      aria-label="Fullscreen"
+                    >
+                      <Maximize2 className="w-4 h-4" />
                     </button>
                   </div>
                 </div>
-              </div>
+              </motion.div>
 
-              {/* Document Preview - Matching the exact image layout */}
+              {/* Document Preview */}
               <div className="p-6 h-full overflow-y-auto">
-                <div className="bg-white border rounded-lg p-8 shadow-inner min-h-[700px]" style={{ 
-                  backgroundImage: 'url("data:image/svg+xml,%3Csvg width="20" height="20" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"%3E%3Cg fill="%23f3f4f6" fill-opacity="0.4"%3E%3Ccircle cx="3" cy="3" r="1"/%3E%3C/g%3E%3C/svg%3E")',
-                }}>
+                <motion.div
+                  className="bg-white border rounded-lg p-8 shadow-inner min-h-[700px]"
+                  style={{
+                    backgroundImage:
+                      'url("data:image/svg+xml,%3Csvg width=\\"20\\" height=\\"20\\" viewBox=\\"0 0 20 20\\" xmlns=\\"http://www.w3.org/2000/svg\\"%3E%3Cg fill=\\"%23f3f4f6\\" fill-opacity=\\"0.4\\"%3E%3Ccircle cx=\\"3\\" cy=\\"3\\" r=\\"1\\"/%3E%3C/g%3E%3C/svg%3E")',
+                  }}
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.4, ease: "easeOut" }}
+                >
                   {/* Document Header with Logo */}
                   <div className="flex items-start gap-4 mb-8 pb-4 border-b border-pink-200">
                     <div className="w-16 h-16 bg-pink-100 rounded-lg flex items-center justify-center">
-                      <div className="w-8 h-8 bg-pink-500 rounded"></div>
+                      <div className="w-8 h-8 bg-pink-500 rounded" />
                     </div>
                     <div className="flex-1">
                       <h3 className="text-lg font-bold text-pink-600 mb-1">University of the Immaculate Conception</h3>
@@ -219,97 +270,58 @@ export default function ActivityPlanApproval({ id }: Props) {
                       <h4 className="text-md font-semibold text-gray-800 mb-3 pb-1 border-b border-gray-200">Expected Participants</h4>
                       <p className="text-sm text-gray-900">Approximately 200-300 students, faculty members, and industry professionals</p>
                     </div>
-
-                    {/* Budget Requirements */}
-                    <div>
-                      <h4 className="text-md font-semibold text-gray-800 mb-3 pb-1 border-b border-gray-200">Budget Requirements</h4>
-                      <div className="text-sm text-gray-900">
-                        <div className="flex justify-between py-1">
-                          <span>Venue Setup</span>
-                          <span>₱15,000</span>
-                        </div>
-                        <div className="flex justify-between py-1">
-                          <span>Speaker Honorarium</span>
-                          <span>₱25,000</span>
-                        </div>
-                        <div className="flex justify-between py-1">
-                          <span>Materials & Supplies</span>
-                          <span>₱8,000</span>
-                        </div>
-                        <div className="flex justify-between py-1">
-                          <span>Refreshments</span>
-                          <span>₱12,000</span>
-                        </div>
-                        <div className="flex justify-between py-1 font-medium border-t border-gray-200 pt-2">
-                          <span>Total</span>
-                          <span>₱60,000</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Signatures */}
-                    <div className="mt-12 pt-8 border-t border-gray-200">
-                      <div className="grid grid-cols-2 gap-8 text-sm">
-                        <div>
-                          <p className="font-medium text-gray-700 mb-4">Prepared by:</p>
-                          <div className="border-b border-gray-400 mb-2 h-8"></div>
-                          <p className="text-center font-medium">{activityPlan.student_name}</p>
-                          <p className="text-center text-gray-600">Student Organizer</p>
-                        </div>
-                        <div>
-                          <p className="font-medium text-gray-700 mb-4">Approved by:</p>
-                          <div className="border-b border-gray-400 mb-2 h-8"></div>
-                          <p className="text-center font-medium">_________________</p>
-                          <p className="text-center text-gray-600">Admin Assistant</p>
-                        </div>
-                      </div>
-                    </div>
                   </div>
-                </div>
+                </motion.div>
               </div>
-            </div>
+            </motion.div>
           </div>
 
           {/* Right Side - Details & Actions */}
           <div className="w-96 p-6">
             <div className="space-y-6">
               {/* Event Details Card */}
-              <div className="bg-white rounded-lg shadow-sm p-4">
+              <motion.div
+                className="bg-white rounded-lg shadow-lg p-4"
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.4, ease: "easeOut" }}
+              >
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">Event Details</h3>
-                <div className="space-y-3">
-                  <div className="flex items-start gap-3">
-                    <Users className="w-5 h-5 text-gray-400 mt-0.5" />
-                    <div>
-                      <p className="text-sm font-medium text-gray-700">Organization</p>
-                      <p className="text-gray-900">{activityPlan.organization}</p>
-                    </div>
+                <div className="space-y-3 text-sm">
+                  <div className="flex items-center gap-2 text-gray-700">
+                    <Calendar className="w-4 h-4 text-red-600" />
+                    <span>{activityPlan.event_date}</span>
                   </div>
-                  <div className="flex items-start gap-3">
-                    <Calendar className="w-5 h-5 text-gray-400 mt-0.5" />
-                    <div>
-                      <p className="text-sm font-medium text-gray-700">Date & Time</p>
-                      <p className="text-gray-900">{activityPlan.event_date}</p>
-                    </div>
+                  <div className="flex items-center gap-2 text-gray-700">
+                    <Users className="w-4 h-4 text-red-600" />
+                    <span>{activityPlan.organization}</span>
                   </div>
-                  <div className="flex items-start gap-3">
-                    <MapPin className="w-5 h-5 text-gray-400 mt-0.5" />
-                    <div>
-                      <p className="text-sm font-medium text-gray-700">Venue</p>
-                      <p className="text-gray-900">University Auditorium</p>
-                    </div>
+                  <div className="flex items-center gap-2 text-gray-700">
+                    <MapPin className="w-4 h-4 text-red-600" />
+                    <span>University Auditorium</span>
                   </div>
                 </div>
-              </div>
+              </motion.div>
 
               {/* Description Card */}
-              <div className="bg-white rounded-lg shadow-sm p-4">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Description</h3>
-                <p className="text-gray-700 text-sm leading-relaxed">{activityPlan.description}</p>
-              </div>
+              <motion.div
+                className="bg-white rounded-lg shadow-lg p-4"
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.4, ease: "easeOut" }}
+              >
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">Description</h3>
+                <p className="text-sm text-gray-800 leading-relaxed">{activityPlan.description}</p>
+              </motion.div>
 
               {/* Actions Card */}
               {activityPlan.approval_status === 'pending' && (
-                <div className="bg-white rounded-lg shadow-sm p-4">
+                <motion.div
+                  className="bg-white rounded-lg shadow-lg p-4"
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.4, ease: "easeOut" }}
+                >
                   <h3 className="text-lg font-semibold text-gray-900 mb-4">Actions</h3>
                   <div className="space-y-3">
                     <button
@@ -320,7 +332,7 @@ export default function ActivityPlanApproval({ id }: Props) {
                       <Check className="w-4 h-4" />
                       {submitting ? 'Processing...' : 'Approve Request'}
                     </button>
-                    
+
                     <button
                       onClick={handleRevision}
                       disabled={submitting}
@@ -330,18 +342,23 @@ export default function ActivityPlanApproval({ id }: Props) {
                       {submitting ? 'Processing...' : 'Request Revision'}
                     </button>
                   </div>
-                </div>
+                </motion.div>
               )}
 
               {/* Comments/Remarks Card */}
-              <div className="bg-white rounded-lg shadow-sm p-4">
+              <motion.div
+                className="bg-white rounded-lg shadow-lg p-4"
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.4, ease: "easeOut" }}
+              >
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">Comments</h3>
-                
+
                 {/* Previous Comments */}
                 {activityPlan.comments && activityPlan.comments.length > 0 && (
                   <div className="mb-4">
                     {activityPlan.comments.map((comment: any, index: number) => (
-                      <div key={index} className="bg-gray-50 rounded p-3 mb-3">
+                      <div key={index} className="bg-white rounded p-3 mb-3 shadow-md border border-gray-100">
                         <div className="flex items-center gap-2 mb-1">
                           <div className="w-6 h-6 bg-gray-400 rounded-full flex items-center justify-center">
                             <span className="text-xs text-white font-medium">
@@ -351,7 +368,7 @@ export default function ActivityPlanApproval({ id }: Props) {
                           <span className="font-medium text-gray-900 text-sm">{comment.author}</span>
                           <span className="text-xs text-gray-500">{comment.date}</span>
                         </div>
-                        <p className="text-gray-700 text-sm">{comment.text}</p>
+                        <p className="text-black text-sm">{comment.text}</p>
                       </div>
                     ))}
                   </div>
@@ -359,31 +376,20 @@ export default function ActivityPlanApproval({ id }: Props) {
 
                 {/* Add Comment */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Add your comment
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Add your comment</label>
                   <textarea
-                    className="w-full border border-gray-300 rounded p-3 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                    className="w-full border border-gray-300 rounded p-3 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none text-black placeholder:text-gray-400 outline-none"
                     placeholder="Add remarks or feedback..."
                     value={remarks}
                     onChange={(e) => setRemarks(e.target.value)}
                     rows={4}
                   />
                 </div>
-              </div>
-
-              {/* Download Actions */}
-              <div className="bg-white rounded-lg shadow-sm p-4">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Downloads</h3>
-                <button className="w-full flex items-center justify-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
-                  <Download className="w-4 h-4" />
-                  Download All Files
-                </button>
-              </div>
+              </motion.div>
             </div>
           </div>
         </div>
-      </div>
+      </motion.div>
     </MainLayout>
   );
 }
