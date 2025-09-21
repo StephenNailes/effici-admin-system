@@ -24,7 +24,8 @@ class ActivityPlanController extends Controller
             'activity_location' => 'nullable|string',
         ]);
 
-        DB::transaction(function () use ($validated) {
+        $plan = null;
+        DB::transaction(function () use ($validated, &$plan) {
             $plan = ActivityPlan::create([
                 'user_id'          => auth()->id(),
                 'activity_name' => $validated['activity_name'],

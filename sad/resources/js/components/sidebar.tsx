@@ -10,11 +10,14 @@ import {
   FaChevronDown,
   FaClipboardList, // Add for Activity Plan
   FaToolbox,       // Add for Borrow Equipment
+  FaChartBar,      // Add for Analytics Dashboard
+  FaBell,          // Add for Notifications
 } from 'react-icons/fa';
 import { usePage, Link } from '@inertiajs/react';
 import { Inertia } from '@inertiajs/inertia';
 import { ReactElement, useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import NotificationPanel from '@/components/NotificationPanel';
 
 type UserRole = 'student' | 'admin_assistant' | 'dean';
 
@@ -46,6 +49,7 @@ export default function Sidebar() {
 
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
+  const [notificationPanelOpen, setNotificationPanelOpen] = useState(false);
 
   // Store requestOpen state in localStorage to persist across navigation
   const [requestOpen, setRequestOpen] = useState(() => {
@@ -72,10 +76,16 @@ export default function Sidebar() {
       if (dropdownRef.current && !(dropdownRef.current as any).contains(event.target)) {
         setDropdownOpen(false);
       }
+      
+      // Handle notification panel click outside
+      const notificationPanel = document.querySelector('[data-external-notification-panel]');
+      if (notificationPanelOpen && notificationPanel && !notificationPanel.contains(event.target as Node)) {
+        setNotificationPanelOpen(false);
+      }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+  }, [notificationPanelOpen]);
 
   // ✅ Menu Items (use Laravel route() helper to match backend routes)
   const menuItems: Record<UserRole, MenuItem[]> = {
@@ -102,6 +112,7 @@ export default function Sidebar() {
     dean: [
       { name: 'Home', href: route('dean.dashboard'), icon: <FaHome /> },
       { name: 'Requests', href: route('dean.requests'), icon: <FaFileAlt /> },
+      { name: 'Analytics', href: route('dean.analytics'), icon: <FaChartBar /> },
       { name: 'Activity History', href: route('dean.activity-history'), icon: <FaChartLine /> },
     ],
   };
@@ -269,11 +280,22 @@ export default function Sidebar() {
                 <Link
                   href="/profile"
                   className="flex items-center gap-2 px-5 py-3 hover:bg-gray-100 transition"
-                  onClick={() => setDropdownOpen(false)} // 👈 Add this line
+                  onClick={() => setDropdownOpen(false)}
                 >
                   <FaUser className="text-sm" />
                   <span>Profile</span>
                 </Link>
+                <button
+                  className="flex w-full items-center gap-2 px-5 py-3 hover:bg-gray-100 transition"
+                  onClick={() => {
+                    setDropdownOpen(false);
+                    // Small delay to let dropdown close animation finish
+                    setTimeout(() => setNotificationPanelOpen(true), 200);
+                  }}
+                >
+                  <FaBell className="text-sm" />
+                  <span>Notifications</span>
+                </button>
                 <hr className="border-t border-gray-200 my-1" />
                 <button
                   className="flex w-full items-center gap-2 px-5 py-3 hover:bg-red-50 transition"
@@ -288,6 +310,12 @@ export default function Sidebar() {
               </motion.div>
             )}
           </AnimatePresence>
+
+          {/* Notification Panel - Outside of dropdown */}
+          <NotificationPanel 
+            isOpen={notificationPanelOpen} 
+            onClose={() => setNotificationPanelOpen(false)}
+          />
         </div>
       </aside>
 

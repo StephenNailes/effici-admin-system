@@ -154,6 +154,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Equipment Management API for admin
     Route::get('/api/equipment-requests/manage', [EquipmentRequestController::class, 'manage']);
     Route::patch('/api/equipment-requests/{id}/status', [EquipmentRequestController::class, 'updateStatus']);
+    
+    // Notification API routes
+    Route::get('/api/notifications', [App\Http\Controllers\NotificationController::class, 'index']);
+    Route::post('/api/notifications/{id}/read', [App\Http\Controllers\NotificationController::class, 'markAsRead']);
+    Route::post('/api/notifications/mark-all-read', [App\Http\Controllers\NotificationController::class, 'markAllAsRead']);
+    Route::get('/api/notifications/unread-count', [App\Http\Controllers\NotificationController::class, 'getUnreadCount']);
 });
 
 // 🟩 Admin + Dean Request Pages
@@ -162,6 +168,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/admin/activity-plan-approval/{id}', fn ($id) => Inertia::render('admin_assistant/ActivityPlanApproval', ['id' => $id]))->name('admin.activity-plan-approval');
     Route::get('/admin/equipment-management', fn () => Inertia::render('admin_assistant/EquipmentManagement'))->name('admin.equipment-management');
     Route::get('/dean/requests', fn () => Inertia::render('dean/request'))->name('dean.requests');
+    Route::get('/dean/activity-plan-approval/{id}', [App\Http\Controllers\NotificationController::class, 'showActivityPlanApproval'])->name('dean.activity-plan-approval');
+    Route::get('/dean/analytics', [App\Http\Controllers\AnalyticsController::class, 'index'])->name('dean.analytics');
 
     Route::get('/admin/activity-history', fn () => Inertia::render('admin_assistant/ActivityHistory'))
         ->name('admin.activity-history');
