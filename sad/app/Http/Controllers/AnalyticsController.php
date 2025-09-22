@@ -25,12 +25,12 @@ class AnalyticsController extends Controller
             default => $endDate->copy()->subMonths(6)
         };
 
-        // Get analytics data
+        // Get analytics data for dean role
         $analyticsData = [
-            'monthlyApprovalRates' => $this->getMonthlyApprovalRates($startDate, $endDate),
-            'timeToApproval' => $this->getTimeToApprovalStats($startDate, $endDate),
+            'monthlyApprovalRates' => $this->getMonthlyApprovalRates($startDate, $endDate, 'dean'),
+            'timeToApproval' => $this->getTimeToApprovalStats($startDate, $endDate, 'dean'),
             'seasonalPatterns' => $this->getSeasonalPatterns(),
-            'summaryStats' => $this->getSummaryStats($startDate, $endDate),
+            'summaryStats' => $this->getSummaryStats($startDate, $endDate, 'dean'),
         ];
 
         return Inertia::render('dean/analytics', [
@@ -39,9 +39,37 @@ class AnalyticsController extends Controller
         ]);
     }
 
-    private function getMonthlyApprovalRates($startDate, $endDate)
+    public function adminAssistantIndex(Request $request)
     {
-        $monthlyData = RequestApproval::where('approver_role', 'dean')
+        // Get time range parameter (default to last 6 months)
+        $timeRange = $request->get('timeRange', 'last6months');
+        
+        // Calculate date range based on selection
+        $endDate = Carbon::now();
+        $startDate = match($timeRange) {
+            'last3months' => $endDate->copy()->subMonths(3),
+            'last6months' => $endDate->copy()->subMonths(6),
+            'lastyear' => $endDate->copy()->subYear(),
+            default => $endDate->copy()->subMonths(6)
+        };
+
+        // Get analytics data for admin_assistant role
+        $analyticsData = [
+            'monthlyApprovalRates' => $this->getMonthlyApprovalRates($startDate, $endDate, 'admin_assistant'),
+            'timeToApproval' => $this->getTimeToApprovalStats($startDate, $endDate, 'admin_assistant'),
+            'seasonalPatterns' => $this->getSeasonalPatterns(),
+            'summaryStats' => $this->getSummaryStats($startDate, $endDate, 'admin_assistant'),
+        ];
+
+        return Inertia::render('admin_assistant/analytics', [
+            'analyticsData' => $analyticsData,
+            'timeRange' => $timeRange
+        ]);
+    }
+
+    private function getMonthlyApprovalRates($startDate, $endDate, $role = 'dean')
+    {
+        $monthlyData = RequestApproval::where('approver_role', $role)
             ->where('request_type', 'activity_plan')
             ->whereBetween('created_at', [$startDate, $endDate])
             ->select([
@@ -77,9 +105,9 @@ class AnalyticsController extends Controller
         return $result;
     }
 
-    private function getTimeToApprovalStats($startDate, $endDate)
+    private function getTimeToApprovalStats($startDate, $endDate, $role = 'dean')
     {
-        $approvedRequests = RequestApproval::where('approver_role', 'dean')
+        $approvedRequests = RequestApproval::where('approver_role', $role)
             ->where('request_type', 'activity_plan')
             ->where('status', 'approved')
             ->whereBetween('created_at', [$startDate, $endDate])
@@ -163,21 +191,21 @@ class AnalyticsController extends Controller
     }
 
 
-    private function getSummaryStats($startDate, $endDate)
+    private function getSummaryStats($startDate, $endDate, $role = 'dean')
     {
         // Current period data
-        $totalSubmissions = RequestApproval::where('approver_role', 'dean')
+        $totalSubmissions = RequestApproval::where('approver_role', $role)
             ->where('request_type', 'activity_plan')
             ->whereBetween('created_at', [$startDate, $endDate])
             ->count();
             
-        $totalApproved = RequestApproval::where('approver_role', 'dean')
+        $totalApproved = RequestApproval::where('approver_role', $role)
             ->where('request_type', 'activity_plan')
             ->where('status', 'approved')
             ->whereBetween('created_at', [$startDate, $endDate])
             ->count();
             
-        $totalRevisionRequested = RequestApproval::where('approver_role', 'dean')
+        $totalRevisionRequested = RequestApproval::where('approver_role', $role)
             ->where('request_type', 'activity_plan')
             ->where('status', 'revision_requested')
             ->whereBetween('created_at', [$startDate, $endDate])
@@ -190,12 +218,12 @@ class AnalyticsController extends Controller
         $previousStartDate = $startDate->copy()->subDays($periodDiff);
         $previousEndDate = $startDate->copy()->subDay();
         
-        $previousSubmissions = RequestApproval::where('approver_role', 'dean')
+        $previousSubmissions = RequestApproval::where('approver_role', $role)
             ->where('request_type', 'activity_plan')
             ->whereBetween('created_at', [$previousStartDate, $previousEndDate])
             ->count();
             
-        $previousApproved = RequestApproval::where('approver_role', 'dean')
+        $previousApproved = RequestApproval::where('approver_role', $role)
             ->where('request_type', 'activity_plan')
             ->where('status', 'approved')
             ->whereBetween('created_at', [$previousStartDate, $previousEndDate])

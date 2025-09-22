@@ -171,6 +171,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/admin/requests', fn () => Inertia::render('admin_assistant/request'))->name('admin.requests');
     Route::get('/admin/activity-plan-approval/{id}', fn ($id) => Inertia::render('admin_assistant/ActivityPlanApproval', ['id' => $id]))->name('admin.activity-plan-approval');
     Route::get('/admin/equipment-management', fn () => Inertia::render('admin_assistant/EquipmentManagement'))->name('admin.equipment-management');
+    Route::get('/admin/analytics', [App\Http\Controllers\AnalyticsController::class, 'adminAssistantIndex'])->name('admin_assistant.analytics');
     Route::get('/dean/requests', fn () => Inertia::render('dean/request'))->name('dean.requests');
     Route::get('/dean/activity-plan-approval/{id}', [App\Http\Controllers\NotificationController::class, 'showActivityPlanApproval'])->name('dean.activity-plan-approval');
     Route::get('/dean/analytics', [App\Http\Controllers\AnalyticsController::class, 'index'])->name('dean.analytics');

@@ -179,6 +179,7 @@ export default function Sidebar() {
       { name: 'Home', href: route('admin.dashboard'), icon: <FaHome /> },
       { name: 'Requests', href: route('admin.requests'), icon: <FaFileAlt /> },
       { name: 'Equipment Management', href: route('admin.equipment-management'), icon: <FaToolbox /> },
+      { name: 'Analytics', href: route('admin_assistant.analytics'), icon: <FaChartBar /> },
       { name: 'Activity History', href: route('admin.activity-history'), icon: <FaChartLine /> },
     ],
     dean: [
