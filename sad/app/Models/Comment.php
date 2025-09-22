@@ -8,7 +8,7 @@ class Comment extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['user_id', 'commentable_id', 'commentable_type', 'text'];
+    protected $fillable = ['user_id', 'commentable_id', 'commentable_type', 'text', 'parent_id'];
 
     public function user()
     {
@@ -18,5 +18,22 @@ class Comment extends Model
     public function commentable()
     {
         return $this->morphTo();
+    }
+
+    // Support for replies
+    public function parent()
+    {
+        return $this->belongsTo(Comment::class, 'parent_id');
+    }
+
+    public function replies()
+    {
+        return $this->hasMany(Comment::class, 'parent_id')->with('user');
+    }
+
+    // Check if this is a reply
+    public function isReply()
+    {
+        return !is_null($this->parent_id);
     }
 }

@@ -16,6 +16,7 @@ use App\Http\Controllers\EquipmentController;
 use App\Http\Controllers\EquipmentRequestController;
 use App\Http\Controllers\DocumentController;
 use App\Http\Controllers\CommentController;
+use App\Http\Controllers\LikeController;
 use App\Http\Controllers\ApprovalController;
 use App\Http\Controllers\RevisionController;
 use App\Http\Controllers\EventController;
@@ -209,6 +210,14 @@ Route::middleware(['auth', 'verified'])->group(function () {
 Route::middleware('auth')->group(function () {
     Route::post('/comments', [CommentController::class, 'store'])->name('comments.store');
     Route::get('/comments/{type}/{id}', [CommentController::class, 'index'])->name('comments.index');
+    Route::put('/comments/{id}', [CommentController::class, 'update'])->name('comments.update');
+    Route::delete('/comments/{id}', [CommentController::class, 'destroy'])->name('comments.destroy');
+});
+
+// 🟩 Likes
+Route::middleware('auth')->group(function () {
+    Route::post('/likes/toggle', [LikeController::class, 'toggle'])->name('likes.toggle');
+    Route::get('/likes/{type}/{id}', [LikeController::class, 'show'])->name('likes.show');
 });
 
 // 🔄 Include extra route files if needed

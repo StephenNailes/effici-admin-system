@@ -12,32 +12,25 @@ export default function Modal({ open, onClose, children }: ModalProps) {
     <AnimatePresence>
       {open && (
         <motion.div
-          className="fixed inset-0 z-50 flex items-center justify-center"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
         >
+          {/* Enhanced backdrop with blur effect */}
           <div
-            className="absolute inset-0 backdrop-blur bg-white/10"
+            className="absolute inset-0 backdrop-blur-sm bg-black/30"
             onClick={onClose}
           />
+          
+          {/* Modal content container */}
           <motion.div
-            className="relative bg-white rounded-2xl shadow-xl p-8 w-full max-w-lg mx-auto z-10"
+            className="relative z-10 w-full max-w-3xl"
             initial={{ scale: 0.95, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0.95, opacity: 0 }}
             transition={{ type: 'spring', stiffness: 300, damping: 30 }}
           >
-            <button
-              className="absolute top-4 right-4 text-gray-400 hover:text-red-600 transition"
-              onClick={onClose}
-              aria-label="Close"
-            >
-              <svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2">
-                <line x1="6" y1="6" x2="18" y2="18" />
-                <line x1="6" y1="18" x2="18" y2="6" />
-              </svg>
-            </button>
             {children}
           </motion.div>
         </motion.div>

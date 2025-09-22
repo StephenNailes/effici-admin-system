@@ -1,7 +1,7 @@
   // resources/js/Pages/Announcements/ViewAllAnnouncements.tsx
 
 import MainLayout from '@/layouts/mainlayout';
-import { Megaphone, MessageCircle, MoreHorizontal, Plus, ArrowLeft, Edit, Trash2, Bookmark } from 'lucide-react';
+import { Megaphone, MessageCircle, MoreHorizontal, Plus, ArrowLeft, Edit, Trash2, Bookmark, Heart } from 'lucide-react';
 import CommentSection from '@/components/CommentSection';
 import Modal from '@/components/Modal';
 import { useEffect, useState, useRef } from 'react';
@@ -25,6 +25,7 @@ interface Announcement {
 }
 
 interface User {
+  id: number;
   first_name: string;
   last_name: string;
   avatarUrl?: string;
@@ -33,8 +34,9 @@ interface User {
 interface Comment {
   id: number;
   text: string;
-  date: string;
+  created_at: string;
   user: User;
+  replies?: Comment[];
 }
 
 type AuthUser = {
@@ -85,6 +87,9 @@ export default function ViewAllAnnouncements() {
   const [deleteAnnouncementId, setDeleteAnnouncementId] = useState<number | null>(null);
   // Per-announcement refs for precise outside-click handling
   const dropdownRefs = useRef<Record<number, HTMLDivElement | null>>({});
+  
+  // Like functionality state
+  const [likes, setLikes] = useState<Record<number, { liked: boolean; count: number }>>({});
 
   useEffect(() => {
     if (modalAnnouncementId !== null) {
@@ -128,28 +133,104 @@ export default function ViewAllAnnouncements() {
 
   const addComment = async (
     announcementId: number,
-    payload: { commentable_id: number; commentable_type: string; text: string }
+    payload: { commentable_id: number; commentable_type: string; text: string; parent_id?: number }
   ) => {
     try {
       const res = await axios.post('/comments', payload);
-      const savedComment: Comment = res.data.comment;
-
+      
+      // Reload all comments to get the updated structure with replies
+      const commentsRes = await axios.get(`/comments/announcements/${announcementId}`);
+      const commentArr = Array.isArray(commentsRes.data)
+        ? commentsRes.data
+        : Array.isArray(commentsRes.data.comments)
+          ? commentsRes.data.comments
+          : [];
+      
       setComments((prev) => ({
         ...prev,
-        [announcementId]: [...(prev[announcementId] || []), savedComment],
+        [announcementId]: commentArr,
       }));
     } catch (error) {
       console.error('Failed to add comment:', error);
     }
   };
 
-  const editComment = (announcementId: number, commentId: number, newText: string) => {
-    setComments((prev) => {
-      const updated = (prev[announcementId] || []).map((c) =>
-        c.id === commentId ? { ...c, text: newText } : c
-      );
-      return { ...prev, [announcementId]: updated };
-    });
+  const toggleLike = async (announcementId: number) => {
+    try {
+      const res = await axios.post('/likes/toggle', {
+        likeable_id: announcementId,
+        likeable_type: 'announcements',
+      });
+
+      setLikes((prev) => ({
+        ...prev,
+        [announcementId]: {
+          liked: res.data.liked,
+          count: res.data.likes_count,
+        },
+      }));
+    } catch (error) {
+      console.error('Failed to toggle like:', error);
+    }
+  };
+
+  // Load likes and comments for all announcements on component mount
+  useEffect(() => {
+    const loadLikesAndComments = async () => {
+      for (const announcement of filtered) {
+        try {
+          // Load likes
+          const likesRes = await axios.get(`/likes/announcements/${announcement.id}`);
+          setLikes((prev) => ({
+            ...prev,
+            [announcement.id]: {
+              liked: likesRes.data.liked,
+              count: likesRes.data.likes_count,
+            },
+          }));
+
+          // Load comments
+          const commentsRes = await axios.get(`/comments/announcements/${announcement.id}`);
+          const commentArr = Array.isArray(commentsRes.data)
+            ? commentsRes.data
+            : Array.isArray(commentsRes.data.comments)
+              ? commentsRes.data.comments
+              : [];
+          
+          setComments((prev) => ({
+            ...prev,
+            [announcement.id]: commentArr,
+          }));
+        } catch (error) {
+          console.error('Failed to load likes or comments:', error);
+        }
+      }
+    };
+    
+    if (filtered.length > 0) {
+      loadLikesAndComments();
+    }
+  }, [filtered]);
+
+  const editComment = async (announcementId: number, commentId: number, newText: string) => {
+    try {
+      await axios.put(`/comments/${commentId}`, { text: newText });
+      
+      // Reload comments to get updated data
+      const commentsRes = await axios.get(`/comments/announcements/${announcementId}`);
+      const commentArr = Array.isArray(commentsRes.data)
+        ? commentsRes.data
+        : Array.isArray(commentsRes.data.comments)
+          ? commentsRes.data.comments
+          : [];
+      
+      setComments((prev) => ({
+        ...prev,
+        [announcementId]: commentArr,
+      }));
+    } catch (error) {
+      console.error('Failed to edit comment:', error);
+    }
   };
 
   const handleEdit = (announcementId: number) => {
@@ -340,7 +421,28 @@ export default function ViewAllAnnouncements() {
                     <h3 className="mb-2 line-clamp-2 text-lg font-semibold text-gray-900">{a.title}</h3>
                     <p className="mb-4 line-clamp-3 text-sm leading-6 text-gray-600">{a.description}</p>
                   </div>
-                  <div className="flex items-center border-t pt-3">
+                  <div className="flex items-center justify-between border-t pt-3">
+                    {/* Like Button */}
+                    <button
+                      className="inline-flex items-center gap-2 text-sm font-medium text-gray-500 transition-colors hover:text-red-600"
+                      onClick={() => toggleLike(a.id)}
+                    >
+                      <Heart 
+                        className={`h-5 w-5 ${
+                          likes[a.id]?.liked 
+                            ? 'fill-red-500 text-red-500' 
+                            : 'text-gray-400'
+                        }`} 
+                      />
+                      <span>Like</span>
+                      {likes[a.id]?.count > 0 && (
+                        <span className="text-xs bg-gray-100 px-2 py-1 rounded-full">
+                          {likes[a.id].count}
+                        </span>
+                      )}
+                    </button>
+
+                    {/* Comment Button - moved to right side */}
                     <button
                       className="inline-flex items-center gap-2 text-sm font-medium text-gray-500 transition-colors hover:text-red-600"
                       onClick={() => setModalAnnouncementId(a.id)}
@@ -356,6 +458,7 @@ export default function ViewAllAnnouncements() {
                       commentableType="announcements"
                       onAddComment={(payload) => addComment(a.id, payload)}
                       onEditComment={(commentId, newText) => editComment(a.id, commentId, newText)}
+                      onClose={() => setModalAnnouncementId(null)}
                     />
                   </Modal>
                 </motion.article>

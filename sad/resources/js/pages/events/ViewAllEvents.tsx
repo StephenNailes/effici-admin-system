@@ -1,7 +1,7 @@
 // resources/js/Pages/Events/ViewAllEvents.tsx
 
 import MainLayout from '@/layouts/mainlayout';
-import { Calendar, MessageCircle, MoreHorizontal, Plus, ArrowLeft, Edit, Trash2, Bookmark } from 'lucide-react';
+import { Calendar, MessageCircle, MoreHorizontal, Plus, ArrowLeft, Edit, Trash2, Bookmark, Heart } from 'lucide-react';
 import CommentSection from '@/components/CommentSection';
 import Modal from '@/components/Modal';
 import { useState, useRef, useEffect } from 'react';
@@ -25,6 +25,7 @@ interface Event {
 }
 
 interface User {
+  id: number;
   first_name: string;
   last_name: string;
   avatarUrl?: string;
@@ -33,8 +34,9 @@ interface User {
 interface Comment {
   id: number;
   text: string;
-  date: string;
+  created_at: string;
   user: User;
+  replies?: Comment[];
 }
 
 type AuthUser = {
@@ -81,6 +83,9 @@ export default function ViewAllEvents() {
   const [deleteEventId, setDeleteEventId] = useState<number | null>(null);
   // Keep a ref per event id so outside-click detection targets the correct card
   const dropdownRefs = useRef<Record<number, HTMLDivElement | null>>({});
+  
+  // Like functionality state
+  const [likes, setLikes] = useState<Record<number, { liked: boolean; count: number }>>({});
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -95,27 +100,128 @@ export default function ViewAllEvents() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [dropdownOpen]);
 
-  const addComment = async (eventId: number, payload: { commentable_id: number; commentable_type: string; text: string }) => {
+  const addComment = async (eventId: number, payload: { commentable_id: number; commentable_type: string; text: string; parent_id?: number }) => {
     try {
       const res = await axios.post('/comments', payload);
-      const savedComment: Comment = res.data.comment; // <-- use .comment
-
+      
+      // Reload all comments to get the updated structure with replies
+      const commentsRes = await axios.get(`/comments/events/${eventId}`);
+      const commentArr = Array.isArray(commentsRes.data)
+        ? commentsRes.data
+        : Array.isArray(commentsRes.data.comments)
+          ? commentsRes.data.comments
+          : [];
+      
       setComments((prev) => ({
         ...prev,
-        [eventId]: [...(prev[eventId] || []), savedComment],
+        [eventId]: commentArr,
       }));
     } catch (error) {
       console.error('Failed to add comment:', error);
     }
   };
 
-  const editComment = (eventIndex: number, commentId: number, newText: string) => {
-    setComments((prev) => {
-      const updated = (prev[eventIndex] || []).map((c) =>
-        c.id === commentId ? { ...c, text: newText } : c
-      );
-      return { ...prev, [eventIndex]: updated };
-    });
+  const toggleLike = async (eventId: number) => {
+    try {
+      const res = await axios.post('/likes/toggle', {
+        likeable_id: eventId,
+        likeable_type: 'events',
+      });
+
+      setLikes((prev) => ({
+        ...prev,
+        [eventId]: {
+          liked: res.data.liked,
+          count: res.data.likes_count,
+        },
+      }));
+    } catch (error) {
+      console.error('Failed to toggle like:', error);
+    }
+  };
+
+  // Load likes and comments for all events on component mount
+  useEffect(() => {
+    const loadLikesAndComments = async () => {
+      for (const event of events) {
+        try {
+          // Load likes
+          const likesRes = await axios.get(`/likes/events/${event.id}`);
+          setLikes((prev) => ({
+            ...prev,
+            [event.id]: {
+              liked: likesRes.data.liked,
+              count: likesRes.data.likes_count,
+            },
+          }));
+
+          // Load comments
+          const commentsRes = await axios.get(`/comments/events/${event.id}`);
+          const commentArr = Array.isArray(commentsRes.data)
+            ? commentsRes.data
+            : Array.isArray(commentsRes.data.comments)
+              ? commentsRes.data.comments
+              : [];
+          
+          setComments((prev) => ({
+            ...prev,
+            [event.id]: commentArr,
+          }));
+        } catch (error) {
+          console.error('Failed to load likes or comments:', error);
+        }
+      }
+    };
+    
+    if (events.length > 0) {
+      loadLikesAndComments();
+    }
+  }, [events]);
+
+  // Load comments when modal opens (for real-time updates)
+  useEffect(() => {
+    if (modalEventId !== null) {
+      const loadCommentsForModal = async () => {
+        try {
+          const res = await axios.get(`/comments/events/${modalEventId}`);
+          const commentArr = Array.isArray(res.data)
+            ? res.data
+            : Array.isArray(res.data.comments)
+              ? res.data.comments
+              : [];
+          
+          setComments((prev) => ({
+            ...prev,
+            [modalEventId]: commentArr,
+          }));
+        } catch (error) {
+          console.error('Failed to load comments for modal:', error);
+        }
+      };
+
+      loadCommentsForModal();
+    }
+  }, [modalEventId]);
+
+  const editComment = async (eventId: number, commentId: number, newText: string) => {
+    try {
+      await axios.put(`/comments/${commentId}`, { text: newText });
+      
+      // Reload comments to get updated data
+      const commentsRes = await axios.get(`/comments/events/${eventId}`);
+      const commentArr = Array.isArray(commentsRes.data)
+        ? commentsRes.data
+        : Array.isArray(commentsRes.data.comments)
+          ? commentsRes.data.comments
+          : [];
+      
+      setComments((prev) => ({
+        ...prev,
+        [eventId]: commentArr,
+      }));
+    } catch (error) {
+      console.error('Failed to edit comment:', error);
+    }
   };
 
   const handleEdit = (eventId: number) => {
@@ -312,7 +418,28 @@ export default function ViewAllEvents() {
                       <p className="mb-4 line-clamp-3 text-sm leading-6 text-gray-600">{event.description}</p>
                     )}
                   </div>
-                  <div className="flex items-center border-t pt-3">
+                  <div className="flex items-center justify-between border-t pt-3">
+                    {/* Like Button */}
+                    <button
+                      className="inline-flex items-center gap-2 text-sm font-medium text-gray-500 transition-colors hover:text-red-600"
+                      onClick={() => toggleLike(event.id)}
+                    >
+                      <Heart 
+                        className={`h-5 w-5 ${
+                          likes[event.id]?.liked 
+                            ? 'fill-red-500 text-red-500' 
+                            : 'text-gray-400'
+                        }`} 
+                      />
+                      <span>Like</span>
+                      {likes[event.id]?.count > 0 && (
+                        <span className="text-xs bg-gray-100 px-2 py-1 rounded-full">
+                          {likes[event.id].count}
+                        </span>
+                      )}
+                    </button>
+
+                    {/* Comment Button - moved to right side */}
                     <button
                       className="inline-flex items-center gap-2 text-sm font-medium text-gray-500 transition-colors hover:text-red-600"
                       onClick={() => setModalEventId(event.id)}
@@ -328,6 +455,7 @@ export default function ViewAllEvents() {
                       commentableType="events"
                       onAddComment={(payload) => addComment(event.id, payload)}
                       onEditComment={(commentId, newText) => editComment(event.id, commentId, newText)}
+                      onClose={() => setModalEventId(null)}
                     />
                   </Modal>
                 </motion.article>

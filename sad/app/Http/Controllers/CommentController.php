@@ -17,6 +17,7 @@ class CommentController extends Controller
             'commentable_id'   => 'required|integer',
             'commentable_type' => 'required|string|in:announcements,events',
             'text'             => 'required|string|max:2000',
+            'parent_id'        => 'nullable|integer|exists:comments,id',
         ]);
 
         $comment = Comment::create([
@@ -24,11 +25,12 @@ class CommentController extends Controller
             'commentable_id'   => $validated['commentable_id'],
             'commentable_type' => $validated['commentable_type'], // store as plain string
             'text'             => $validated['text'],
+            'parent_id'        => $validated['parent_id'] ?? null,
         ]);
 
         return response()->json([
             'success' => true,
-            'comment' => $comment->load('user'),
+            'comment' => $comment->load(['user', 'replies.user']),
         ]);
     }
 
@@ -45,9 +47,10 @@ class CommentController extends Controller
             ], 400);
         }
 
-        $comments = Comment::with('user')
+        $comments = Comment::with(['user', 'replies.user'])
             ->where('commentable_type', $type)
             ->where('commentable_id', $id)
+            ->whereNull('parent_id') // Only get top-level comments
             ->orderByDesc('created_at')
             ->get();
 
