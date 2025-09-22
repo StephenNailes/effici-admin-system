@@ -221,5 +221,3 @@ Route::middleware('auth')->group(function () {
     Route::get('/likes/{type}/{id}', [LikeController::class, 'show'])->name('likes.show');
 });
 
-// 🔄 Include extra route files if needed
-require __DIR__ . '/settings.php';
