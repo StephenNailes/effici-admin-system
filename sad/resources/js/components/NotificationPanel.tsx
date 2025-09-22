@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { FaBell, FaTimes, FaCheck, FaExclamationTriangle } from 'react-icons/fa';
+import { createPortal } from 'react-dom';
+import { FaBell, FaTimes, FaCheck, FaExclamationTriangle, FaTrash } from 'react-icons/fa';
+import { Bell, AlertTriangle } from 'lucide-react';
 import { router } from '@inertiajs/react';
 import axios from 'axios';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -101,6 +103,10 @@ export default function NotificationPanel({ className = '', onOpen, isOpen: exte
     }
   };
 
+  // Filter urgent and high priority notifications for urgent section
+  const urgentNotifications = notifications.filter(n => (n.priority === 'urgent' || n.priority === 'high') && !n.is_read);
+  const regularNotifications = notifications.filter(n => (n.priority === 'normal' || n.priority === 'low') || n.is_read);
+
   const markAsRead = async (notificationId: number) => {
     try {
       await axios.post(`/api/notifications/${notificationId}/read`);
@@ -126,6 +132,20 @@ export default function NotificationPanel({ className = '', onOpen, isOpen: exte
     }
   };
 
+  const deleteNotification = async (notificationId: number) => {
+    try {
+      await axios.delete(`/api/notifications/${notificationId}`);
+      setNotifications(prev => prev.filter(n => n.id !== notificationId));
+      // Update unread count if the deleted notification was unread
+      const deletedNotification = notifications.find(n => n.id === notificationId);
+      if (deletedNotification && !deletedNotification.is_read) {
+        setUnreadCount(prev => Math.max(0, prev - 1));
+      }
+    } catch (error) {
+      console.error('Error deleting notification:', error);
+    }
+  };
+
   const handleNotificationClick = (notification: NotificationData) => {
     if (!notification.is_read) {
       markAsRead(notification.id);
@@ -146,8 +166,12 @@ export default function NotificationPanel({ className = '', onOpen, isOpen: exte
   const getPriorityIcon = (priority: string) => {
     switch (priority) {
       case 'urgent':
-        return <FaExclamationTriangle className="w-4 h-4 text-red-500" />;
-      default:
+        return <FaExclamationTriangle className="w-4 h-4 text-red-600" />;
+      case 'high':
+        return <FaExclamationTriangle className="w-4 h-4 text-orange-500" />;
+      case 'low':
+        return <FaBell className="w-4 h-4 text-gray-500" />;
+      default: // normal
         return <FaBell className="w-4 h-4 text-blue-500" />;
     }
   };
@@ -155,10 +179,12 @@ export default function NotificationPanel({ className = '', onOpen, isOpen: exte
   const getPriorityColor = (priority: string) => {
     switch (priority) {
       case 'urgent':
-        return 'border-l-4 border-red-500 bg-red-50';
+        return 'border-l-4 border-red-600 bg-red-50';
       case 'high':
         return 'border-l-4 border-orange-500 bg-orange-50';
-      default:
+      case 'low':
+        return 'border-l-4 border-gray-400 bg-gray-50';
+      default: // normal
         return 'border-l-4 border-blue-500 bg-blue-50';
     }
   };
@@ -187,32 +213,33 @@ export default function NotificationPanel({ className = '', onOpen, isOpen: exte
         >
           <FaBell className="text-sm" />
           <span>Notifications</span>
-          {unreadCount > 0 && (
-            <span className="absolute right-3 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center animate-pulse">
-              {unreadCount > 9 ? '9+' : unreadCount}
-            </span>
-          )}
         </button>
       )}
 
       {/* Render external panel when controlled from outside */}
-      {externalIsOpen && (
-        <motion.div
-          data-notification-panel-external
-          initial={{ opacity: 0, x: -20, scale: 0.98 }}
-          animate={{ opacity: 1, x: 0, scale: 1 }}
-          exit={{ opacity: 0, x: -20, scale: 0.98 }}
-          transition={{ duration: 0.18 }}
-          className="fixed bottom-8 left-[17rem] w-96 bg-white text-black rounded-xl shadow-2xl z-[9999] text-base overflow-hidden border border-gray-200 max-h-[80vh]"
-        >
+      {externalIsOpen && createPortal(
+        <>
+          {/* Backdrop to ensure panel sits above content and intercepts clicks */}
+          <div
+            className="fixed inset-0 z-[2147483646] bg-transparent"
+            onClick={() => onClose && onClose()}
+          />
+          <motion.div
+            data-notification-panel
+            initial={{ opacity: 0, x: -20, scale: 0.98 }}
+            animate={{ opacity: 1, x: 0, scale: 1 }}
+            exit={{ opacity: 0, x: -20, scale: 0.98 }}
+            transition={{ duration: 0.18 }}
+            className="fixed bottom-8 left-[17rem] w-96 bg-white text-black rounded-xl shadow-2xl z-[2147483647] text-base overflow-hidden border border-gray-200 max-h-[70vh]"
+          >
           {/* Header */}
           <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between bg-gray-50">
             <div className="flex items-center gap-2">
               <FaBell className="w-5 h-5 text-gray-600" />
               <h3 className="font-semibold text-gray-900">Notifications</h3>
-              {unreadCount > 0 && (
-                <span className="text-xs bg-red-100 text-red-600 px-2 py-1 rounded-full">
-                  {unreadCount}
+              {urgentNotifications.length > 0 && (
+                <span className="text-xs bg-red-500 text-white px-2 py-1 rounded-full animate-pulse ml-1">
+                  PRIORITY
                 </span>
               )}
             </div>
@@ -225,9 +252,89 @@ export default function NotificationPanel({ className = '', onOpen, isOpen: exte
           </div>
 
           {/* Notifications List */}
-          <div className="max-h-96 overflow-y-auto">
-            {notifications.length > 0 ? (
-              notifications.map((notification) => (
+          <div className="max-h-72 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
+            {/* Urgent Notifications Section */}
+            {urgentNotifications.length > 0 && (
+              <div className="bg-red-50 border-b-2 border-red-200">
+                <div className="px-4 py-2 bg-red-100">
+                  <div className="flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4 text-red-600" />
+                    <span className="text-xs font-bold text-red-600 uppercase">PRIORITY ALERTS</span>
+                    <span className="text-xs text-red-500">(Urgent & High Priority)</span>
+                  </div>
+                </div>
+                {urgentNotifications.map((notification) => (
+                  <div
+                    key={notification.id}
+                    className={`px-4 py-3 border-b cursor-pointer transition-colors ${
+                      notification.priority === 'urgent' 
+                        ? 'border-red-200 hover:bg-red-100 bg-red-50' 
+                        : 'border-orange-200 hover:bg-orange-100 bg-orange-50'
+                    }`}
+                    onClick={() => handleNotificationClick(notification)}
+                  >
+                      <div className="flex items-start gap-3">
+                      <div className="flex-shrink-0 mt-1">
+                        {getPriorityIcon(notification.priority)}
+                      </div>
+                      
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between mb-1">
+                          <div className="flex items-center gap-2">
+                            <p className="text-sm font-bold text-red-800">
+                              {notification.title}
+                            </p>
+                            <span className={`text-xs font-bold px-2 py-1 rounded-full uppercase ${
+                              notification.priority === 'urgent' ? 'bg-red-200 text-red-800' : 'bg-orange-200 text-orange-800'
+                            }`}>
+                              {notification.priority}
+                            </span>
+                          </div>
+                          <div className={`w-2 h-2 rounded-full flex-shrink-0 animate-pulse ${
+                            notification.priority === 'urgent' ? 'bg-red-500' : 'bg-orange-500'
+                          }`}></div>
+                        </div>                        <p className="text-sm text-red-700 mb-2 line-clamp-2">
+                          {notification.message}
+                        </p>
+                        
+                        <div className="flex items-center justify-between">
+                          <p className="text-xs text-red-600">
+                            {notification.time_ago}
+                          </p>
+                          
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                markAsRead(notification.id);
+                              }}
+                              className="text-xs text-red-600 hover:text-red-800 flex items-center gap-1 font-medium"
+                            >
+                              <FaCheck className="w-3 h-3" />
+                              Dismiss
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                deleteNotification(notification.id);
+                              }}
+                              className="text-xs text-red-600 hover:text-red-800 flex items-center gap-1 font-medium"
+                              title="Delete notification"
+                            >
+                              <FaTrash className="w-3 h-3" />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Regular Notifications Section */}
+            {regularNotifications.length > 0 ? (
+              regularNotifications.map((notification) => (
                 <div
                   key={notification.id}
                   className={`px-4 py-3 border-b border-gray-100 cursor-pointer transition-colors hover:bg-gray-50
@@ -260,34 +367,46 @@ export default function NotificationPanel({ className = '', onOpen, isOpen: exte
                           {notification.time_ago}
                         </p>
                         
-                        {!notification.is_read && (
+                        <div className="flex items-center gap-2">
+                          {!notification.is_read && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                markAsRead(notification.id);
+                              }}
+                              className="text-xs text-blue-500 hover:text-blue-700 flex items-center gap-1"
+                            >
+                              <FaCheck className="w-3 h-3" />
+                              Mark as read
+                            </button>
+                          )}
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              markAsRead(notification.id);
+                              deleteNotification(notification.id);
                             }}
-                            className="text-xs text-blue-500 hover:text-blue-700 flex items-center gap-1"
+                            className="text-xs text-gray-400 hover:text-red-500 flex items-center gap-1 transition-colors"
+                            title="Delete notification"
                           >
-                            <FaCheck className="w-3 h-3" />
-                            Mark as read
+                            <FaTrash className="w-3 h-3" />
                           </button>
-                        )}
+                        </div>
                       </div>
                     </div>
                   </div>
                 </div>
               ))
-            ) : (
+            ) : urgentNotifications.length === 0 ? (
               <div className="px-4 py-8 text-center">
                 <FaCheck className="w-12 h-12 text-green-500 mx-auto mb-3" />
                 <p className="text-sm text-gray-600 mb-1">No notifications</p>
                 <p className="text-xs text-gray-400">You're all caught up!</p>
               </div>
-            )}
+            ) : null}
           </div>
 
           {/* Footer Actions */}
-          {notifications.length > 0 && unreadCount > 0 && (
+          {(urgentNotifications.length > 0 || regularNotifications.length > 0) && unreadCount > 0 && (
             <div className="px-4 py-3 border-t border-gray-200 bg-gray-50">
               <button
                 onClick={markAllAsRead}
@@ -298,7 +417,9 @@ export default function NotificationPanel({ className = '', onOpen, isOpen: exte
               </button>
             </div>
           )}
-        </motion.div>
+          </motion.div>
+        </>,
+        document.body
       )}
 
       {/* Production Panel */}
@@ -369,18 +490,30 @@ export default function NotificationPanel({ className = '', onOpen, isOpen: exte
                               {notification.time_ago}
                             </p>
                             
-                            {!notification.is_read && (
+                            <div className="flex items-center gap-2">
+                              {!notification.is_read && (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    markAsRead(notification.id);
+                                  }}
+                                  className="text-xs text-blue-500 hover:text-blue-700 flex items-center gap-1"
+                                >
+                                  <FaCheck className="w-3 h-3" />
+                                  Mark as read
+                                </button>
+                              )}
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  markAsRead(notification.id);
+                                  deleteNotification(notification.id);
                                 }}
-                                className="text-xs text-blue-500 hover:text-blue-700 flex items-center gap-1"
+                                className="text-xs text-gray-400 hover:text-red-500 flex items-center gap-1 transition-colors"
+                                title="Delete notification"
                               >
-                                <FaCheck className="w-3 h-3" />
-                                Mark as read
+                                <FaTrash className="w-3 h-3" />
                               </button>
-                            )}
+                            </div>
                           </div>
                         </div>
                       </div>

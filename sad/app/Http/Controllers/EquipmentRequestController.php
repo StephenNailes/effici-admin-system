@@ -8,11 +8,18 @@ use Illuminate\Support\Facades\Log;
 use App\Models\EquipmentRequest;
 use App\Models\Equipment;
 use App\Models\RequestApproval;
+use App\Services\NotificationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
 class EquipmentRequestController extends Controller
 {
+    protected $notificationService;
+
+    public function __construct(NotificationService $notificationService)
+    {
+        $this->notificationService = $notificationService;
+    }
     /**
      * Equipment Management: Get all requests with lifecycle statuses for admin
      */
@@ -167,9 +174,12 @@ class EquipmentRequestController extends Controller
             return back()->withErrors(['category' => 'Invalid category selected']);
         }
 
-        DB::transaction(function () use ($validated) {
-            $eq = EquipmentRequest::create([
-                'user_id' => Auth::id(),
+        $equipmentRequest = null;
+        $user = Auth::user();
+
+        DB::transaction(function () use ($validated, &$equipmentRequest, $user) {
+            $equipmentRequest = EquipmentRequest::create([
+                'user_id' => $user->id,
                 'activity_plan_id' => $validated['activity_plan_id'] ?? null,
                 'purpose' => $validated['purpose'],
                 'start_datetime' => $validated['start_datetime'],
@@ -179,17 +189,37 @@ class EquipmentRequestController extends Controller
             ]);
 
             foreach ($validated['items'] as $item) {
-                $eq->items()->create($item);
+                $equipmentRequest->items()->create($item);
             }
 
             RequestApproval::create([
                 'request_type' => 'equipment',
-                'request_id' => $eq->id,
+                'request_id' => $equipmentRequest->id,
                 'approver_role' => 'admin_assistant',
                 'status' => 'pending',
-                'category' => $eq->category,
+                'category' => $equipmentRequest->category,
             ]);
         });
+
+        // Create notification for admin assistants about new equipment request
+        if ($equipmentRequest) {
+            // Map category to notification priority
+            $priorityMap = [
+                'minor' => 'low',
+                'normal' => 'normal',
+                'urgent' => 'urgent'
+            ];
+            $priority = $priorityMap[$validated['category']] ?? 'normal';
+            $studentName = $user->first_name . ' ' . $user->last_name;
+            
+            $this->notificationService->notifyNewRequest(
+                'admin_assistant',
+                $studentName,
+                'equipment',
+                $equipmentRequest->id,
+                $priority
+            );
+        }
 
         // Redirect to equipment-requests page with flash success message
         return redirect()->route('equipment-requests.index')

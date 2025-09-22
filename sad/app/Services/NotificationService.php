@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Notification;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class NotificationService
 {
@@ -29,21 +30,59 @@ class NotificationService
      */
     public function notifyRequestStatusChange($userId, $requestType, $status, $requestId, $approverRole = null)
     {
-        $statusMessages = [
-            'approved' => $approverRole === 'dean' ? 'Dean has approved your request' : 'Admin has approved your request',
-            'revision_requested' => $approverRole === 'dean' ? 'Dean requested revision for your request' : 'Admin requested revision for your request',
-            'pending' => 'Your request is now pending approval'
-        ];
+        // Generate specific messages based on request type, status, and approver role
+        $title = '';
+        $message = '';
+        $priority = 'normal';
+
+        if ($status === 'approved') {
+            if ($requestType === 'equipment_request') {
+                $title = '✅ Equipment Request Approved';
+                $message = 'Great news! The Admin Assistant has approved your equipment request. You can now proceed with borrowing the requested equipment.';
+                $priority = 'high';
+            } elseif ($requestType === 'activity_plan') {
+                if ($approverRole === 'admin_assistant') {
+                    $title = '✅ Activity Plan - Initial Approval';
+                    $message = 'Your activity plan has been approved by the Admin Assistant and is now forwarded to the Dean for final approval.';
+                    $priority = 'normal';
+                } elseif ($approverRole === 'dean') {
+                    $title = '🎉 Activity Plan - Final Approval';
+                    $message = 'Congratulations! The Dean has given final approval to your activity plan. You can now proceed with organizing your event.';
+                    $priority = 'high';
+                }
+            }
+        } elseif ($status === 'revision_requested') {
+            if ($requestType === 'equipment_request') {
+                $title = '📝 Equipment Request - Revision Required';
+                $message = 'The Admin Assistant has requested revisions to your equipment request. Please check the details and resubmit.';
+                $priority = 'high';
+            } elseif ($requestType === 'activity_plan') {
+                if ($approverRole === 'admin_assistant') {
+                    $title = '📝 Activity Plan - Revision Required';
+                    $message = 'The Admin Assistant has requested revisions to your activity plan. Please review the feedback and resubmit.';
+                } elseif ($approverRole === 'dean') {
+                    $title = '📝 Activity Plan - Dean Revision Required';
+                    $message = 'The Dean has requested revisions to your activity plan. Please review the feedback and resubmit.';
+                }
+                $priority = 'high';
+            }
+        }
+
+        // Fallback messages
+        if (empty($title)) {
+            $title = 'Request Status Update';
+            $message = $approverRole === 'dean' ? 'Dean has updated your request status' : 'Admin has updated your request status';
+        }
 
         $actionUrl = $requestType === 'activity_plan' 
-            ? "/student/requests/activity-plan/{$requestId}"
-            : "/student/activity-log";
+            ? "/student/requests/activity-plan"
+            : "/student/borrow-equipment";
 
         return $this->create([
             'user_id' => $userId,
             'type' => 'request_status_change',
-            'title' => 'Request Status Update',
-            'message' => $statusMessages[$status] ?? 'Your request status has been updated',
+            'title' => $title,
+            'message' => $message,
             'data' => [
                 'request_type' => $requestType,
                 'request_id' => $requestId,
@@ -51,7 +90,7 @@ class NotificationService
                 'approver_role' => $approverRole
             ],
             'action_url' => $actionUrl,
-            'priority' => 'normal'
+            'priority' => $priority
         ]);
     }
 
@@ -91,11 +130,28 @@ class NotificationService
             ? "/dean/activity-plan-approval/{$requestId}"
             : "/admin/requests";
 
-        $title = $requestType === 'activity_plan' ? 'New Activity Plan Request' : 'New Equipment Request';
-        $message = "A student ({$studentName}) submitted a {$requestType} request";
+        // Generate appropriate title and message based on priority
+        switch ($priority) {
+            case 'urgent':
+                $title = $requestType === 'activity_plan' ? '🚨 URGENT: Activity Plan Request' : '🚨 URGENT: Equipment Request';
+                $message = "URGENT REQUEST: {$studentName} submitted a {$requestType} request requiring immediate attention";
+                break;
+            case 'high':
+                $title = $requestType === 'activity_plan' ? '⚡ HIGH: Activity Plan Request' : '⚡ HIGH: Equipment Request';
+                $message = "HIGH PRIORITY: {$studentName} submitted a {$requestType} request";
+                break;
+            case 'low':
+                $title = $requestType === 'activity_plan' ? 'Activity Plan Request' : 'Equipment Request';
+                $message = "{$studentName} submitted a {$requestType} request (low priority)";
+                break;
+            default: // normal
+                $title = $requestType === 'activity_plan' ? 'New Activity Plan Request' : 'New Equipment Request';
+                $message = "{$studentName} submitted a new {$requestType} request for review";
+                break;
+        }
 
         foreach ($approvers as $approver) {
-            $this->create([
+            $notification = $this->create([
                 'user_id' => $approver->id,
                 'type' => 'new_request',
                 'title' => $title,
@@ -107,7 +163,16 @@ class NotificationService
                     'priority' => $priority
                 ],
                 'action_url' => $actionUrl,
-                'priority' => $priority === 'urgent' ? 'urgent' : 'normal'
+                'priority' => $priority // Use the exact priority value from the request
+            ]);
+            
+            // Log notification creation for debugging
+            Log::info('Notification created', [
+                'notification_id' => $notification->id,
+                'recipient' => $approver->email,
+                'type' => $requestType,
+                'priority' => $priority,
+                'student' => $studentName
             ]);
         }
     }
@@ -152,21 +217,39 @@ class NotificationService
         // Notify all students about events and announcements
         $students = User::where('role', 'student')->get();
 
-        $actionUrl = $type === 'event' ? '/events' : '/announcements';
+        // Customize notification content based on type
+        if ($type === 'event') {
+            $notificationTitle = '📅 New Event Posted';
+            $message = "A new event '{$title}' has been scheduled. Check it out to see the details and mark your calendar!";
+            $actionUrl = '/events';
+            $priority = 'normal';
+        } else {
+            $notificationTitle = '📢 New Announcement';
+            $message = "Important announcement '{$title}' has been posted. Click to read the full details.";
+            $actionUrl = '/announcements';
+            $priority = 'normal';
+        }
+
+        // Add extra priority for Dean announcements
+        if ($createdBy === 'dean' && $type === 'announcement') {
+            $priority = 'high';
+            $notificationTitle = '📢 Important Announcement from Dean';
+            $message = "The Dean has posted an important announcement: '{$title}'. Please review it as soon as possible.";
+        }
 
         foreach ($students as $student) {
             $this->create([
                 'user_id' => $student->id,
                 'type' => 'new_' . $type,
-                'title' => "New " . ucfirst($type),
-                'message' => "A new {$type} '{$title}' has been posted",
+                'title' => $notificationTitle,
+                'message' => $message,
                 'data' => [
                     'type' => $type,
                     'title' => $title,
                     'created_by' => $createdBy
                 ],
                 'action_url' => $actionUrl,
-                'priority' => 'normal'
+                'priority' => $priority
             ]);
         }
     }
@@ -230,5 +313,22 @@ class NotificationService
         return Notification::forUser($userId)
             ->unread()
             ->update(['read_at' => now()]);
+    }
+
+    /**
+     * Delete notification
+     */
+    public function deleteNotification($notificationId, $userId): bool
+    {
+        $notification = Notification::where('id', $notificationId)
+            ->where('user_id', $userId)
+            ->first();
+
+        if ($notification) {
+            $notification->delete();
+            return true;
+        }
+
+        return false;
     }
 }

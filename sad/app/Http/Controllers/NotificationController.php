@@ -79,6 +79,22 @@ class NotificationController extends Controller
     }
 
     /**
+     * Delete a specific notification
+     */
+    public function delete($id)
+    {
+        $user = Auth::user();
+        
+        $success = $this->notificationService->deleteNotification($id, $user->id);
+        
+        if ($success) {
+            return response()->json(['success' => true]);
+        }
+        
+        return response()->json(['success' => false, 'message' => 'Notification not found'], 404);
+    }
+
+    /**
      * Show the activity plan approval page and automatically mark related notifications as read
      */
     public function showActivityPlanApproval($id)

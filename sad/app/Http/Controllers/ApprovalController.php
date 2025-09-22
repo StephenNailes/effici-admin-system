@@ -4,9 +4,16 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use App\Services\NotificationService;
 
 class ApprovalController extends Controller
 {
+    protected $notificationService;
+
+    public function __construct(NotificationService $notificationService)
+    {
+        $this->notificationService = $notificationService;
+    }
     // Fetch requests for any approver role (admin_assistant or dean)
     public function indexApi(Request $request)
     {
@@ -84,6 +91,14 @@ class ApprovalController extends Controller
         DB::transaction(function () use ($id, $role) {
             $ra = DB::table('request_approvals')->where('id', $id)->first();
 
+            // Get student user ID for notification
+            $studentId = null;
+            if ($ra->request_type === 'equipment') {
+                $studentId = DB::table('equipment_requests')->where('id', $ra->request_id)->value('user_id');
+            } else {
+                $studentId = DB::table('activity_plans')->where('id', $ra->request_id)->value('user_id');
+            }
+
             // Update current approval row
             DB::table('request_approvals')->where('id', $id)->update([
                 'status' => 'approved',
@@ -91,8 +106,19 @@ class ApprovalController extends Controller
             ]);
 
             if ($ra->request_type === 'equipment') {
-                // Equipment ends with admin assistant
+                // Equipment ends with admin assistant - notify student of final approval
                 DB::table('equipment_requests')->where('id', $ra->request_id)->update(['status' => 'approved']);
+                
+                // Notify student that admin assistant approved their equipment request
+                if ($studentId) {
+                    $this->notificationService->notifyRequestStatusChange(
+                        $studentId, 
+                        'equipment_request', 
+                        'approved', 
+                        $ra->request_id, 
+                        'admin_assistant'
+                    );
+                }
             } else {
                 if ($role === 'admin_assistant') {
                     // Admin assistant approves → escalate to dean
@@ -106,9 +132,31 @@ class ApprovalController extends Controller
                         'created_at' => now(),
                         'updated_at' => now(),
                     ]);
+
+                    // Notify student that admin assistant approved their activity plan (still needs dean approval)
+                    if ($studentId) {
+                        $this->notificationService->notifyRequestStatusChange(
+                            $studentId, 
+                            'activity_plan', 
+                            'approved', 
+                            $ra->request_id, 
+                            'admin_assistant'
+                        );
+                    }
                 } elseif ($role === 'dean') {
                     // Dean approves → final
                     DB::table('activity_plans')->where('id', $ra->request_id)->update(['status' => 'approved']);
+
+                    // Notify student that dean approved their activity plan (final approval)
+                    if ($studentId) {
+                        $this->notificationService->notifyRequestStatusChange(
+                            $studentId, 
+                            'activity_plan', 
+                            'approved', 
+                            $ra->request_id, 
+                            'dean'
+                        );
+                    }
                 }
             }
         });
@@ -125,6 +173,14 @@ class ApprovalController extends Controller
         DB::transaction(function () use ($id, $remarks, $role) {
             $ra = DB::table('request_approvals')->where('id', $id)->first();
 
+            // Get student user ID for notification
+            $studentId = null;
+            if ($ra->request_type === 'equipment') {
+                $studentId = DB::table('equipment_requests')->where('id', $ra->request_id)->value('user_id');
+            } else {
+                $studentId = DB::table('activity_plans')->where('id', $ra->request_id)->value('user_id');
+            }
+
             DB::table('request_approvals')->where('id', $id)->update([
                 'status' => 'revision_requested',
                 'remarks' => $remarks,
@@ -133,8 +189,30 @@ class ApprovalController extends Controller
 
             if ($ra->request_type === 'equipment') {
                 DB::table('equipment_requests')->where('id', $ra->request_id)->update(['status' => 'under_revision']);
+                
+                // Notify student that revision is requested for their equipment request
+                if ($studentId) {
+                    $this->notificationService->notifyRequestStatusChange(
+                        $studentId, 
+                        'equipment_request', 
+                        'revision_requested', 
+                        $ra->request_id, 
+                        $role
+                    );
+                }
             } else {
                 DB::table('activity_plans')->where('id', $ra->request_id)->update(['status' => 'under_revision']);
+                
+                // Notify student that revision is requested for their activity plan
+                if ($studentId) {
+                    $this->notificationService->notifyRequestStatusChange(
+                        $studentId, 
+                        'activity_plan', 
+                        'revision_requested', 
+                        $ra->request_id, 
+                        $role
+                    );
+                }
             }
         });
 

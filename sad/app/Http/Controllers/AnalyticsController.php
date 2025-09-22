@@ -30,7 +30,6 @@ class AnalyticsController extends Controller
             'monthlyApprovalRates' => $this->getMonthlyApprovalRates($startDate, $endDate),
             'timeToApproval' => $this->getTimeToApprovalStats($startDate, $endDate),
             'seasonalPatterns' => $this->getSeasonalPatterns(),
-            'currentStatus' => $this->getCurrentStatus(),
             'summaryStats' => $this->getSummaryStats($startDate, $endDate),
         ];
 
@@ -163,37 +162,6 @@ class AnalyticsController extends Controller
         return $result;
     }
 
-    private function getCurrentStatus()
-    {
-        $thisMonth = Carbon::now()->startOfMonth();
-        
-        $pending = RequestApproval::where('approver_role', 'dean')
-            ->where('request_type', 'activity_plan')
-            ->where('status', 'pending')
-            ->count();
-            
-        $approved = RequestApproval::where('approver_role', 'dean')
-            ->where('request_type', 'activity_plan')
-            ->where('status', 'approved')
-            ->count();
-            
-        $revisionRequested = RequestApproval::where('approver_role', 'dean')
-            ->where('request_type', 'activity_plan')
-            ->where('status', 'revision_requested')
-            ->count();
-            
-        $totalThisMonth = RequestApproval::where('approver_role', 'dean')
-            ->where('request_type', 'activity_plan')
-            ->where('created_at', '>=', $thisMonth)
-            ->count();
-
-        return [
-            'pending' => $pending,
-            'approved' => $approved,
-            'revisionRequested' => $revisionRequested,
-            'totalThisMonth' => $totalThisMonth
-        ];
-    }
 
     private function getSummaryStats($startDate, $endDate)
     {

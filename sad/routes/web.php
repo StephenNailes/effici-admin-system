@@ -18,6 +18,8 @@ use App\Http\Controllers\DocumentController;
 use App\Http\Controllers\CommentController;
 use App\Http\Controllers\ApprovalController;
 use App\Http\Controllers\RevisionController;
+use App\Http\Controllers\EventController;
+use App\Http\Controllers\AnnouncementController;
 
 use App\Models\Event;
 use App\Models\Announcement;
@@ -158,6 +160,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Notification API routes
     Route::get('/api/notifications', [App\Http\Controllers\NotificationController::class, 'index']);
     Route::post('/api/notifications/{id}/read', [App\Http\Controllers\NotificationController::class, 'markAsRead']);
+    Route::delete('/api/notifications/{id}', [App\Http\Controllers\NotificationController::class, 'delete']);
     Route::post('/api/notifications/mark-all-read', [App\Http\Controllers\NotificationController::class, 'markAllAsRead']);
     Route::get('/api/notifications/unread-count', [App\Http\Controllers\NotificationController::class, 'getUnreadCount']);
 });
@@ -186,13 +189,21 @@ Route::middleware(['auth', 'verified'])->prefix('api/approvals')->group(function
 });
 
 // 🟩 Events + Announcements
-Route::get('/events', fn () => Inertia::render('events/ViewAllEvents', [
-    'events' => Event::all()
-]))->name('events.index');
-
-Route::get('/announcements', fn () => Inertia::render('announcements/ViewAllAnnouncements', [
-    'announcements' => Announcement::all()
-]))->name('announcements.index');
+Route::middleware(['auth', 'verified'])->group(function () {
+    Route::get('/events', [EventController::class, 'index'])->name('events.index');
+    Route::get('/events/create', [EventController::class, 'create'])->name('events.create');
+    Route::post('/events', [EventController::class, 'store'])->name('events.store');
+    Route::get('/events/{id}/edit', [EventController::class, 'edit'])->name('events.edit');
+    Route::put('/events/{id}', [EventController::class, 'update'])->name('events.update');
+    Route::delete('/events/{id}', [EventController::class, 'destroy'])->name('events.destroy');
+    
+    Route::get('/announcements', [AnnouncementController::class, 'index'])->name('announcements.index');
+    Route::get('/announcements/create', [AnnouncementController::class, 'create'])->name('announcements.create');
+    Route::post('/announcements', [AnnouncementController::class, 'store'])->name('announcements.store');
+    Route::get('/announcements/{id}/edit', [AnnouncementController::class, 'edit'])->name('announcements.edit');
+    Route::put('/announcements/{id}', [AnnouncementController::class, 'update'])->name('announcements.update');
+    Route::delete('/announcements/{id}', [AnnouncementController::class, 'destroy'])->name('announcements.destroy');
+});
 
 // 🟩 Comments
 Route::middleware('auth')->group(function () {

@@ -4,11 +4,20 @@ namespace App\Http\Controllers;
 
 use App\Models\ActivityPlan;
 use App\Models\RequestApproval;
+use App\Services\NotificationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Auth;
 
 class ActivityPlanController extends Controller
 {
+    protected $notificationService;
+
+    public function __construct(NotificationService $notificationService)
+    {
+        $this->notificationService = $notificationService;
+    }
+
     public function store(Request $request)
     {
         $validated = $request->validate([
@@ -25,9 +34,11 @@ class ActivityPlanController extends Controller
         ]);
 
         $plan = null;
-        DB::transaction(function () use ($validated, &$plan) {
+        $user = Auth::user();
+        
+        DB::transaction(function () use ($validated, &$plan, $user) {
             $plan = ActivityPlan::create([
-                'user_id'          => auth()->id(),
+                'user_id'          => $user->id,
                 'activity_name' => $validated['activity_name'],
                 'activity_purpose' => $validated['activity_purpose'],
                 'category' => $validated['category'],
@@ -62,12 +73,32 @@ class ActivityPlanController extends Controller
             ]);
         });
 
+        // Create notification for admin assistants about new activity plan request
+        if ($plan) {
+            // Map category to notification priority
+            $priorityMap = [
+                'minor' => 'low',
+                'normal' => 'normal', 
+                'urgent' => 'urgent'
+            ];
+            $priority = $priorityMap[$validated['category']] ?? 'normal';
+            $studentName = $user->first_name . ' ' . $user->last_name;
+            
+            $this->notificationService->notifyNewRequest(
+                'admin_assistant',
+                $studentName,
+                'activity_plan',
+                $plan->id,
+                $priority
+            );
+        }
+
         return redirect()->back()->with('success', 'Activity plan submitted successfully!');
     }
 
     public function index()
     {
-        $plans = ActivityPlan::where('user_id', auth()->id())->get();
+        $plans = ActivityPlan::where('user_id', Auth::id())->get();
         return inertia('student/ActivityPlan', [
             'plans' => $plans
         ]);

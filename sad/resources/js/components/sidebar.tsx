@@ -12,12 +12,15 @@ import {
   FaToolbox,       // Add for Borrow Equipment
   FaChartBar,      // Add for Analytics Dashboard
   FaBell,          // Add for Notifications
+  FaCalendarAlt,   // Add for Events notification indicator
+  FaBullhorn,      // Add for Announcements notification indicator
 } from 'react-icons/fa';
 import { usePage, Link } from '@inertiajs/react';
 import { Inertia } from '@inertiajs/inertia';
 import { ReactElement, useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import NotificationPanel from '@/components/NotificationPanel';
+import axios from 'axios';
 
 type UserRole = 'student' | 'admin_assistant' | 'dean';
 
@@ -50,6 +53,9 @@ export default function Sidebar() {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [notificationPanelOpen, setNotificationPanelOpen] = useState(false);
+  const [notificationBadgeCount, setNotificationBadgeCount] = useState(0);
+  const [eventNotificationCount, setEventNotificationCount] = useState(0);
+  const [announcementNotificationCount, setAnnouncementNotificationCount] = useState(0);
 
   // Store requestOpen state in localStorage to persist across navigation
   const [requestOpen, setRequestOpen] = useState(() => {
@@ -66,9 +72,75 @@ export default function Sidebar() {
     localStorage.setItem('requestOpen', JSON.stringify(requestOpen));
   }, [requestOpen]);
 
+  // Fetch notification badge count 
+  // Shows: urgent/high priority notifications (all users) + new/resubmitted requests (admin/dean only) + new events/announcements (students)
+  const fetchNotificationBadgeCount = async () => {
+    try {
+      const response = await axios.get('/api/notifications');
+      const notifications = response.data.notifications || [];
+      
+      let badgeCount = 0;
+      
+      // Always include urgent/high priority unread notifications for all users
+      const urgentCount = notifications.filter((n: any) => 
+        (n.priority === 'urgent' || n.priority === 'high') && !n.is_read
+      ).length;
+      badgeCount += urgentCount;
+      
+      // For admin/dean users, also include new request submissions and resubmissions
+      if (role === 'admin_assistant' || role === 'dean') {
+        const requestNotifications = notifications.filter((n: any) => 
+          !n.is_read && (n.type === 'new_request' || n.type === 'request_resubmission')
+        ).length;
+        badgeCount += requestNotifications;
+      }
+      
+      // For students, also include new events and announcements
+      if (role === 'student') {
+        const eventNotifications = notifications.filter((n: any) => 
+          !n.is_read && n.type === 'new_event'
+        ).length;
+        const announcementNotifications = notifications.filter((n: any) => 
+          !n.is_read && n.type === 'new_announcement'
+        ).length;
+        
+        setEventNotificationCount(eventNotifications);
+        setAnnouncementNotificationCount(announcementNotifications);
+        
+        badgeCount += eventNotifications + announcementNotifications;
+      } else {
+        // Reset event/announcement counts for non-students
+        setEventNotificationCount(0);
+        setAnnouncementNotificationCount(0);
+      }
+      
+      setNotificationBadgeCount(badgeCount);
+    } catch (error) {
+      console.error('Error fetching notification badge count:', error);
+    }
+  };
+
+  // Fetch notification badge count on mount and periodically
+  useEffect(() => {
+    fetchNotificationBadgeCount();
+    
+    // Poll for new notifications every 30 seconds
+    const interval = setInterval(fetchNotificationBadgeCount, 30000);
+    
+    return () => clearInterval(interval);
+  }, []);
+
   const handleLogout = () => {
     setShowConfirm(false);
     Inertia.post('/logout');
+  };
+
+  // Helper function to get notification badge for menu items
+  const getMenuItemBadge = (href: string) => {
+    // Since Events and Announcements are no longer menu items for students,
+    // this function will return 0 for all current menu items
+    // Event/Announcement notifications will only show in the profile badge
+    return 0;
   };
 
   useEffect(() => {
@@ -216,16 +288,26 @@ export default function Sidebar() {
                   <Link
                     href={item.href!}
                     preserveState={false}
-                    className={`flex items-center gap-3 px-5 py-3 rounded-lg transition-all duration-200 ease-in-out font-medium
+                    className={`flex items-center justify-between px-5 py-3 rounded-lg transition-all duration-200 ease-in-out font-medium
                       ${currentPath === item.href
                         ? 'bg-white/30 text-white shadow-lg border-l-4 border-white scale-[1.05] font-bold'
                         : 'hover:bg-white/20 hover:scale-[1.03] hover:shadow-md'}
                     `}
                   >
-                    <span className={`text-lg ${currentPath === item.href ? 'drop-shadow' : ''}`}>
-                      {item.icon}
-                    </span>
-                    <span className="text-base">{item.name}</span>
+                    <div className="flex items-center gap-3">
+                      <span className={`text-lg ${currentPath === item.href ? 'drop-shadow' : ''}`}>
+                        {item.icon}
+                      </span>
+                      <span className="text-base">{item.name}</span>
+                    </div>
+                    {(() => {
+                      const badgeCount = getMenuItemBadge(item.href!);
+                      return badgeCount > 0 ? (
+                        <div className="bg-white text-red-600 text-xs rounded-full w-5 h-5 flex items-center justify-center animate-pulse font-bold border border-red-200 shadow-sm">
+                          {badgeCount > 9 ? '9+' : badgeCount}
+                        </div>
+                      ) : null;
+                    })()}
                   </Link>
                 )}
               </div>
@@ -236,26 +318,34 @@ export default function Sidebar() {
         {/* Profile Dropdown */}
         <div className="relative px-4 py-7" ref={dropdownRef}>
           <div
-            className="flex items-center justify-between bg-white text-black rounded-xl p-2 cursor-pointer shadow-lg hover:shadow-xl transition"
+            className="flex items-center justify-between bg-white text-black rounded-xl p-2 cursor-pointer shadow-lg hover:shadow-xl transition relative"
             onClick={() => setDropdownOpen((prev) => !prev)}
           >
             <div className="flex items-center gap-3">
-              <div className="w-11 h-11 rounded-full border-2 border-[#e6232a] overflow-hidden bg-[#e6232a] flex items-center justify-center">
-                {user.profile_picture ? (
-                  <img
-                    src={getProfilePictureUrl(user.profile_picture) || '/images/profile.png'}
-                    alt="Profile"
-                    className="w-full h-full object-cover"
-                    onError={(e) => {
-                      // Replace failed image with user initials
-                      const img = e.target as HTMLImageElement;
-                      const parent = img.parentElement!;
-                      parent.innerHTML = `<div class="w-full h-full bg-[#e6232a] flex items-center justify-center text-white font-bold text-lg">${user.first_name?.charAt(0).toUpperCase() || 'U'}</div>`;
-                    }}
-                  />
-                ) : (
-                  <div className="w-full h-full bg-[#e6232a] flex items-center justify-center text-white font-bold text-lg">
-                    {user.first_name?.charAt(0).toUpperCase() || 'U'}
+              <div className="relative">
+                <div className="w-11 h-11 rounded-full border-2 border-[#e6232a] overflow-hidden bg-[#e6232a] flex items-center justify-center">
+                  {user.profile_picture ? (
+                    <img
+                      src={getProfilePictureUrl(user.profile_picture) || '/images/profile.png'}
+                      alt="Profile"
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        // Replace failed image with user initials
+                        const img = e.target as HTMLImageElement;
+                        const parent = img.parentElement!;
+                        parent.innerHTML = `<div class="w-full h-full bg-[#e6232a] flex items-center justify-center text-white font-bold text-lg">${user.first_name?.charAt(0).toUpperCase() || 'U'}</div>`;
+                      }}
+                    />
+                  ) : (
+                    <div className="w-full h-full bg-[#e6232a] flex items-center justify-center text-white font-bold text-lg">
+                      {user.first_name?.charAt(0).toUpperCase() || 'U'}
+                    </div>
+                  )}
+                </div>
+                {/* Notification Badge - Outside the profile circle */}
+                {notificationBadgeCount > 0 && (
+                  <div className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full w-6 h-6 flex items-center justify-center animate-pulse font-bold border-2 border-white shadow-lg z-10">
+                    {notificationBadgeCount > 9 ? '9+' : notificationBadgeCount}
                   </div>
                 )}
               </div>
@@ -285,17 +375,34 @@ export default function Sidebar() {
                   <FaUser className="text-sm" />
                   <span>Profile</span>
                 </Link>
-                <button
-                  className="flex w-full items-center gap-2 px-5 py-3 hover:bg-gray-100 transition"
-                  onClick={() => {
-                    setDropdownOpen(false);
-                    // Small delay to let dropdown close animation finish
-                    setTimeout(() => setNotificationPanelOpen(true), 200);
-                  }}
-                >
-                  <FaBell className="text-sm" />
-                  <span>Notifications</span>
-                </button>
+                <div className="relative">
+                  <NotificationPanel 
+                    className=""
+                    onOpen={() => {
+                      setDropdownOpen(false);
+                      setTimeout(() => {
+                        setNotificationPanelOpen(true);
+                        // Refresh notification badge count when opening notification panel
+                        fetchNotificationBadgeCount();
+                      }, 200);
+                    }}
+                  />
+                  {/* Show event/announcement notification indicators for students */}
+                  {role === 'student' && (eventNotificationCount > 0 || announcementNotificationCount > 0) && (
+                    <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                      {eventNotificationCount > 0 && (
+                        <div className="bg-blue-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center animate-pulse font-bold" title={`${eventNotificationCount} new event${eventNotificationCount > 1 ? 's' : ''}`}>
+                          <FaCalendarAlt className="w-2 h-2" />
+                        </div>
+                      )}
+                      {announcementNotificationCount > 0 && (
+                        <div className="bg-green-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center animate-pulse font-bold" title={`${announcementNotificationCount} new announcement${announcementNotificationCount > 1 ? 's' : ''}`}>
+                          <FaBullhorn className="w-2 h-2" />
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
                 <hr className="border-t border-gray-200 my-1" />
                 <button
                   className="flex w-full items-center gap-2 px-5 py-3 hover:bg-red-50 transition"
@@ -314,7 +421,11 @@ export default function Sidebar() {
           {/* Notification Panel - Outside of dropdown */}
           <NotificationPanel 
             isOpen={notificationPanelOpen} 
-            onClose={() => setNotificationPanelOpen(false)}
+            onClose={() => {
+              setNotificationPanelOpen(false);
+              // Refresh notification badge count when closing notification panel
+              setTimeout(() => fetchNotificationBadgeCount(), 500);
+            }}
           />
         </div>
       </aside>

@@ -18,7 +18,7 @@ export default function Modal({ open, onClose, children }: ModalProps) {
           exit={{ opacity: 0 }}
         >
           <div
-            className="absolute inset-0 backdrop-blur-md bg-white/10"
+            className="absolute inset-0 backdrop-blur bg-white/10"
             onClick={onClose}
           />
           <motion.div
