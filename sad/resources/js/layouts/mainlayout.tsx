@@ -1,7 +1,7 @@
 import Sidebar from '@/components/sidebar'
 import { AnimatePresence, motion } from 'framer-motion'
-import { ToastContainer } from 'react-toastify'
-import 'react-toastify/dist/ReactToastify.css'
+import FlashToaster from '@/components/FlashToaster'
+// ToastContainer is provided globally in app.tsx
 
 export default function MainLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -19,19 +19,9 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
             {children}
           </motion.div>
         </AnimatePresence>
-      </main>
-      <ToastContainer
-        position="top-right"
-        autoClose={3000}
-        hideProgressBar={false}
-        newestOnTop={false}
-        closeOnClick
-        rtl={false}
-        pauseOnFocusLoss
-        draggable
-        pauseOnHover
-        theme="light"
-      />
+  </main>
+  {/* Toast listener lives under Inertia context to avoid usePage error */}
+  <FlashToaster />
     </div>
   )
 }

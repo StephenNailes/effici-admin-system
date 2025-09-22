@@ -19,13 +19,15 @@ export default function Modal({ open, onClose, children }: ModalProps) {
         >
           {/* Enhanced backdrop with blur effect */}
           <div
-            className="absolute inset-0 backdrop-blur-sm bg-black/30"
+            className="absolute inset-0 bg-black/10 backdrop-blur-sm"
             onClick={onClose}
           />
           
           {/* Modal content container */}
           <motion.div
-            className="relative z-10 w-full max-w-3xl"
+            role="dialog"
+            aria-modal="true"
+            className="relative z-10 w-full max-w-xs sm:max-w-sm md:max-w-md lg:max-w-lg bg-white rounded-2xl shadow-xl border border-gray-200 p-6"
             initial={{ scale: 0.95, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0.95, opacity: 0 }}
