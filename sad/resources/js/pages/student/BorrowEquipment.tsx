@@ -185,9 +185,6 @@ export default function BorrowEquipment() {
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [confirmChecked, setConfirmChecked] = useState(false);
 
-  const [notification, setNotification] = useState<{ type: "error" | "success"; message: string } | null>(null);
-  const [showNotification, setShowNotification] = useState(false);
-
   const { data, setData, processing, reset } = useForm<{
     activity_plan_id?: number | null;
     purpose: string;
@@ -259,24 +256,6 @@ export default function BorrowEquipment() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data.start_datetime, data.end_datetime]);
 
-  useEffect(() => {
-    if (props.flash?.success) {
-      triggerNotification("success", props.flash.success);
-    }
-    if (props.flash?.error) {
-      triggerNotification("error", props.flash.error);
-    }
-  }, [props.flash]);
-
-  function triggerNotification(type: "error" | "success", message: string) {
-    setNotification({ type, message });
-    setShowNotification(true);
-    setTimeout(() => {
-      setShowNotification(false);
-      setTimeout(() => setNotification(null), 300);
-    }, 3000);
-  }
-
   function submit(e: React.FormEvent) {
     e.preventDefault();
     setShowConfirmModal(true);
@@ -291,8 +270,8 @@ export default function BorrowEquipment() {
         setConfirmChecked(false);
       },
       onError: (errors) => {
-        const errorMessage = Object.values(errors).flat().join(", ");
-        triggerNotification("error", errorMessage || "Failed to submit request.");
+        // Errors will be handled by React Toastify
+        console.error("Equipment request submission failed:", errors);
       },
     });
   }
@@ -313,26 +292,6 @@ export default function BorrowEquipment() {
 
   return (
     <MainLayout>
-      {/* Toast */}
-      {notification && (
-        <div
-          className={`fixed top-6 right-6 z-50 max-w-sm px-4 py-3 rounded-lg shadow-lg transition-all duration-500 transform ${
-            showNotification ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-4"
-          } ${notification.type === "error" ? "bg-red-500 text-white" : "bg-green-500 text-white"}`}
-        >
-          <div className="flex justify-between items-center">
-            <span className="text-sm font-medium">{notification.message}</span>
-            <button
-              onClick={() => setShowNotification(false)}
-              className="ml-3 text-white font-bold"
-              aria-label="Close notification"
-            >
-              ×
-            </button>
-          </div>
-        </div>
-      )}
-
       <div className="p-6 font-poppins min-h-screen text-black bg-white">
         {/* Header */}
         <div className="mb-8 flex flex-col gap-1">

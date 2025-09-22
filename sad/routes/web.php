@@ -28,50 +28,55 @@ use App\Models\Announcement;
 // 🔁 Redirect root to login page
 Route::get('/', fn () => redirect()->route('login'));
 
-// 🟩 Login Routes
-Route::get('/login', [AuthenticatedSessionController::class, 'create'])->name('login');
-Route::post('/login', [AuthenticatedSessionController::class, 'store']);
-Route::post('/logout', [AuthenticatedSessionController::class, 'destroy'])->name('logout');
+// 🟩 Auth Routes
+Route::middleware('guest')->group(function () {
+    Route::get('/login', [AuthenticatedSessionController::class, 'create'])->name('login');
+    Route::post('/login', [AuthenticatedSessionController::class, 'store'])->middleware('throttle:10,1');
 
-// 🟩 Registration Routes
-Route::get('/register', [RegisteredUserController::class, 'create'])->name('register');
-Route::post('/register', [RegisteredUserController::class, 'store'])->name('register.store');
-
-// ✅ Optional: Database connection check
-Route::get('/db-check', function () {
-    try {
-        DB::connection()->getPdo();
-        return '✅ Connected to DB: ' . DB::connection()->getDatabaseName();
-    } catch (\Exception $e) {
-        return '❌ DB Error: ' . $e->getMessage();
-    }
+    Route::get('/register', [RegisteredUserController::class, 'create'])->name('register');
+    Route::post('/register', [RegisteredUserController::class, 'store'])->name('register.store')->middleware('throttle:10,1');
 });
 
-// ✅ Resend Email Test Route
-Route::get('/test-resend', function () {
-    try {
-        $start = microtime(true);
-        \Illuminate\Support\Facades\Mail::raw('Test email from Resend API - EFFICIADMIN System', function($message) {
-            $message->to('snailes_230000001146@uic.edu.ph')  // Your verified email
-                   ->subject('Resend Test - EFFICIADMIN System');
-        });
-        $end = microtime(true);
-        $time = round(($end - $start), 3);
-        return "✅ SUCCESS: Email sent via Resend in {$time} seconds<br>Current mailer: " . config('mail.default');
-    } catch (\Exception $e) {
-        return "❌ ERROR: " . $e->getMessage();
-    }
-});
+Route::post('/logout', [AuthenticatedSessionController::class, 'destroy'])
+    ->middleware('auth')
+    ->name('logout');
+
+// ✅ Optional: Development-only utility routes
+if (app()->environment('local')) {
+    Route::get('/db-check', function () {
+        try {
+            DB::connection()->getPdo();
+            return '✅ Connected to DB: ' . DB::connection()->getDatabaseName();
+        } catch (\Exception $e) {
+            return '❌ DB Error: ' . $e->getMessage();
+        }
+    });
+
+    Route::get('/test-resend', function () {
+        try {
+            $start = microtime(true);
+            \Illuminate\Support\Facades\Mail::raw('Test email from Resend API - EFFICIADMIN System', function($message) {
+                $message->to('snailes_230000001146@uic.edu.ph')  // Your verified email
+                       ->subject('Resend Test - EFFICIADMIN System');
+            });
+            $end = microtime(true);
+            $time = round(($end - $start), 3);
+            return "✅ SUCCESS: Email sent via Resend in {$time} seconds<br>Current mailer: " . config('mail.default');
+        } catch (\Exception $e) {
+            return "❌ ERROR: " . $e->getMessage();
+        }
+    });
+}
 
 // ✅ Email Verification Routes
 Route::get('/email/verify', function () {
     return Inertia::render('auth/verifyemail', [
         'emailJustSent' => Session::get('status') === 'verification-link-sent',
     ]);
-})->name('verification.notice');
+})->middleware('auth')->name('verification.notice');
 
 Route::get('/email/verify/{id}/{hash}', VerifyEmailController::class)
-    ->middleware(['signed', 'throttle:6,1'])
+    ->middleware(['auth', 'signed', 'throttle:6,1'])
     ->name('verification.verify');
 
 Route::post('/email/verification-notification', [EmailVerificationNotificationController::class, 'store'])
@@ -154,20 +159,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/api/equipment/all', [EquipmentController::class, 'all']);
     Route::get('/api/equipment/availableForStudent', [EquipmentController::class, 'availableForStudent']);
 
-    // Equipment Management API for admin
-    Route::get('/api/equipment-requests/manage', [EquipmentRequestController::class, 'manage']);
-    Route::patch('/api/equipment-requests/{id}/status', [EquipmentRequestController::class, 'updateStatus']);
-    
-    // Notification API routes
-    Route::get('/api/notifications', [App\Http\Controllers\NotificationController::class, 'index']);
-    Route::post('/api/notifications/{id}/read', [App\Http\Controllers\NotificationController::class, 'markAsRead']);
-    Route::delete('/api/notifications/{id}', [App\Http\Controllers\NotificationController::class, 'delete']);
-    Route::post('/api/notifications/mark-all-read', [App\Http\Controllers\NotificationController::class, 'markAllAsRead']);
-    Route::get('/api/notifications/unread-count', [App\Http\Controllers\NotificationController::class, 'getUnreadCount']);
+    // (moved) Equipment management admin API is defined below with proper role protection
+    // (moved) Notification API routes are defined once below with throttling
 });
 
-// 🟩 Admin + Dean Request Pages
-Route::middleware(['auth', 'verified'])->group(function () {
+// 🟩 Admin + Dean Request Pages (role protected)
+Route::middleware(['auth', 'verified', 'role:admin_assistant,dean'])->group(function () {
     Route::get('/admin/requests', fn () => Inertia::render('admin_assistant/request'))->name('admin.requests');
     Route::get('/admin/activity-plan-approval/{id}', fn ($id) => Inertia::render('admin_assistant/ActivityPlanApproval', ['id' => $id]))->name('admin.activity-plan-approval');
     Route::get('/admin/equipment-management', fn () => Inertia::render('admin_assistant/EquipmentManagement'))->name('admin.equipment-management');
@@ -182,13 +179,18 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->name('dean.activity-history');
 });
 
-// 🟩 Unified Approval API
-Route::middleware(['auth', 'verified'])->prefix('api/approvals')->group(function () {
+// 🟩 Unified Approval API (role protected)
+Route::middleware(['auth', 'verified', 'role:admin_assistant,dean'])->prefix('api/approvals')->group(function () {
     Route::get('/', [ApprovalController::class, 'indexApi'])->name('approvals.index');
     Route::get('/{id}', [ApprovalController::class, 'show'])->name('approvals.show');
     Route::post('/{id}/approve', [ApprovalController::class, 'approve'])->name('approvals.approve');
     Route::post('/{id}/revision', [ApprovalController::class, 'requestRevision'])->name('approvals.revision');
 });
+    // Equipment Management API for admin (role protected)
+    Route::middleware(['auth', 'verified', 'role:admin_assistant'])->group(function () {
+        Route::get('/api/equipment-requests/manage', [EquipmentRequestController::class, 'manage']);
+        Route::patch('/api/equipment-requests/{id}/status', [EquipmentRequestController::class, 'updateStatus']);
+    });
 
 // 🟩 Events + Announcements
 Route::middleware(['auth', 'verified'])->group(function () {
@@ -205,19 +207,27 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/announcements/{id}/edit', [AnnouncementController::class, 'edit'])->name('announcements.edit');
     Route::put('/announcements/{id}', [AnnouncementController::class, 'update'])->name('announcements.update');
     Route::delete('/announcements/{id}', [AnnouncementController::class, 'destroy'])->name('announcements.destroy');
+    // Notification API routes (defined once)
+    Route::prefix('api/notifications')->group(function () {
+        Route::get('/', [App\Http\Controllers\NotificationController::class, 'index']);
+        Route::post('/{id}/read', [App\Http\Controllers\NotificationController::class, 'markAsRead'])->middleware('throttle:30,1');
+        Route::delete('/{id}', [App\Http\Controllers\NotificationController::class, 'delete']);
+        Route::post('/mark-all-read', [App\Http\Controllers\NotificationController::class, 'markAllAsRead'])->middleware('throttle:6,1');
+        Route::get('/unread-count', [App\Http\Controllers\NotificationController::class, 'getUnreadCount'])->middleware('throttle:12,1');
+    });
 });
 
 // 🟩 Comments
 Route::middleware('auth')->group(function () {
-    Route::post('/comments', [CommentController::class, 'store'])->name('comments.store');
+    Route::post('/comments', [CommentController::class, 'store'])->middleware('throttle:30,1')->name('comments.store');
     Route::get('/comments/{type}/{id}', [CommentController::class, 'index'])->name('comments.index');
-    Route::put('/comments/{id}', [CommentController::class, 'update'])->name('comments.update');
-    Route::delete('/comments/{id}', [CommentController::class, 'destroy'])->name('comments.destroy');
+    Route::put('/comments/{id}', [CommentController::class, 'update'])->middleware('throttle:30,1')->name('comments.update');
+    Route::delete('/comments/{id}', [CommentController::class, 'destroy'])->middleware('throttle:30,1')->name('comments.destroy');
 });
 
 // 🟩 Likes
 Route::middleware('auth')->group(function () {
-    Route::post('/likes/toggle', [LikeController::class, 'toggle'])->name('likes.toggle');
+    Route::post('/likes/toggle', [LikeController::class, 'toggle'])->middleware('throttle:60,1')->name('likes.toggle');
     Route::get('/likes/{type}/{id}', [LikeController::class, 'show'])->name('likes.show');
 });
 

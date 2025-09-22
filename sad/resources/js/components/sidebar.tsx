@@ -81,18 +81,16 @@ export default function Sidebar() {
       
       let badgeCount = 0;
       
-      // Always include urgent/high priority unread notifications for all users
-      const urgentCount = notifications.filter((n: any) => 
-        (n.priority === 'urgent' || n.priority === 'high') && !n.is_read
-      ).length;
-      badgeCount += urgentCount;
-      
-      // For admin/dean users, also include new request submissions and resubmissions
+      // For admin/dean users, include all unread notifications (request notifications already have appropriate priorities)
       if (role === 'admin_assistant' || role === 'dean') {
-        const requestNotifications = notifications.filter((n: any) => 
-          !n.is_read && (n.type === 'new_request' || n.type === 'request_resubmission')
+        const allUnreadCount = notifications.filter((n: any) => !n.is_read).length;
+        badgeCount += allUnreadCount;
+      } else {
+        // For other users (students), only include urgent/high priority notifications
+        const urgentCount = notifications.filter((n: any) => 
+          (n.priority === 'urgent' || n.priority === 'high') && !n.is_read
         ).length;
-        badgeCount += requestNotifications;
+        badgeCount += urgentCount;
       }
       
       // For students, also include new events and announcements
@@ -185,7 +183,6 @@ export default function Sidebar() {
     dean: [
       { name: 'Home', href: route('dean.dashboard'), icon: <FaHome /> },
       { name: 'Requests', href: route('dean.requests'), icon: <FaFileAlt /> },
-      { name: 'Analytics', href: route('dean.analytics'), icon: <FaChartBar /> },
       { name: 'Activity History', href: route('dean.activity-history'), icon: <FaChartLine /> },
     ],
   };

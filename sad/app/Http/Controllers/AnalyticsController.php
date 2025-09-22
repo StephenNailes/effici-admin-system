@@ -30,6 +30,7 @@ class AnalyticsController extends Controller
             'monthlyApprovalRates' => $this->getMonthlyApprovalRates($startDate, $endDate, 'dean'),
             'timeToApproval' => $this->getTimeToApprovalStats($startDate, $endDate, 'dean'),
             'seasonalPatterns' => $this->getSeasonalPatterns(),
+            'currentStatus' => $this->getCurrentStatusData('dean'),
             'summaryStats' => $this->getSummaryStats($startDate, $endDate, 'dean'),
         ];
 
@@ -58,6 +59,7 @@ class AnalyticsController extends Controller
             'monthlyApprovalRates' => $this->getMonthlyApprovalRates($startDate, $endDate, 'admin_assistant'),
             'timeToApproval' => $this->getTimeToApprovalStats($startDate, $endDate, 'admin_assistant'),
             'seasonalPatterns' => $this->getSeasonalPatterns(),
+            'currentStatus' => $this->getCurrentStatusData('admin_assistant'),
             'summaryStats' => $this->getSummaryStats($startDate, $endDate, 'admin_assistant'),
         ];
 
@@ -70,7 +72,7 @@ class AnalyticsController extends Controller
     private function getMonthlyApprovalRates($startDate, $endDate, $role = 'dean')
     {
         $monthlyData = RequestApproval::where('approver_role', $role)
-            ->where('request_type', 'activity_plan')
+            ->whereIn('request_type', ['activity_plan', 'equipment'])
             ->whereBetween('created_at', [$startDate, $endDate])
             ->select([
                 DB::raw('DATE_FORMAT(created_at, "%b") as month'),
@@ -108,7 +110,7 @@ class AnalyticsController extends Controller
     private function getTimeToApprovalStats($startDate, $endDate, $role = 'dean')
     {
         $approvedRequests = RequestApproval::where('approver_role', $role)
-            ->where('request_type', 'activity_plan')
+            ->whereIn('request_type', ['activity_plan', 'equipment'])
             ->where('status', 'approved')
             ->whereBetween('created_at', [$startDate, $endDate])
             ->select([
@@ -161,7 +163,8 @@ class AnalyticsController extends Controller
         // Get submissions by month for the current year
         $currentYear = Carbon::now()->year;
         
-        $monthlySubmissions = ActivityPlan::whereYear('created_at', $currentYear)
+        // Combine activity plans and equipment requests for total submissions
+        $activityPlansData = ActivityPlan::whereYear('created_at', $currentYear)
             ->select([
                 DB::raw('DATE_FORMAT(created_at, "%b") as month'),
                 DB::raw('MONTH(created_at) as month_num'),
@@ -169,15 +172,37 @@ class AnalyticsController extends Controller
             ])
             ->groupBy('month_num', 'month')
             ->orderBy('month_num')
-            ->get()
-            ->keyBy('month');
+            ->get();
+            
+        $equipmentRequestsData = \App\Models\EquipmentRequest::whereYear('created_at', $currentYear)
+            ->select([
+                DB::raw('DATE_FORMAT(created_at, "%b") as month'),
+                DB::raw('MONTH(created_at) as month_num'),
+                DB::raw('COUNT(*) as submissions')
+            ])
+            ->groupBy('month_num', 'month')
+            ->orderBy('month_num')
+            ->get();
+            
+        // Combine both datasets
+        $combinedData = collect();
+        foreach($activityPlansData as $data) {
+            $combinedData->put($data->month, $data->submissions);
+        }
+        
+        foreach($equipmentRequestsData as $data) {
+            $existing = $combinedData->get($data->month, 0);
+            $combinedData->put($data->month, $existing + $data->submissions);
+        }
+        
+        $monthlySubmissions = $combinedData;
 
         // Define all months
         $months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
         
         $result = [];
         foreach ($months as $month) {
-            $submissions = $monthlySubmissions->get($month)->submissions ?? 0;
+            $submissions = $monthlySubmissions->get($month, 0);
             $trend = $submissions > 20 ? 'peak' : ($submissions > 10 ? 'high' : ($submissions > 5 ? 'moderate' : 'low'));
             
             $result[] = [
@@ -195,18 +220,18 @@ class AnalyticsController extends Controller
     {
         // Current period data
         $totalSubmissions = RequestApproval::where('approver_role', $role)
-            ->where('request_type', 'activity_plan')
+            ->whereIn('request_type', ['activity_plan', 'equipment'])
             ->whereBetween('created_at', [$startDate, $endDate])
             ->count();
             
         $totalApproved = RequestApproval::where('approver_role', $role)
-            ->where('request_type', 'activity_plan')
+            ->whereIn('request_type', ['activity_plan', 'equipment'])
             ->where('status', 'approved')
             ->whereBetween('created_at', [$startDate, $endDate])
             ->count();
             
         $totalRevisionRequested = RequestApproval::where('approver_role', $role)
-            ->where('request_type', 'activity_plan')
+            ->whereIn('request_type', ['activity_plan', 'equipment'])
             ->where('status', 'revision_requested')
             ->whereBetween('created_at', [$startDate, $endDate])
             ->count();
@@ -219,12 +244,12 @@ class AnalyticsController extends Controller
         $previousEndDate = $startDate->copy()->subDay();
         
         $previousSubmissions = RequestApproval::where('approver_role', $role)
-            ->where('request_type', 'activity_plan')
+            ->whereIn('request_type', ['activity_plan', 'equipment'])
             ->whereBetween('created_at', [$previousStartDate, $previousEndDate])
             ->count();
             
         $previousApproved = RequestApproval::where('approver_role', $role)
-            ->where('request_type', 'activity_plan')
+            ->whereIn('request_type', ['activity_plan', 'equipment'])
             ->where('status', 'approved')
             ->whereBetween('created_at', [$previousStartDate, $previousEndDate])
             ->count();
@@ -239,6 +264,30 @@ class AnalyticsController extends Controller
             'overallApprovalRate' => $overallApprovalRate,
             'approvalRateTrend' => $approvalRateTrend,
             'previousApprovalRate' => $previousApprovalRate
+        ];
+    }
+
+    private function getCurrentStatusData($role = 'admin_assistant')
+    {
+        $pendingCount = RequestApproval::where('approver_role', $role)
+            ->whereIn('request_type', ['activity_plan', 'equipment'])
+            ->where('status', 'pending')
+            ->count();
+
+        $approvedCount = RequestApproval::where('approver_role', $role)
+            ->whereIn('request_type', ['activity_plan', 'equipment'])
+            ->where('status', 'approved')
+            ->count();
+
+        $revisionRequestedCount = RequestApproval::where('approver_role', $role)
+            ->whereIn('request_type', ['activity_plan', 'equipment'])
+            ->where('status', 'revision_requested')
+            ->count();
+
+        return [
+            'pending' => $pendingCount,
+            'approved' => $approvedCount,
+            'revision_requested' => $revisionRequestedCount,
         ];
     }
 }

@@ -16,9 +16,9 @@ class RevisionController extends Controller
         
         // Fetch activity plans that need revision
         $activityRevisions = DB::table('activity_plans')
-            ->leftJoin('request_approvals', function ($join) {
+        ->leftJoin('request_approvals', function ($join) {
                 $join->on('activity_plans.id', '=', 'request_approvals.request_id')
-                    ->where('request_approvals.request_type', '=', 'activity')
+            ->where('request_approvals.request_type', '=', 'activity_plan')
                     ->where('request_approvals.status', '=', 'revision_requested');
             })
             ->where('activity_plans.user_id', $userId)
@@ -28,7 +28,7 @@ class RevisionController extends Controller
                 'activity_plans.activity_name as title',
                 'request_approvals.remarks as comment',
                 'activity_plans.status',
-                DB::raw("'activity' as request_type")
+                DB::raw("'activity_plan' as request_type")
             ])
             ->get();
 
@@ -71,11 +71,11 @@ class RevisionController extends Controller
         $userId = Auth::id();
         $requestType = request()->query('type');
 
-        if ($requestType === 'activity') {
+    if ($requestType === 'activity_plan') {
             $revision = DB::table('activity_plans')
                 ->leftJoin('request_approvals', function ($join) {
                     $join->on('activity_plans.id', '=', 'request_approvals.request_id')
-                        ->where('request_approvals.request_type', '=', 'activity')
+                        ->where('request_approvals.request_type', '=', 'activity_plan')
                         ->where('request_approvals.status', '=', 'revision_requested');
                 })
                 ->where('activity_plans.id', $id)
@@ -84,7 +84,7 @@ class RevisionController extends Controller
                 ->select([
                     'activity_plans.*',
                     'request_approvals.remarks as comment',
-                    DB::raw("'activity' as request_type")
+                    DB::raw("'activity_plan' as request_type")
                 ])
                 ->first();
         } else {
@@ -159,7 +159,7 @@ class RevisionController extends Controller
         ]);
 
         DB::transaction(function () use ($id, $validated, $userId, $requestType) {
-            if ($requestType === 'activity') {
+            if ($requestType === 'activity_plan') {
                 // Update activity plan
                 $affectedRows = DB::table('activity_plans')
                     ->where('id', $id)
@@ -187,7 +187,7 @@ class RevisionController extends Controller
                 // Reset approval status to pending
                 $approvalAffectedRows = DB::table('request_approvals')
                     ->where('request_id', $id)
-                    ->where('request_type', 'activity')
+                    ->where('request_type', 'activity_plan')
                     ->update([
                         'status' => 'pending',
                         'remarks' => null,

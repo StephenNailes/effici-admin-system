@@ -145,7 +145,7 @@ export default function Request() {
         <div className="mb-6">
           <div>
             <h1 className="text-2xl font-bold text-black">Activity Plan Approval</h1>
-            <p className="text-gray-600">Review and approve student activity plans. Final approval authority for activities.</p>
+            <p className="text-gray-600">Review and approve student activity plans.</p>
           </div>
         </div>
         

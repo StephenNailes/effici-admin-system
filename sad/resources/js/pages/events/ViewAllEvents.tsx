@@ -9,6 +9,8 @@ import { usePage, router } from '@inertiajs/react';
 import { motion, AnimatePresence } from 'framer-motion';
 import axios from 'axios';
 
+// Pagination removed; pages now receive plain arrays
+
 interface Event {
   id: number; // add id for DB reference
   title: string;
@@ -71,7 +73,8 @@ const cardVariants = {
 };
 
 export default function ViewAllEvents() {
-  const { auth, events = [] } = usePage<PageProps>().props; // Expect events from props or API
+  const { auth, events = [] } = usePage<PageProps>().props; // Now events is a plain array
+  const items: Event[] = Array.isArray(events) ? events : [];
 
   // Check if user can create events (admin_assistant or dean)
   const canCreateEvent = auth.user.role === 'admin_assistant' || auth.user.role === 'dean';
@@ -102,7 +105,7 @@ export default function ViewAllEvents() {
 
   const addComment = async (eventId: number, payload: { commentable_id: number; commentable_type: string; text: string; parent_id?: number }) => {
     try {
-      const res = await axios.post('/comments', payload);
+      await axios.post('/comments', payload);
       
       // Reload all comments to get the updated structure with replies
       const commentsRes = await axios.get(`/comments/events/${eventId}`);
@@ -143,7 +146,7 @@ export default function ViewAllEvents() {
   // Load likes and comments for all events on component mount
   useEffect(() => {
     const loadLikesAndComments = async () => {
-      for (const event of events) {
+  for (const event of items) {
         try {
           // Load likes
           const likesRes = await axios.get(`/likes/events/${event.id}`);
@@ -173,10 +176,10 @@ export default function ViewAllEvents() {
       }
     };
     
-    if (events.length > 0) {
+    if (items.length > 0) {
       loadLikesAndComments();
     }
-  }, [events]);
+  }, [items]);
 
   // Load comments when modal opens (for real-time updates)
   useEffect(() => {
@@ -310,7 +313,7 @@ export default function ViewAllEvents() {
               <motion.button
                 whileTap={{ scale: 0.98 }}
                 onClick={() => router.visit('/events/create')}
-                className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-white shadow-sm hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
+                className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-white shadow-sm hover:bg-red-700 focus:outline-none"
               >
                 <Plus className="w-4 h-4" />
                 Add Event
@@ -323,8 +326,8 @@ export default function ViewAllEvents() {
             animate="visible"
             className="grid gap-5 sm:gap-6 md:grid-cols-2 lg:grid-cols-3"
           >
-            {events.length > 0 ? (
-              events.map((event: Event) => (
+            {items.length > 0 ? (
+              items.map((event: Event) => (
                 <motion.article
                   variants={cardVariants}
                   key={event.id}
@@ -464,6 +467,7 @@ export default function ViewAllEvents() {
               <p className="text-gray-500 italic">No events available.</p>
             )}
           </motion.div>
+          {/* Pagination removed */}
         </section>
       </motion.div>
     {/* Delete Confirmation Modal */}

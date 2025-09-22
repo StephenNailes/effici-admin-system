@@ -9,6 +9,8 @@ import { usePage, router } from '@inertiajs/react';
 import { motion, AnimatePresence } from 'framer-motion';
 import axios from 'axios';
 
+// Pagination removed; pages now receive plain arrays
+
 interface Announcement {
   id: number;
   title: string;
@@ -76,10 +78,7 @@ export default function ViewAllAnnouncements() {
   // Check if user can create announcements (admin_assistant or dean)
   const canCreateAnnouncement = auth.user.role === 'admin_assistant' || auth.user.role === 'dean';
 
-  // Filter using created_by (snake_case)
-  const filtered = announcements.filter(
-    (a: Announcement) => a.created_by === 'admin_assistant' || a.created_by === 'dean'
-  );
+  const items: Announcement[] = Array.isArray(announcements) ? announcements : [];
 
   const [comments, setComments] = useState<Record<number, Comment[]>>({});
   const [modalAnnouncementId, setModalAnnouncementId] = useState<number | null>(null);
@@ -93,7 +92,7 @@ export default function ViewAllAnnouncements() {
 
   useEffect(() => {
     if (modalAnnouncementId !== null) {
-      const ann = filtered.find((a: Announcement) => a.id === modalAnnouncementId);
+      const ann = items.find((a: Announcement) => a.id === modalAnnouncementId);
       if (!ann) return;
       axios
         .get(`/comments/announcements/${ann.id}`)
@@ -116,7 +115,7 @@ export default function ViewAllAnnouncements() {
           }));
         });
     }
-  }, [modalAnnouncementId, filtered]);
+  }, [modalAnnouncementId, items]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -136,7 +135,7 @@ export default function ViewAllAnnouncements() {
     payload: { commentable_id: number; commentable_type: string; text: string; parent_id?: number }
   ) => {
     try {
-      const res = await axios.post('/comments', payload);
+      await axios.post('/comments', payload);
       
       // Reload all comments to get the updated structure with replies
       const commentsRes = await axios.get(`/comments/announcements/${announcementId}`);
@@ -177,7 +176,7 @@ export default function ViewAllAnnouncements() {
   // Load likes and comments for all announcements on component mount
   useEffect(() => {
     const loadLikesAndComments = async () => {
-      for (const announcement of filtered) {
+      for (const announcement of items) {
         try {
           // Load likes
           const likesRes = await axios.get(`/likes/announcements/${announcement.id}`);
@@ -207,10 +206,10 @@ export default function ViewAllAnnouncements() {
       }
     };
     
-    if (filtered.length > 0) {
+    if (items.length > 0) {
       loadLikesAndComments();
     }
-  }, [filtered]);
+  }, [items]);
 
   const editComment = async (announcementId: number, commentId: number, newText: string) => {
     try {
@@ -315,7 +314,7 @@ export default function ViewAllAnnouncements() {
               <motion.button
                 whileTap={{ scale: 0.98 }}
                 onClick={() => router.visit('/announcements/create')}
-                className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-white shadow-sm hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
+                className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-white shadow-sm hover:bg-red-700 focus:outline-none"
               >
                 <Plus className="w-4 h-4" />
                 Add Announcement
@@ -328,8 +327,8 @@ export default function ViewAllAnnouncements() {
             animate="visible"
             className="grid gap-5 sm:gap-6 md:grid-cols-2 lg:grid-cols-3"
           >
-            {filtered.length > 0 ? (
-              filtered.map((a: Announcement) => (
+            {items.length > 0 ? (
+              items.map((a: Announcement) => (
                 <motion.article
                   key={a.id}
                   variants={cardVariants}
@@ -467,6 +466,7 @@ export default function ViewAllAnnouncements() {
               <p className="text-gray-500 italic">No announcements posted.</p>
             )}
           </motion.div>
+          {/* Pagination removed */}
         </section>
       </motion.div>
       {/* Delete Confirmation Modal */}

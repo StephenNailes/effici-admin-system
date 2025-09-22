@@ -26,7 +26,7 @@ const FilterModal = ({
   const typeOptions = ["All Types", "Activity Plan", "Equipment"];
   const statusOptions = [
     "All Status", "Pending", "Approved", "Completed", 
-    "Under Revision", "Cancelled", "Checked Out", 
+    "Under Revision", "Checked Out", 
     "Returned", "Overdue"
   ];
 
@@ -534,12 +534,6 @@ export default function ActivityHistory() {
                             return (
                               <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-blue-100 text-blue-700 text-xs font-semibold">
                                 Under Revision
-                              </span>
-                            );
-                          } else if (status === "cancelled") {
-                            return (
-                              <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-red-100 text-red-700 text-xs font-semibold">
-                                Cancelled
                               </span>
                             );
                           } else if (status === "checked out") {

@@ -289,6 +289,41 @@ class NotificationService
     }
 
     /**
+     * Get notifications for user using Laravel pagination
+     */
+    public function getForUserPaginated($userId, $perPage = 10, $page = 1): array
+    {
+        $paginator = Notification::forUser($userId)
+            ->orderBy('created_at', 'desc')
+            ->paginate($perPage, ['*'], 'page', $page);
+
+        $data = collect($paginator->items())->map(function ($notification) {
+            return [
+                'id' => $notification->id,
+                'type' => $notification->type,
+                'title' => $notification->title,
+                'message' => $notification->message,
+                'data' => $notification->data,
+                'action_url' => $notification->action_url,
+                'priority' => $notification->priority,
+                'is_read' => $notification->isRead(),
+                'time_ago' => $notification->time_ago,
+                'created_at' => $notification->created_at->toISOString()
+            ];
+        })->all();
+
+        return [
+            'data' => $data,
+            'meta' => [
+                'current_page' => $paginator->currentPage(),
+                'last_page' => $paginator->lastPage(),
+                'per_page' => $paginator->perPage(),
+                'total' => $paginator->total(),
+            ],
+        ];
+    }
+
+    /**
      * Mark notification as read
      */
     public function markAsRead($notificationId, $userId): bool

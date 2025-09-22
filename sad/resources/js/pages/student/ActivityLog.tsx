@@ -47,7 +47,7 @@ export default function ActivityLog() {
     const colors: Record<string, string> = {
       Approved: "bg-green-100 text-green-700 border-green-300",
       Pending: "bg-yellow-100 text-yellow-700 border-yellow-300",
-      Cancelled: "bg-red-100 text-red-700 border-red-300",
+
       Completed: "bg-green-100 text-green-800 border-green-400",
     };
     return (
@@ -127,7 +127,7 @@ export default function ActivityLog() {
                 <option value="">All</option>
                 <option value="Approved">Approved</option>
                 <option value="Pending">Pending</option>
-                <option value="Cancelled">Cancelled</option>
+
               </select>
             </div>
             <div>

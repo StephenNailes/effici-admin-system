@@ -9,7 +9,6 @@ const STATUS_COLORS: Record<string, string> = {
   returned: "bg-yellow-100 text-yellow-700",
   overdue: "bg-red-100 text-red-700",
   completed: "bg-gray-200 text-gray-700",
-  cancelled: "bg-red-900 text-white",
 };
 
 const STATUS_LABELS: Record<string, string> = {
@@ -18,13 +17,12 @@ const STATUS_LABELS: Record<string, string> = {
   returned: "Returned",
   overdue: "Overdue",
   completed: "Completed",
-  cancelled: "Cancelled",
 };
 
 function getValidActions(status: string) {
   switch (status) {
     case "approved":
-      return ["check_out", "cancel"];
+      return ["check_out"];
     case "checked_out":
       return ["return", "mark_overdue"];
     case "overdue":
@@ -47,9 +45,9 @@ export default function EquipmentManagement() {
     axios
       .get("/api/equipment-requests/manage")
       .then((res) => {
-        // Filter out completed and cancelled requests
+        // Filter out completed requests
         const activeRequests = res.data.filter((req: any) => 
-          req.status !== "completed" && req.status !== "cancelled"
+          req.status !== "completed"
         );
         setRequests(activeRequests);
         setLoading(false);
@@ -76,9 +74,6 @@ export default function EquipmentManagement() {
       case "complete":
         newStatus = "completed";
         break;
-      case "cancel":
-        newStatus = "cancelled";
-        break;
       default:
         return;
     }
@@ -87,8 +82,8 @@ export default function EquipmentManagement() {
         status: newStatus,
       });
       
-      // If the status is completed or cancelled, remove from the list
-      if (newStatus === "completed" || newStatus === "cancelled") {
+      // If the status is completed, remove from the list
+      if (newStatus === "completed") {
         setRequests((prev) => prev.filter((r) => r.id !== id));
       } else {
         // Otherwise, update the status
@@ -201,7 +196,6 @@ export default function EquipmentManagement() {
                             {action === "return" && "Return"}
                             {action === "mark_overdue" && "Mark Overdue"}
                             {action === "complete" && "Complete"}
-                            {action === "cancel" && "Cancel"}
                           </button>
                         ))}
                       </td>

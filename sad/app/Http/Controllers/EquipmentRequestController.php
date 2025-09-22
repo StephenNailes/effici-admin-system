@@ -27,7 +27,7 @@ class EquipmentRequestController extends Controller
     {
         $requests = EquipmentRequest::with(['items.equipment', 'user'])
             ->whereIn('status', [
-                'approved', 'checked_out', 'returned', 'overdue', 'completed', 'cancelled'
+                'approved', 'checked_out', 'returned', 'overdue', 'completed'
             ])
             ->orderByDesc('created_at')
             ->get()
@@ -46,7 +46,7 @@ class EquipmentRequestController extends Controller
                     }),
                 ];
             });
-    Log::info('Equipment Management API returned:', ['count' => $requests->count(), 'requests' => $requests]);
+    Log::info('Equipment Management API returned', ['count' => $requests->count()]);
         return response()->json($requests);
     }
 
@@ -56,7 +56,7 @@ class EquipmentRequestController extends Controller
     public function updateStatus(Request $request, $id)
     {
         $validated = $request->validate([
-            'status' => 'required|string|in:checked_out,returned,overdue,completed,cancelled'
+            'status' => 'required|string|in:checked_out,returned,overdue,completed'
         ]);
         $newStatus = $validated['status'];
 
@@ -65,7 +65,7 @@ class EquipmentRequestController extends Controller
 
         // Only allow logical transitions
         $validTransitions = [
-            'approved' => ['checked_out', 'cancelled'],
+            'approved' => ['checked_out'],
             'checked_out' => ['returned', 'overdue'],
             'overdue' => ['returned'],
             'returned' => ['completed'],
@@ -176,6 +176,40 @@ class EquipmentRequestController extends Controller
 
         $equipmentRequest = null;
         $user = Auth::user();
+
+        // Validate stock availability for each equipment item during requested time period
+        foreach ($validated['items'] as $item) {
+            $equipmentId = $item['equipment_id'];
+            $requestedQuantity = $item['quantity'];
+            
+            // Calculate available quantity during the requested time window
+            $equipment = DB::table('equipment')->where('id', $equipmentId)->first();
+            if (!$equipment) {
+                return back()->withErrors(['items' => 'Equipment not found']);
+            }
+            
+            $bookedQuantity = DB::table('equipment_request_items as eri')
+                ->join('equipment_requests as er', 'er.id', '=', 'eri.equipment_request_id')
+                ->where('eri.equipment_id', $equipmentId)
+                ->whereIn('er.status', ['pending', 'approved', 'checked_out'])
+                ->where(function ($query) use ($validated) {
+                    $query->whereBetween('er.start_datetime', [$validated['start_datetime'], $validated['end_datetime']])
+                          ->orWhereBetween('er.end_datetime', [$validated['start_datetime'], $validated['end_datetime']])
+                          ->orWhere(function ($q) use ($validated) {
+                              $q->where('er.start_datetime', '<=', $validated['start_datetime'])
+                                ->where('er.end_datetime', '>=', $validated['end_datetime']);
+                          });
+                })
+                ->sum('eri.quantity');
+            
+            $availableQuantity = $equipment->total_quantity - $bookedQuantity;
+            
+            if ($requestedQuantity > $availableQuantity) {
+                return back()->withErrors([
+                    'items' => "Insufficient stock for {$equipment->name}. Available: {$availableQuantity}, Requested: {$requestedQuantity}"
+                ]);
+            }
+        }
 
         DB::transaction(function () use ($validated, &$equipmentRequest, $user) {
             $equipmentRequest = EquipmentRequest::create([

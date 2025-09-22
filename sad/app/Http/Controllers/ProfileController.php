@@ -76,6 +76,7 @@ class ProfileController extends Controller
     public function updateName(Request $request)
     {
         $request->validate([
+            'current_password' => ['required', 'current_password'],
             'first_name' => ['required', 'string', 'max:255'],
             'middle_name' => ['nullable', 'string', 'max:255'],
             'last_name' => ['required', 'string', 'max:255'],
@@ -106,6 +107,7 @@ class ProfileController extends Controller
         }
 
         $request->validate([
+            'current_password' => ['required', 'current_password'],
             'email' => ['required', 'string', 'email', 'max:255', 'unique:users,email,' . $user->id],
         ]);
 
@@ -122,6 +124,7 @@ class ProfileController extends Controller
     public function updatePassword(Request $request)
     {
         $request->validate([
+            'current_password' => ['required', 'current_password'],
             'password' => ['required', 'confirmed', Password::defaults()],
         ]);
 

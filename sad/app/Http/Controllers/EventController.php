@@ -17,13 +17,14 @@ class EventController extends Controller
     {
         $this->notificationService = $notificationService;
     }
-    public function index()
+    public function index(Request $request)
     {
         $events = Event::with('user')
             ->orderByDesc('id')
             ->get();
+
         return Inertia::render('events/ViewAllEvents', [
-            'events' => $events
+            'events' => $events,
         ]);
     }
 

@@ -30,7 +30,7 @@ class ActivityPlan extends Model
     public function approvals()
     {
         return $this->hasMany(RequestApproval::class, 'request_id')
-                    ->where('request_type', 'activity');
+                    ->where('request_type', 'activity_plan');
     }
 
     // ✅ Relationship to attached files

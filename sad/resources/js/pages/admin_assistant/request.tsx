@@ -10,6 +10,29 @@ import { router } from "@inertiajs/react";
 // Add pagination state
 const PAGE_SIZE = 8;
 
+// Local types
+type RequestItem = {
+  approval_id: number;
+  student_name: string;
+  request_type: string; // 'equipment' | 'activity' | 'activity_plan'
+  title?: string;
+  priority?: string; // 'urgent' | 'normal' | 'minor' | string
+  approval_status: string; // 'pending' | 'approved' | 'revision_requested' | 'under_revision' | string
+  submitted_at: string; // ISO date string
+  equipment_items?: Array<{
+    equipment_name: string;
+    quantity: number;
+  }>;
+};
+
+type EquipmentItem = {
+  id: number;
+  name: string;
+  description?: string | null;
+  category?: string | null;
+  total_quantity: number;
+};
+
 export default function Request() {
   const [searchInput, setSearchInput] = useState(""); // for input field
   const [searchTerm, setSearchTerm] = useState("");   // for actual search
@@ -19,52 +42,29 @@ export default function Request() {
     approved: 0,
     underRevision: 0,
   });
-  const [requests, setRequests] = useState<any[]>([]);
-  const [selected, setSelected] = useState<any | null>(null);
-  const [equipment, setEquipment] = useState<any[]>([]);
+  const [requests, setRequests] = useState<RequestItem[]>([]);
+  const [selected, setSelected] = useState<RequestItem | null>(null);
+  const [equipment, setEquipment] = useState<EquipmentItem[]>([]);
   const [equipmentLoading, setEquipmentLoading] = useState(true);
   const [filterModalOpen, setFilterModalOpen] = useState(false);
   const [filters, setFilters] = useState({ status: "", priority: "" });
   const [currentPage, setCurrentPage] = useState(1);
 
   const fetchRequests = () => {
-    axios.get(`/api/approvals?role=admin_assistant`).then((res) => {
-      // Add dummy activity plan data for testing
-      const dummyActivityPlan = {
-        approval_id: 999,
-        student_name: "Stephen Nailes",
-        request_type: "activity",
-        title: "Tech Summit 2025",
-        priority: "normal",
-        approval_status: "pending",
-        submitted_at: "2025-05-02T10:30:00Z"
-      };
-      
-      const requestsWithDummy = [dummyActivityPlan, ...(res.data.requests || [])];
-      setRequests(requestsWithDummy);
-      
-      // Update stats to include the dummy activity plan
-      const originalStats = res.data.stats || { total: 0, pending: 0, approved: 0, underRevision: 0 };
-      setStats({
-        ...originalStats,
-        total: originalStats.total + 1,
-        pending: originalStats.pending + 1
+    axios
+      .get(`/api/approvals?role=admin_assistant`)
+      .then((res) => {
+        setRequests(res.data.requests || []);
+        setStats(
+          res.data.stats || { total: 0, pending: 0, approved: 0, underRevision: 0 }
+        );
+      })
+      .catch((err) => {
+        console.error("Error fetching requests:", err);
+        // Fallback to empty state if API fails
+        setRequests([]);
+        setStats({ total: 0, pending: 0, approved: 0, underRevision: 0 });
       });
-    }).catch(err => {
-      console.error('Error fetching requests:', err);
-      // Fallback to dummy data if API fails
-      const dummyActivityPlan = {
-        approval_id: 999,
-        student_name: "Stephen Nailes",
-        request_type: "activity",
-        title: "Tech Summit 2025",
-        priority: "normal",
-        approval_status: "pending",
-        submitted_at: "2025-05-02T10:30:00Z"
-      };
-      setRequests([dummyActivityPlan]);
-      setStats({ total: 1, pending: 1, approved: 0, underRevision: 0 });
-    });
   };
 
   const fetchEquipment = () => {
@@ -125,9 +125,9 @@ export default function Request() {
       // Show both equipment and activity plan requests
       const requestType = r.request_type?.toLowerCase();
       
-      // Hide approved equipment requests (they've been processed)
+      // Show pending equipment requests and all activity plan requests
       if (requestType === "equipment" && r.approval_status?.toLowerCase() === "approved") {
-        return false;
+        return false; // Hide approved equipment requests as they're already processed
       }
       
       return requestType === "equipment" || requestType === "activity" || requestType === "activity_plan";
@@ -240,7 +240,7 @@ export default function Request() {
                     </tr>
                   </thead>
                   <tbody>
-                    {equipment.map((eq, idx) => (
+                    {equipment.map((eq) => (
                       <tr key={eq.id} className="group hover:bg-red-50 transition-colors border-b border-gray-100">
                         <td className="p-2 font-medium text-gray-900">{eq.name}</td>
                         <td className="p-2 text-gray-600">{eq.description ?? "—"}</td>
@@ -355,7 +355,7 @@ export default function Request() {
                     </td>
                     <td
                       className={`px-6 py-4 text-sm font-medium ${getPriorityColor(
-                        req.priority
+                        req.priority ?? ""
                       )}`}
                     >
                       {req.priority}

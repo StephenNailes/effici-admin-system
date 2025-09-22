@@ -27,15 +27,16 @@ class NotificationController extends Controller
     public function index(Request $request)
     {
         $user = Auth::user();
-        $limit = $request->get('limit', 10);
-        $offset = $request->get('offset', 0);
+        $perPage = (int) $request->get('per_page', 10);
+        $page = (int) $request->get('page', 1);
 
-        $notifications = $this->notificationService->getForUser($user->id, $limit, $offset);
+        $result = $this->notificationService->getForUserPaginated($user->id, $perPage, $page);
         $unreadCount = $this->notificationService->getUnreadCount($user->id);
 
         return response()->json([
-            'notifications' => $notifications,
-            'unread_count' => $unreadCount
+            'notifications' => $result['data'],
+            'meta' => $result['meta'],
+            'unread_count' => $unreadCount,
         ]);
     }
 

@@ -17,13 +17,14 @@ class AnnouncementController extends Controller
     {
         $this->notificationService = $notificationService;
     }
-    public function index()
+    public function index(Request $request)
     {
         $announcements = Announcement::with('user')
             ->orderByDesc('id')
             ->get();
+
         return Inertia::render('announcements/ViewAllAnnouncements', [
-            'announcements' => $announcements
+            'announcements' => $announcements,
         ]);
     }
 

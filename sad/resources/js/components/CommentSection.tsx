@@ -8,6 +8,7 @@ interface User {
   id: number;
   first_name: string;
   last_name: string;
+  profile_picture?: string;
   avatarUrl?: string;
 }
 
@@ -51,7 +52,15 @@ export default function CommentSection({
   const { auth } = usePage().props as any;
   const userFirstName = auth.user.first_name;
   const userId = auth.user.id;
-  const userAvatar = auth.user.avatarUrl || '/avatars/default.png';
+  // Match Sidebar logic for resolving profile picture URLs
+  const getProfilePictureUrl = (profilePicture?: string | null) => {
+    if (!profilePicture) return null;
+    if (profilePicture.startsWith('/storage/')) return profilePicture;
+    return `/storage/${profilePicture}`;
+  };
+
+  const currentUserProfileRaw: string | null = auth.user.profile_picture || auth.user.avatarUrl || null;
+  const userAvatar = getProfilePictureUrl(currentUserProfileRaw) || '/images/profile.png';
 
   const [newComment, setNewComment] = useState('');
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -110,13 +119,7 @@ export default function CommentSection({
   };
 
   return (
-    <motion.div
-      initial={{ scale: 0.95, opacity: 0 }}
-      animate={{ scale: 1, opacity: 1 }}
-      exit={{ scale: 0.95, opacity: 0 }}
-      transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-      className="flex flex-col h-[600px] w-full max-w-2xl mx-auto bg-white rounded-2xl shadow-xl relative"
-    >
+    <div className="flex flex-col h-[600px] w-full">
       {/* Header */}
       <div className="flex items-center justify-between p-6 border-b border-gray-100">
         <span className="text-xl font-semibold text-gray-800">Comments</span>
@@ -131,8 +134,8 @@ export default function CommentSection({
         </div>
       </div>
 
-      {/* Comment List */}
-      <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+  {/* Comment List */}
+  <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
         {comments.length === 0 ? (
           <div className="text-center py-8">
             <p className="text-gray-400 italic">No comments yet. Be the first to comment!</p>
@@ -142,11 +145,22 @@ export default function CommentSection({
             <div key={comment.id} className="space-y-3">
               {/* Main Comment */}
               <div className="flex gap-3 items-start">
-                <img
-                  src={comment.user?.avatarUrl || '/avatars/default.png'}
-                  alt={comment.user?.first_name || 'User'}
-                  className="w-10 h-10 rounded-full object-cover mt-1"
-                />
+                {comment.user?.profile_picture || comment.user?.avatarUrl ? (
+                  <img
+                    src={getProfilePictureUrl(comment.user.profile_picture || comment.user.avatarUrl) || '/images/profile.png'}
+                    alt={comment.user?.first_name || 'User'}
+                    className="w-10 h-10 rounded-full object-cover mt-1"
+                    onError={(e) => {
+                      const img = e.target as HTMLImageElement;
+                      const parent = img.parentElement!;
+                      parent.innerHTML = `<div class='flex w-10 h-10 items-center justify-center rounded-full bg-gray-200 text-gray-600 font-semibold text-sm'>${(comment.user?.first_name?.charAt(0) || 'U').toUpperCase()}</div>`;
+                    }}
+                  />
+                ) : (
+                  <div className="w-10 h-10 flex items-center justify-center rounded-full bg-gray-200 text-gray-600 font-semibold text-sm mt-1">
+                    {(comment.user?.first_name?.charAt(0) || 'U').toUpperCase()}
+                  </div>
+                )}
                 <div className="flex-1">
                   <div className="bg-gray-50 rounded-xl px-4 py-3">
                     <div className="flex items-center gap-2 mb-1">
@@ -211,11 +225,22 @@ export default function CommentSection({
                       className="mt-3 ml-4"
                     >
                       <div className="flex gap-2 items-center">
-                        <img
-                          src={userAvatar}
-                          alt={userFirstName}
-                          className="w-8 h-8 rounded-full object-cover"
-                        />
+                        {userAvatar ? (
+                          <img
+                            src={userAvatar}
+                            alt={userFirstName}
+                            className="w-8 h-8 rounded-full object-cover"
+                            onError={(e) => {
+                              const img = e.target as HTMLImageElement;
+                              const parent = img.parentElement!;
+                              parent.innerHTML = `<div class='flex w-8 h-8 items-center justify-center rounded-full bg-gray-200 text-gray-600 font-semibold text-xs'>${(userFirstName?.charAt(0) || 'U').toUpperCase()}</div>`;
+                            }}
+                          />
+                        ) : (
+                          <div className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-200 text-gray-600 font-semibold text-xs">
+                            {(userFirstName?.charAt(0) || 'U').toUpperCase()}
+                          </div>
+                        )}
                         <input
                           type="text"
                           value={replyText}
@@ -250,11 +275,22 @@ export default function CommentSection({
                     <div className="mt-3 ml-4 space-y-3">
                       {comment.replies.map((reply) => (
                         <div key={reply.id} className="flex gap-2 items-start">
-                          <img
-                            src={reply.user?.avatarUrl || '/avatars/default.png'}
-                            alt={reply.user?.first_name || 'User'}
-                            className="w-8 h-8 rounded-full object-cover mt-1"
-                          />
+                          {reply.user?.profile_picture || reply.user?.avatarUrl ? (
+                            <img
+                              src={getProfilePictureUrl(reply.user.profile_picture || reply.user.avatarUrl) || '/images/profile.png'}
+                              alt={reply.user?.first_name || 'User'}
+                              className="w-8 h-8 rounded-full object-cover mt-1"
+                              onError={(e) => {
+                                const img = e.target as HTMLImageElement;
+                                const parent = img.parentElement!;
+                                parent.innerHTML = `<div class='flex w-8 h-8 items-center justify-center rounded-full bg-gray-200 text-gray-600 font-semibold text-xs'>${(reply.user?.first_name?.charAt(0) || 'U').toUpperCase()}</div>`;
+                              }}
+                            />
+                          ) : (
+                            <div className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-200 text-gray-600 font-semibold text-xs mt-1">
+                              {(reply.user?.first_name?.charAt(0) || 'U').toUpperCase()}
+                            </div>
+                          )}
                           <div className="flex-1">
                             <div className="bg-white border border-gray-200 rounded-lg px-3 py-2">
                               <div className="flex items-center gap-2 mb-1">
@@ -282,11 +318,22 @@ export default function CommentSection({
       {/* Add Comment Form */}
       <div className="p-6 border-t border-gray-100">
         <form onSubmit={handleSubmit} className="flex items-center gap-3">
-          <img
-            src={userAvatar}
-            alt={userFirstName}
-            className="w-10 h-10 rounded-full object-cover"
-          />
+          {userAvatar ? (
+            <img
+              src={userAvatar}
+              alt={userFirstName}
+              className="w-10 h-10 rounded-full object-cover"
+              onError={(e) => {
+                const img = e.target as HTMLImageElement;
+                const parent = img.parentElement!;
+                parent.innerHTML = `<div class='flex w-10 h-10 items-center justify-center rounded-full bg-gray-200 text-gray-600 font-semibold text-sm'>${(userFirstName?.charAt(0) || 'U').toUpperCase()}</div>`;
+              }}
+            />
+          ) : (
+            <div className="w-10 h-10 flex items-center justify-center rounded-full bg-gray-200 text-gray-600 font-semibold text-sm">
+              {(userFirstName?.charAt(0) || 'U').toUpperCase()}
+            </div>
+          )}
           <input
             type="text"
             value={newComment}
@@ -302,6 +349,6 @@ export default function CommentSection({
           </button>
         </form>
       </div>
-    </motion.div>
+    </div>
   );
 }
