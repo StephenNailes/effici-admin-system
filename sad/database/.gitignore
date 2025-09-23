@@ -2,3 +2,6 @@
 /
 database/
 .github/
+.github/copilot-instructions.md
+sad/database/NewMigrations/
+sad/database/OldMigrations/
