@@ -137,7 +137,8 @@ class ApprovalController extends Controller
             abort(403);
         }
 
-        DB::transaction(function () use ($id, $role) {
+        try {
+            DB::transaction(function () use ($id, $role) {
             $ra = DB::table('request_approvals')->where('id', $id)->first();
             if (!$ra || $ra->approver_role !== $role) {
                 abort(403);
@@ -158,6 +159,15 @@ class ApprovalController extends Controller
             ]);
 
             if ($ra->request_type === 'equipment') {
+                // Check stock availability before approval
+                $stockCheck = $this->validateEquipmentStock($ra->request_id);
+                if (!$stockCheck['canApprove']) {
+                    throw new \Exception(json_encode([
+                        'error' => 'insufficient_stock',
+                        'details' => $stockCheck['details']
+                    ]));
+                }
+
                 // Equipment ends with admin assistant - notify student of final approval
                 DB::table('equipment_requests')->where('id', $ra->request_id)->update(['status' => 'approved']);
                 
@@ -218,7 +228,24 @@ class ApprovalController extends Controller
                     }
                 }
             }
-        });
+            });
+        } catch (\Exception $e) {
+            // Check if this is a stock validation error
+            $errorData = json_decode($e->getMessage(), true);
+            if (isset($errorData['error']) && $errorData['error'] === 'insufficient_stock') {
+                // Return stock conflict details to frontend
+                if ($request->expectsJson()) {
+                    return response()->json([
+                        'error' => 'insufficient_stock',
+                        'details' => $errorData['details']
+                    ], 422);
+                }
+                // For non-JSON requests, redirect with error details
+                return back()->withErrors(['stock' => 'Insufficient stock for approval. Please review request details.']);
+            }
+            // Re-throw if not a stock validation error
+            throw $e;
+        }
 
         // Return appropriate response based on request type
         if ($request->expectsJson()) {
@@ -292,5 +319,109 @@ class ApprovalController extends Controller
         }
         
         return back()->with('success', 'Revision requested successfully!');
+    }
+
+    /**
+     * Validate equipment stock availability for a request
+     * Returns detailed information about conflicts if stock is insufficient
+     */
+    private function validateEquipmentStock($equipmentRequestId)
+    {
+        // Get the equipment request details
+        $equipmentRequest = DB::table('equipment_requests')
+            ->where('id', $equipmentRequestId)
+            ->first();
+
+        if (!$equipmentRequest) {
+            return ['canApprove' => false, 'details' => ['error' => 'Request not found']];
+        }
+
+        // Get all items for this request
+        $requestItems = DB::table('equipment_request_items as eri')
+            ->join('equipment as e', 'eri.equipment_id', '=', 'e.id')
+            ->where('eri.equipment_request_id', $equipmentRequestId)
+            ->select('eri.equipment_id', 'e.name as equipment_name', 'eri.quantity', 'e.total_quantity')
+            ->get();
+
+        $conflicts = [];
+        $canApprove = true;
+
+        foreach ($requestItems as $item) {
+            // Calculate how much of this equipment is already allocated to other requests
+            // that overlap with this request's time period
+            $allocatedQuantity = DB::table('equipment_request_items as eri')
+                ->join('equipment_requests as er', 'er.id', '=', 'eri.equipment_request_id')
+                ->where('eri.equipment_id', $item->equipment_id)
+                ->where('er.id', '!=', $equipmentRequestId) // Exclude current request
+                ->whereIn('er.status', ['pending', 'approved', 'checked_out'])
+                ->where(function ($query) use ($equipmentRequest) {
+                    $query->whereBetween('er.start_datetime', [$equipmentRequest->start_datetime, $equipmentRequest->end_datetime])
+                          ->orWhereBetween('er.end_datetime', [$equipmentRequest->start_datetime, $equipmentRequest->end_datetime])
+                          ->orWhere(function ($q) use ($equipmentRequest) {
+                              $q->where('er.start_datetime', '<=', $equipmentRequest->start_datetime)
+                                ->where('er.end_datetime', '>=', $equipmentRequest->end_datetime);
+                          });
+                })
+                ->sum('eri.quantity');
+
+            $availableQuantity = $item->total_quantity - $allocatedQuantity;
+            
+            if ($item->quantity > $availableQuantity) {
+                $canApprove = false;
+                
+                // Get details of conflicting requests
+                $conflictingRequests = DB::table('equipment_request_items as eri')
+                    ->join('equipment_requests as er', 'er.id', '=', 'eri.equipment_request_id')
+                    ->join('users as u', 'u.id', '=', 'er.user_id')
+                    ->where('eri.equipment_id', $item->equipment_id)
+                    ->where('er.id', '!=', $equipmentRequestId)
+                    ->whereIn('er.status', ['pending', 'approved', 'checked_out'])
+                    ->where(function ($query) use ($equipmentRequest) {
+                        $query->whereBetween('er.start_datetime', [$equipmentRequest->start_datetime, $equipmentRequest->end_datetime])
+                              ->orWhereBetween('er.end_datetime', [$equipmentRequest->start_datetime, $equipmentRequest->end_datetime])
+                              ->orWhere(function ($q) use ($equipmentRequest) {
+                                  $q->where('er.start_datetime', '<=', $equipmentRequest->start_datetime)
+                                    ->where('er.end_datetime', '>=', $equipmentRequest->end_datetime);
+                              });
+                    })
+                    ->select(
+                        'er.id as request_id',
+                        'eri.quantity',
+                        'er.status',
+                        'er.purpose',
+                        'er.start_datetime',
+                        'er.end_datetime',
+                        DB::raw("CONCAT(u.first_name, ' ', u.last_name) as student_name")
+                    )
+                    ->get();
+
+                $conflicts[] = [
+                    'equipment_name' => $item->equipment_name,
+                    'total_stock' => $item->total_quantity,
+                    'requested_quantity' => $item->quantity,
+                    'available_quantity' => $availableQuantity,
+                    'shortage' => $item->quantity - $availableQuantity,
+                    'conflicting_requests' => $conflictingRequests->toArray()
+                ];
+            }
+        }
+
+        // Get current student name for the request being approved
+        $currentStudent = DB::table('equipment_requests as er')
+            ->join('users as u', 'u.id', '=', 'er.user_id')
+            ->where('er.id', $equipmentRequestId)
+            ->select(DB::raw("CONCAT(u.first_name, ' ', u.last_name) as student_name"))
+            ->first();
+
+        return [
+            'canApprove' => $canApprove,
+            'details' => [
+                'request_id' => $equipmentRequestId,
+                'student_name' => $currentStudent->student_name ?? 'Unknown',
+                'conflicts' => $conflicts,
+                'total_conflicts' => count($conflicts),
+                'suggestion' => $canApprove ? null : 'Consider requesting revision to reduce quantities or suggest alternative equipment.'
+            ]
+        ];
     }
 }

@@ -6,6 +6,7 @@ import { FaInfoCircle, FaTimes, FaPlus, FaTrash, FaPaperPlane, FaChevronDown, Fa
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import "./datepicker-theme.css";
+import axios from "axios";
 
 // Themed minimal Select component (keyboard + mouse)
 type SelectOption<V extends string | number | null = string | number | null> = {
@@ -191,7 +192,7 @@ export default function BorrowEquipment() {
     start_datetime: string;
     end_datetime: string;
     items: { equipment_id: number; quantity: number }[];
-    category: "minor" | "normal" | "urgent"; // <-- Add this line
+    category: "minor" | "normal" | "urgent";
   }>({
     activity_plan_id: undefined,
     purpose: "",
@@ -234,25 +235,23 @@ export default function BorrowEquipment() {
     if (!canCheck) return;
     setChecking(true);
     try {
-      // Get CSRF token from meta tag
-      const token = (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)?.content || '';
-      
-      const res = await fetch("/equipment/availability", {
-        method: "POST",
-        headers: { 
-          "Content-Type": "application/json", 
-          "X-Requested-With": "XMLHttpRequest",
-          "X-CSRF-TOKEN": token
-        },
-        body: JSON.stringify({
-          start: data.start_datetime,
-          end: data.end_datetime,
-        }),
-      });
-      const rows: Array<{ id: number; available: number }> = await res.json();
+      // Use GET with query params to avoid CSRF requirements
+      const { data: responseData } = await axios.get<Array<{ id: number; available: number }>>(
+        "/equipment/availability",
+        {
+          params: {
+            start: data.start_datetime,
+            end: data.end_datetime,
+          },
+        }
+      );
+
+      const rows: Array<{ id: number; available: number }> = Array.isArray(responseData) ? responseData : [];
       const map: Record<number, number> = {};
       rows.forEach((r) => (map[r.id] = r.available));
       setAvailability(map);
+    } catch (error) {
+      console.error("Error fetching availability:", error);
     } finally {
       setChecking(false);
     }
@@ -271,14 +270,16 @@ export default function BorrowEquipment() {
   function confirmAndSubmit() {
     if (!confirmChecked) return;
     setShowConfirmModal(false);
+    // Inertia handles CSRF automatically
     router.post("/equipment-requests", data, {
       onSuccess: () => {
         reset();
         setConfirmChecked(false);
+        setAvailability({});
       },
       onError: (errors) => {
-        // Errors will be handled by React Toastify
         console.error("Equipment request submission failed:", errors);
+        setConfirmChecked(false);
       },
     });
   }
@@ -622,29 +623,6 @@ export default function BorrowEquipment() {
               ))}
             </div>
 
-            {/* Request Summary */}
-            {data.items.length > 1 && (
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg"
-              >
-                <h4 className="font-semibold text-blue-800 mb-2">Request Summary</h4>
-                <p className="text-blue-700 text-sm">
-                  You are requesting <span className="font-bold">{data.items.length}</span> different equipment items:
-                </p>
-                <ul className="mt-2 space-y-1">
-                  {data.items.map((item, index) => {
-                    const eq = equipmentList.find((e) => e.id === item.equipment_id);
-                    return (
-                      <li key={index} className="text-sm text-blue-600">
-                        • {eq?.name} (Qty: {item.quantity})
-                      </li>
-                    );
-                  })}
-                </ul>
-              </motion.div>
-            )}
 
             <div className="flex justify-end mt-8">
               <motion.button

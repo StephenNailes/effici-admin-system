@@ -183,20 +183,30 @@ class EquipmentRequestController extends Controller
      */
     public function store(Request $request)
     {
-        $validated = $request->validate([
-            'purpose' => 'required|string|max:255',
-            'start_datetime' => 'required|date',
-            'end_datetime' => 'required|date|after_or_equal:start_datetime',
-            'items' => 'required|array|min:1',
-            'items.*.equipment_id' => 'required|exists:equipment,id',
-            'items.*.quantity' => 'required|integer|min:1',
-            'category' => 'required|string',
-        ]);
+        // Handle both regular Inertia requests and API requests properly
+        try {
+            $validated = $request->validate([
+                'purpose' => 'required|string|max:255',
+                'start_datetime' => 'required|date',
+                'end_datetime' => 'required|date|after_or_equal:start_datetime',
+                'items' => 'required|array|min:1',
+                'items.*.equipment_id' => 'required|exists:equipment,id',
+                'items.*.quantity' => 'required|integer|min:1',
+                'category' => 'required|string|in:minor,normal,urgent',
+                'activity_plan_id' => 'nullable|exists:activity_plans,id',
+            ]);
 
-        $validated['category'] = strtolower($validated['category']);
-
-        if (!in_array($validated['category'], ['minor', 'normal', 'urgent'])) {
-            return back()->withErrors(['category' => 'Invalid category selected']);
+            $validated['category'] = strtolower($validated['category']);
+            
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            // Return proper JSON error for API requests
+            if ($request->expectsJson() || $request->wantsJson()) {
+                return response()->json([
+                    'message' => 'Validation failed',
+                    'errors' => $e->errors()
+                ], 422);
+            }
+            throw $e;
         }
 
         $equipmentRequest = null;
@@ -213,10 +223,12 @@ class EquipmentRequestController extends Controller
                 return back()->withErrors(['items' => 'Equipment not found']);
             }
             
+            // Only consider approved and checked_out requests when students submit requests
+            // Pending requests should not block other students from requesting equipment
             $bookedQuantity = DB::table('equipment_request_items as eri')
                 ->join('equipment_requests as er', 'er.id', '=', 'eri.equipment_request_id')
                 ->where('eri.equipment_id', $equipmentId)
-                ->whereIn('er.status', ['pending', 'approved', 'checked_out'])
+                ->whereIn('er.status', ['approved', 'checked_out'])
                 ->where(function ($query) use ($validated) {
                     $query->whereBetween('er.start_datetime', [$validated['start_datetime'], $validated['end_datetime']])
                           ->orWhereBetween('er.end_datetime', [$validated['start_datetime'], $validated['end_datetime']])
@@ -230,9 +242,16 @@ class EquipmentRequestController extends Controller
             $availableQuantity = $equipment->total_quantity - $bookedQuantity;
             
             if ($requestedQuantity > $availableQuantity) {
-                return back()->withErrors([
-                    'items' => "Insufficient stock for {$equipment->name}. Available: {$availableQuantity}, Requested: {$requestedQuantity}"
-                ]);
+                $errorMessage = "Insufficient stock for {$equipment->name}. Available: {$availableQuantity}, Requested: {$requestedQuantity}";
+                
+                if ($request->expectsJson() || $request->wantsJson()) {
+                    return response()->json([
+                        'message' => 'Validation failed',
+                        'errors' => ['items' => [$errorMessage]]
+                    ], 422);
+                }
+                
+                return back()->withErrors(['items' => $errorMessage]);
             }
         }
 
@@ -278,6 +297,14 @@ class EquipmentRequestController extends Controller
                 $equipmentRequest->id,
                 $priority
             );
+        }
+
+        // Return appropriate response based on request type
+        if ($request->expectsJson() || $request->wantsJson()) {
+            return response()->json([
+                'message' => 'Equipment request submitted successfully!',
+                'request_id' => $equipmentRequest?->id
+            ], 201);
         }
 
         // Redirect to equipment-requests page with flash success message

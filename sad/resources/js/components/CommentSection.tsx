@@ -1,5 +1,5 @@
 // resources/js/Components/CommentSection.tsx
-import { useState, memo } from 'react';
+import { useState, memo, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { FaHeart, FaReply, FaPaperPlane, FaTimes } from 'react-icons/fa';
 import { usePage } from '@inertiajs/react';
@@ -18,12 +18,13 @@ const Avatar = memo(({ src, alt, size = 40, fallbackInitial = 'U', className = '
   const dimension = `${size}px`;
   const baseClasses = `rounded-full object-cover ${className}`.trim();
 
+  // Use red background and white text for fallback, matching events/announcements
   if (!src || errored) {
     const textSize = size <= 32 ? 'text-xs' : size <= 40 ? 'text-sm' : 'text-base';
     return (
       <div
         style={{ width: dimension, height: dimension }}
-        className={`flex items-center justify-center rounded-full bg-gray-200 text-gray-600 font-semibold ${textSize}`}
+        className={`flex items-center justify-center rounded-full bg-red-600 text-white font-semibold ${textSize}`}
         aria-label={alt}
       >
         {(fallbackInitial || 'U').toUpperCase()}
@@ -107,7 +108,7 @@ export default function CommentSection({
   };
 
   const currentUserProfileRaw: string | null = (authUser?.profile_picture_url || authUser?.profile_picture || authUser?.avatarUrl) ?? null;
-  const userAvatar = authUser?.profile_picture_url || getProfilePictureUrl(currentUserProfileRaw) || '/images/profile.png';
+  const userAvatar = authUser?.profile_picture_url || getProfilePictureUrl(currentUserProfileRaw) || null;
 
   // Avatar moved to module scope and memoized
 
@@ -116,6 +117,14 @@ export default function CommentSection({
   const [editText, setEditText] = useState('');
   const [replyingTo, setReplyingTo] = useState<number | null>(null);
   const [replyText, setReplyText] = useState('');
+
+  // Count top-level comments + replies
+  const totalCommentCount = useMemo(() => {
+    return (comments || []).reduce((sum, c) => {
+      const repliesCount = Array.isArray(c.replies) ? c.replies.length : 0;
+      return sum + 1 + repliesCount; // include the comment itself + its replies
+    }, 0);
+  }, [comments]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -173,7 +182,7 @@ export default function CommentSection({
       <div className="flex items-center justify-between p-6 border-b border-gray-100">
         <span className="text-xl font-semibold text-gray-800">Comments</span>
         <div className="flex items-center gap-4">
-          <span className="text-gray-500 font-medium">{comments.length} comments</span>
+          <span className="text-gray-500 font-medium">{totalCommentCount} {totalCommentCount === 1 ? 'comment' : 'comments'}</span>
           <button
             onClick={onClose}
             className="text-gray-400 hover:text-red-600 transition p-1"
@@ -196,7 +205,7 @@ export default function CommentSection({
               <div className="flex gap-3 items-start">
                 <div className="mt-1">
                   <Avatar
-                    src={comment.user.profile_picture_url || getProfilePictureUrl(comment.user.profile_picture || comment.user.avatarUrl) || '/images/profile.png'}
+                    src={comment.user.profile_picture_url || getProfilePictureUrl(comment.user.profile_picture || comment.user.avatarUrl) || null}
                     alt={comment.user?.first_name || 'User'}
                     size={40}
                     className=""
@@ -309,7 +318,7 @@ export default function CommentSection({
                         <div key={reply.id} className="flex gap-2 items-start">
                           <div className="mt-1">
                             <Avatar
-                              src={reply.user.profile_picture_url || getProfilePictureUrl(reply.user.profile_picture || reply.user.avatarUrl) || '/images/profile.png'}
+                              src={reply.user.profile_picture_url || getProfilePictureUrl(reply.user.profile_picture || reply.user.avatarUrl) || null}
                               alt={reply.user?.first_name || 'User'}
                               size={32}
                               fallbackInitial={(reply.user?.first_name?.charAt(0) || 'U')}

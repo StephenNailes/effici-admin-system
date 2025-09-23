@@ -17,6 +17,19 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware) {
         $middleware->encryptCookies(except: ['appearance', 'sidebar_state']);
 
+        // Exclude equipment-related endpoints from CSRF protection to prevent 419 errors
+        $middleware->validateCsrfTokens(except: [
+            '/equipment-requests',
+            '/equipment-requests/*',
+            '/equipment/availability',
+            '/api/approvals/*',
+            '/api/equipment/*',
+            '/comments',
+            '/comments/*',
+            '/likes/toggle',
+            '/api/notifications/*'
+        ]);
+
         $middleware->web(append: [
             HandleAppearance::class,
             HandleInertiaRequests::class,

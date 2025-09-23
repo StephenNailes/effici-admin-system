@@ -35,19 +35,29 @@ class EquipmentController extends Controller
      */
     public function availability(Request $request)
     {
-        $data = $request->validate([
-            'start' => ['required', 'date'],
-            'end'   => ['required', 'date', 'after:start'],
-        ]);
+        // Handle both GET (query params) and POST (body) requests
+        try {
+            $data = $request->validate([
+                'start' => ['required', 'date'],
+                'end'   => ['required', 'date', 'after_or_equal:start'],
+            ]);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            // Return proper JSON error for validation failures
+            return response()->json([
+                'message' => 'Validation failed',
+                'errors' => $e->errors()
+            ], 422);
+        }
 
         // ✅ Only return id + available so frontend .forEach() works
+        // Only consider approved and checked_out requests, NOT pending ones
         $rows = DB::select("
             SELECT
               e.id,
               MAX(e.total_quantity)
                 - COALESCE(SUM(
                     CASE
-                      WHEN er.status IN ('pending','approved','checked_out')
+                      WHEN er.status IN ('approved','checked_out')
                        AND NOT (er.end_datetime <= ? OR er.start_datetime >= ?)
                       THEN eri.quantity ELSE 0
                     END
@@ -73,6 +83,7 @@ class EquipmentController extends Controller
         }
 
         // Get all equipment and calculate current available quantity
+        // Only consider approved and checked_out requests, NOT pending ones
         $equipment = DB::select("
             SELECT
                 e.id,
@@ -83,7 +94,7 @@ class EquipmentController extends Controller
                 (MAX(e.total_quantity)
                     - COALESCE(SUM(
                         CASE
-                            WHEN er.status IN ('pending','approved','checked_out')
+                            WHEN er.status IN ('approved','checked_out')
                             THEN eri.quantity ELSE 0
                         END
                     ), 0)

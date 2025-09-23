@@ -411,49 +411,6 @@ export default function Analytics({ analyticsData, timeRange: initialTimeRange }
           </div>
         </div>
 
-        {/* Quick Actions */}
-        <div className="bg-white p-6 rounded-lg shadow-sm">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-xl font-semibold text-black">Quick Actions</h3>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <button 
-              onClick={() => router.visit('/admin_assistant/requests')}
-              className="flex items-center gap-3 p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
-            >
-              <FileText className="w-5 h-5 text-red-500" />
-              <div className="text-left">
-                <div className="font-medium text-black">View Pending</div>
-                <div className="text-sm text-gray-600">Review approvals</div>
-              </div>
-            </button>
-            
-            <button className="flex items-center gap-3 p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
-              <Download className="w-5 h-5 text-blue-500" />
-              <div className="text-left">
-                <div className="font-medium text-black">Export Data</div>
-                <div className="text-sm text-gray-600">Download reports</div>
-              </div>
-            </button>
-            
-            <button className="flex items-center gap-3 p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
-              <BarChart3 className="w-5 h-5 text-green-500" />
-              <div className="text-left">
-                <div className="font-medium text-black">Custom Report</div>
-                <div className="text-sm text-gray-600">Generate insights</div>
-              </div>
-            </button>
-            
-            <button className="flex items-center gap-3 p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
-              <Filter className="w-5 h-5 text-purple-500" />
-              <div className="text-left">
-                <div className="font-medium text-black">Filter Data</div>
-                <div className="text-sm text-gray-600">Advanced filters</div>
-              </div>
-            </button>
-          </div>
-        </div>
-
       </div>
     </MainLayout>
   );

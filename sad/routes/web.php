@@ -4,6 +4,7 @@ use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\Session;
+use Illuminate\Support\Facades\Auth;
 
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\Auth\RegisteredUserController;
@@ -27,8 +28,8 @@ use App\Models\Announcement;
 
 // 🔁 Root: send authenticated users to their dashboard, guests to login
 Route::get('/', function () {
-    if (auth()->check()) {
-        $role = auth()->user()->role ?? null;
+    if (Auth::check()) {
+        $role = Auth::user()->role ?? null;
         return match ($role) {
             'student' => redirect()->route('student.dashboard'),
             'admin_assistant' => redirect()->route('admin.dashboard'),
@@ -165,7 +166,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->name('equipment-requests.index');
     Route::post('/equipment-requests', [EquipmentRequestController::class, 'store'])
         ->name('equipment-requests.store');
-    Route::post('/equipment/availability', [EquipmentController::class, 'availability'])
+    // Accept both GET and POST for availability so CSRF isn't required (GET)
+    Route::match(['get', 'post'], '/equipment/availability', [EquipmentController::class, 'availability'])
         ->name('equipment.availability');
     Route::get('/api/equipment/all', [EquipmentController::class, 'all']);
     Route::get('/api/equipment/availableForStudent', [EquipmentController::class, 'availableForStudent']);

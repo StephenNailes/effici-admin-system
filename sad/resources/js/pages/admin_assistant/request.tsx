@@ -3,6 +3,7 @@ import MainLayout from "@/layouts/mainlayout";
 import { Search, Filter, Eye, FileText, Clock, CheckCircle, Edit } from "lucide-react";
 import EquipmentModal from "@/components/EquipmentModal";
 import FilterModal from "@/components/FilterModal";
+import StockConflictModal from "@/components/StockConflictModal";
 import { motion } from "framer-motion";
 import { router } from "@inertiajs/react";
 
@@ -12,6 +13,7 @@ const PAGE_SIZE = 8;
 // Local types
 type RequestItem = {
   approval_id: number;
+  request_id: number;
   student_name: string;
   request_type: string; // 'equipment' | 'activity' | 'activity_plan'
   title?: string;
@@ -48,17 +50,15 @@ export default function Request() {
   const [filterModalOpen, setFilterModalOpen] = useState(false);
   const [filters, setFilters] = useState({ status: "", priority: "" });
   const [currentPage, setCurrentPage] = useState(1);
+  const [stockConflictModalOpen, setStockConflictModalOpen] = useState(false);
+  const [stockConflictDetails, setStockConflictDetails] = useState<any>(null);
 
   const fetchRequests = () => {
-    // Get CSRF token from meta tag
-    const token = (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)?.content || '';
-    
     fetch(`/api/approvals?role=admin_assistant`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
-        'X-Requested-With': 'XMLHttpRequest',
-        'X-CSRF-TOKEN': token
+        'X-Requested-With': 'XMLHttpRequest'
       }
     })
       .then(res => res.json())
@@ -78,15 +78,12 @@ export default function Request() {
 
   const fetchEquipment = () => {
     setEquipmentLoading(true);
-    // Get CSRF token from meta tag
-    const token = (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)?.content || '';
     
     fetch(`/api/equipment/all`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
-        'X-Requested-With': 'XMLHttpRequest',
-        'X-CSRF-TOKEN': token
+        'X-Requested-With': 'XMLHttpRequest'
       }
     })
       .then(res => res.json())
@@ -105,28 +102,91 @@ export default function Request() {
     fetchEquipment();
   }, []);
 
-  const handleApprove = (id: number) => {
-    router.post(`/api/approvals/${id}/approve`, {}, {
-      onSuccess: () => {
+  const handleApprove = async (id: number) => {
+    try {
+      const response = await fetch(`/api/approvals/${id}/approve`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Requested-With': 'XMLHttpRequest'
+        }
+      });
+      
+      const data = await response.json();
+      
+      if (response.ok) {
+        // Success
         fetchRequests();
         setSelected(null);
-      },
-      onError: (errors) => {
-        console.error('Error approving request:', errors);
+      } else {
+        // Handle errors
+        console.error('Error approving request:', data);
+        
+        // Check if this is a stock conflict error
+        if (data.error === 'insufficient_stock' && data.details) {
+          setStockConflictDetails(data.details);
+          setStockConflictModalOpen(true);
+          return;
+        }
+        
+        // Handle other types of errors
+        alert('An error occurred while approving the request. Please try again.');
       }
-    });
+    } catch (error) {
+      console.error('Network error:', error);
+      alert('Network error occurred. Please check your connection and try again.');
+    }
   };
 
-  const handleRevision = (id: number, remarks: string) => {
-    router.post(`/api/approvals/${id}/revision`, { remarks }, {
-      onSuccess: () => {
+  const handleRevision = async (id: number, remarks: string) => {
+    try {
+      const response = await fetch(`/api/approvals/${id}/revision`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Requested-With': 'XMLHttpRequest'
+        },
+        body: JSON.stringify({ remarks })
+      });
+      
+      const data = await response.json();
+      
+      if (response.ok) {
+        // Success
         fetchRequests();
         setSelected(null);
-      },
-      onError: (errors) => {
-        console.error('Error requesting revision:', errors);
+      } else {
+        console.error('Error requesting revision:', data);
+        alert('An error occurred while requesting revision. Please try again.');
       }
+    } catch (error) {
+      console.error('Network error:', error);
+      alert('Network error occurred. Please check your connection and try again.');
+    }
+  };
+
+  const handleStockConflictRevision = (requestId: number) => {
+    // Create a detailed revision message based on the stock conflicts
+    const conflicts = stockConflictDetails?.conflicts || [];
+    let revisionMessage = "Stock availability conflict detected. Please review and reduce quantities for the following equipment:\n\n";
+    
+    conflicts.forEach((conflict: any, index: number) => {
+      revisionMessage += `${index + 1}. ${conflict.equipment_name}:\n`;
+      revisionMessage += `   - Requested: ${conflict.requested_quantity} units\n`;
+      revisionMessage += `   - Available: ${conflict.available_quantity} units\n`;
+      revisionMessage += `   - Shortage: ${conflict.shortage} units\n\n`;
     });
+    
+    revisionMessage += "Please modify your request to fit within available stock limits or consider alternative equipment.";
+
+    // Find the approval ID for this request
+    const request = requests.find(r => r.request_id === requestId);
+    if (request) {
+      handleRevision(request.approval_id, revisionMessage);
+    }
+    
+    setStockConflictModalOpen(false);
+    setStockConflictDetails(null);
   };
 
   const getStatusBadgeColor = (status: string) => {
@@ -469,6 +529,17 @@ export default function Request() {
             onRevision={handleRevision}
           />
         )}
+
+        {/* Stock Conflict Modal */}
+        <StockConflictModal
+          open={stockConflictModalOpen}
+          onClose={() => {
+            setStockConflictModalOpen(false);
+            setStockConflictDetails(null);
+          }}
+          details={stockConflictDetails}
+          onRequestRevision={handleStockConflictRevision}
+        />
       </div>
     </MainLayout>
   );
