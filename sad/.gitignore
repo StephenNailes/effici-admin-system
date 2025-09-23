@@ -23,3 +23,7 @@ yarn-error.log
 /.vscode
 /.zed
 .github/
+.github/copilot-instructions.md
+sad/database/NewMigrations/
+sad/database/OldMigrations/
+sadproject_improved.sql
