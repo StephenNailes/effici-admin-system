@@ -25,8 +25,19 @@ use App\Http\Controllers\AnnouncementController;
 use App\Models\Event;
 use App\Models\Announcement;
 
-// 🔁 Redirect root to login page
-Route::get('/', fn () => redirect()->route('login'));
+// 🔁 Root: send authenticated users to their dashboard, guests to login
+Route::get('/', function () {
+    if (auth()->check()) {
+        $role = auth()->user()->role ?? null;
+        return match ($role) {
+            'student' => redirect()->route('student.dashboard'),
+            'admin_assistant' => redirect()->route('admin.dashboard'),
+            'dean' => redirect()->route('dean.dashboard'),
+            default => redirect()->route('login'),
+        };
+    }
+    return redirect()->route('login');
+})->name('home');
 
 // 🟩 Auth Routes
 Route::middleware('guest')->group(function () {
@@ -167,7 +178,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
 Route::middleware(['auth', 'verified', 'role:admin_assistant,dean'])->group(function () {
     Route::get('/admin/requests', fn () => Inertia::render('admin_assistant/request'))->name('admin.requests');
     Route::get('/admin/activity-plan-approval/{id}', fn ($id) => Inertia::render('admin_assistant/ActivityPlanApproval', ['id' => $id]))->name('admin.activity-plan-approval');
-    Route::get('/admin/equipment-management', fn () => Inertia::render('admin_assistant/EquipmentManagement'))->name('admin.equipment-management');
+    Route::get('/admin/equipment-management', [EquipmentRequestController::class, 'equipmentManagement'])->name('admin.equipment-management');
+    Route::patch('/equipment-requests/{id}/status', [EquipmentRequestController::class, 'updateStatus'])->name('equipment-requests.update-status');
     Route::get('/admin/analytics', [App\Http\Controllers\AnalyticsController::class, 'adminAssistantIndex'])->name('admin_assistant.analytics');
     Route::get('/dean/requests', fn () => Inertia::render('dean/request'))->name('dean.requests');
     Route::get('/dean/activity-plan-approval/{id}', [App\Http\Controllers\NotificationController::class, 'showActivityPlanApproval'])->name('dean.activity-plan-approval');

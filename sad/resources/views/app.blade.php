@@ -33,6 +33,7 @@
         <title inertia>{{ config('app.name', 'Laravel') }}</title>
 
         <link rel="icon" href="{{ asset('logo.png') }}" type="image/png">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
 
         <link rel="apple-touch-icon" href="/apple-touch-icon.png">
             

@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from "react";
 import MainLayout from "@/layouts/mainlayout";
 import { Search, Filter, Eye, FileText, Clock, CheckCircle, Edit } from "lucide-react";
-import axios from "axios";
 import EquipmentModal from "@/components/EquipmentModal";
 import FilterModal from "@/components/FilterModal";
 import { motion } from "framer-motion";
@@ -51,12 +50,22 @@ export default function Request() {
   const [currentPage, setCurrentPage] = useState(1);
 
   const fetchRequests = () => {
-    axios
-      .get(`/api/approvals?role=admin_assistant`)
-      .then((res) => {
-        setRequests(res.data.requests || []);
+    // Get CSRF token from meta tag
+    const token = (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)?.content || '';
+    
+    fetch(`/api/approvals?role=admin_assistant`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Requested-With': 'XMLHttpRequest',
+        'X-CSRF-TOKEN': token
+      }
+    })
+      .then(res => res.json())
+      .then((data) => {
+        setRequests(data.requests || []);
         setStats(
-          res.data.stats || { total: 0, pending: 0, approved: 0, underRevision: 0 }
+          data.stats || { total: 0, pending: 0, approved: 0, underRevision: 0 }
         );
       })
       .catch((err) => {
@@ -69,10 +78,26 @@ export default function Request() {
 
   const fetchEquipment = () => {
     setEquipmentLoading(true);
-    axios.get(`/api/equipment/all`).then((res) => {
-      setEquipment(res.data);
-      setEquipmentLoading(false);
-    });
+    // Get CSRF token from meta tag
+    const token = (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)?.content || '';
+    
+    fetch(`/api/equipment/all`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Requested-With': 'XMLHttpRequest',
+        'X-CSRF-TOKEN': token
+      }
+    })
+      .then(res => res.json())
+      .then((data) => {
+        setEquipment(data);
+        setEquipmentLoading(false);
+      })
+      .catch((err) => {
+        console.error("Error fetching equipment:", err);
+        setEquipmentLoading(false);
+      });
   };
 
   useEffect(() => {
@@ -80,16 +105,28 @@ export default function Request() {
     fetchEquipment();
   }, []);
 
-  const handleApprove = async (id: number) => {
-    await axios.post(`/api/approvals/${id}/approve`);
-    fetchRequests();
-    setSelected(null);
+  const handleApprove = (id: number) => {
+    router.post(`/api/approvals/${id}/approve`, {}, {
+      onSuccess: () => {
+        fetchRequests();
+        setSelected(null);
+      },
+      onError: (errors) => {
+        console.error('Error approving request:', errors);
+      }
+    });
   };
 
-  const handleRevision = async (id: number, remarks: string) => {
-    await axios.post(`/api/approvals/${id}/revision`, { remarks });
-    fetchRequests();
-    setSelected(null);
+  const handleRevision = (id: number, remarks: string) => {
+    router.post(`/api/approvals/${id}/revision`, { remarks }, {
+      onSuccess: () => {
+        fetchRequests();
+        setSelected(null);
+      },
+      onError: (errors) => {
+        console.error('Error requesting revision:', errors);
+      }
+    });
   };
 
   const getStatusBadgeColor = (status: string) => {

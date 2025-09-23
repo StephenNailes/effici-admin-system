@@ -21,14 +21,26 @@ class EquipmentRequestController extends Controller
         $this->notificationService = $notificationService;
     }
     /**
-     * Equipment Management: Get all requests with lifecycle statuses for admin
+     * Show Equipment Management page with data
      */
-    public function manage()
+    public function equipmentManagement()
     {
-        $requests = EquipmentRequest::with(['items.equipment', 'user'])
+        $requests = $this->getEquipmentRequestsData();
+        
+        return inertia('admin_assistant/EquipmentManagement', [
+            'requests' => $requests
+        ]);
+    }
+
+    /**
+     * Get equipment requests data (helper method)
+     */
+    private function getEquipmentRequestsData()
+    {
+        return EquipmentRequest::with(['items.equipment', 'user'])
             ->whereIn('status', [
-                'approved', 'checked_out', 'returned', 'overdue', 'completed'
-            ])
+                'approved', 'checked_out', 'returned', 'overdue'
+            ]) // Exclude completed requests
             ->orderByDesc('created_at')
             ->get()
             ->map(function ($req) {
@@ -46,7 +58,15 @@ class EquipmentRequestController extends Controller
                     }),
                 ];
             });
-    Log::info('Equipment Management API returned', ['count' => $requests->count()]);
+    }
+
+    /**
+     * Equipment Management: Get all requests with lifecycle statuses for admin (API)
+     */
+    public function manage()
+    {
+        $requests = $this->getEquipmentRequestsData();
+        Log::info('Equipment Management API returned', ['count' => $requests->count()]);
         return response()->json($requests);
     }
 
@@ -96,7 +116,12 @@ class EquipmentRequestController extends Controller
             $equipmentRequest->save();
         });
 
-        return response()->json(['success' => true]);
+        // Return appropriate response based on request type
+        if ($request->expectsJson()) {
+            return response()->json(['success' => true]);
+        }
+        
+        return back()->with('success', 'Equipment status updated successfully!');
     }
     /**
      * Show the equipment request page and student's requests

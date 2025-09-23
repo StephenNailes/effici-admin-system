@@ -96,6 +96,24 @@ class User extends Authenticatable implements MustVerifyEmail
         return $name;
     }
 
+    public function getProfilePictureUrlAttribute(): ?string
+    {
+        if (!$this->profile_picture) {
+            return null;
+        }
+
+        // If already a full URL, return as is
+        if (str_starts_with($this->profile_picture, 'http://') || 
+            str_starts_with($this->profile_picture, 'https://') ||
+            str_starts_with($this->profile_picture, 'data:') ||
+            str_starts_with($this->profile_picture, 'blob:')) {
+            return $this->profile_picture;
+        }
+
+        // Generate storage URL
+        return asset('storage/' . $this->profile_picture);
+    }
+
     public function isStudent(): bool
     {
         return $this->role === 'student';

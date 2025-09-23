@@ -220,7 +220,12 @@ class ApprovalController extends Controller
             }
         });
 
-        return response()->json(['ok' => true]);
+        // Return appropriate response based on request type
+        if ($request->expectsJson()) {
+            return response()->json(['ok' => true]);
+        }
+        
+        return back()->with('success', 'Request approved successfully!');
     }
 
     // Request revision
@@ -281,6 +286,11 @@ class ApprovalController extends Controller
             }
         });
 
-        return response()->json(['ok' => true]);
+        // Return appropriate response based on request type
+        if ($request->expectsJson()) {
+            return response()->json(['ok' => true]);
+        }
+        
+        return back()->with('success', 'Revision requested successfully!');
     }
 }

@@ -234,9 +234,16 @@ export default function BorrowEquipment() {
     if (!canCheck) return;
     setChecking(true);
     try {
+      // Get CSRF token from meta tag
+      const token = (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)?.content || '';
+      
       const res = await fetch("/equipment/availability", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "X-Requested-With": "XMLHttpRequest" },
+        headers: { 
+          "Content-Type": "application/json", 
+          "X-Requested-With": "XMLHttpRequest",
+          "X-CSRF-TOKEN": token
+        },
         body: JSON.stringify({
           start: data.start_datetime,
           end: data.end_datetime,

@@ -25,19 +25,6 @@ export default function Profile() {
   const { auth } = usePage().props as any;
   const user = auth?.user ?? {};
 
-  // Helper function to get correct profile picture URL
-  const getProfilePictureUrl = (profilePicture: string | null) => {
-    if (!profilePicture) return null;
-    
-    // If it already starts with /storage/, use as is
-    if (profilePicture.startsWith('/storage/')) {
-      return profilePicture;
-    }
-    
-    // Otherwise, add /storage/ prefix
-    return `/storage/${profilePicture}`;
-  };
-
   // Form states 
   const [editingEmail, setEditingEmail] = useState(false);
   const [editingPassword, setEditingPassword] = useState(false);
@@ -87,7 +74,7 @@ export default function Profile() {
     }, {
       onSuccess: () => {
         setEditingEmail(false);
-        toast.success('Email updated successfully!');
+        // Flash message will be handled by FlashToaster component
       },
       onError: (errors) => {
         const errorMessage = errors.email || 'Failed to update email.';
@@ -120,7 +107,7 @@ export default function Profile() {
         setEditingPassword(false);
         setPassword('');
         setConfirmPassword('');
-        toast.success('Password updated successfully!');
+        // Flash message will be handled by FlashToaster component
       },
       onError: (errors) => {
         const errorMessage = errors.password || 'Failed to update password.';
@@ -166,11 +153,14 @@ export default function Profile() {
     formData.append('profile_picture', profilePictureFile);
     
     router.post('/profile/update-picture', formData, {
-      onSuccess: () => {
-        setProfilePicture(profilePicturePreview);
+      onSuccess: (page: any) => {
+        const updatedPic = (page?.props as any)?.auth?.user?.profile_picture ?? null;
+        setProfilePicture(updatedPic);
+        if (profilePicturePreview) URL.revokeObjectURL(profilePicturePreview);
+        setProfilePicturePreview(null);
         setEditingProfilePicture(false);
         setProfilePictureFile(null);
-        toast.success('Profile picture updated successfully!');
+        // Flash message will be handled by FlashToaster component
       },
       onError: (errors) => {
         const errorMessage = errors.profile_picture || 'Failed to update profile picture.';
@@ -196,7 +186,7 @@ export default function Profile() {
     router.delete('/profile/remove-picture', {
       onSuccess: () => {
         setProfilePicture(null);
-        toast.success('Profile picture removed successfully!');
+        // Flash message will be handled by FlashToaster component
       },
       onError: (errors) => {
         const errorMessage = errors.profile_picture || 'Failed to remove profile picture.';
@@ -223,7 +213,7 @@ export default function Profile() {
     }, {
       onSuccess: () => {
         setEditingName(false);
-        toast.success('Name updated successfully!');
+        // Flash message will be handled by FlashToaster component
       },
       onError: (errors) => {
         const errorMessage = errors.first_name || errors.last_name || 'Failed to update name.';
@@ -261,9 +251,9 @@ export default function Profile() {
                       className="w-32 h-32 rounded-full overflow-hidden bg-gray-100 border-4 border-gray-200 shadow-lg cursor-pointer hover:border-[#e6232a]/50 transition-colors"
                       onClick={() => !editingProfilePicture && setShowProfileDropdown(!showProfileDropdown)}
                     >
-                      {(profilePicturePreview || profilePicture) ? (
+                      {(profilePicturePreview || user.profile_picture_url) ? (
                         <img
-                          src={profilePicturePreview || getProfilePictureUrl(profilePicture) || ''}
+                          src={profilePicturePreview || user.profile_picture_url || ''}
                           alt="Profile"
                           className="w-full h-full object-cover"
                         />

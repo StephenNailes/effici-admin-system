@@ -40,14 +40,15 @@ export default function Sidebar() {
   // Helper function to get correct profile picture URL
   const getProfilePictureUrl = (profilePicture: string | null) => {
     if (!profilePicture) return null;
-    
-    // If it already starts with /storage/, use as is
-    if (profilePicture.startsWith('/storage/')) {
-      return profilePicture;
+    const val = profilePicture.trim();
+    if (val.startsWith('http://') || val.startsWith('https://') || val.startsWith('data:') || val.startsWith('blob:')) {
+      return val;
     }
-    
-    // Otherwise, add /storage/ prefix
-    return `/storage/${profilePicture}`;
+    if (val.includes('/storage/')) {
+      return val.startsWith('/') ? val : `/${val}`;
+    }
+    const clean = val.replace(/^public[\\/]/, '').replace(/^storage[\\/]/, '').replace(/^\/?(public|storage)\//, '');
+    return `/storage/${clean}`;
   };
 
   const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -56,6 +57,7 @@ export default function Sidebar() {
   const [notificationBadgeCount, setNotificationBadgeCount] = useState(0);
   const [eventNotificationCount, setEventNotificationCount] = useState(0);
   const [announcementNotificationCount, setAnnouncementNotificationCount] = useState(0);
+  const [profileImgErrored, setProfileImgErrored] = useState(false);
 
   // Store requestOpen state in localStorage to persist across navigation
   const [requestOpen, setRequestOpen] = useState(() => {
@@ -322,22 +324,17 @@ export default function Sidebar() {
             <div className="flex items-center gap-3">
               <div className="relative">
                 <div className="w-11 h-11 rounded-full border-2 border-[#e6232a] overflow-hidden bg-[#e6232a] flex items-center justify-center">
-                  {user.profile_picture ? (
+                  {(!user.profile_picture || profileImgErrored) ? (
+                    <div className="w-full h-full bg-[#e6232a] flex items-center justify-center text-white font-bold text-lg">
+                      {user.first_name?.charAt(0).toUpperCase() || 'U'}
+                    </div>
+                  ) : (
                     <img
                       src={getProfilePictureUrl(user.profile_picture) || '/images/profile.png'}
                       alt="Profile"
                       className="w-full h-full object-cover"
-                      onError={(e) => {
-                        // Replace failed image with user initials
-                        const img = e.target as HTMLImageElement;
-                        const parent = img.parentElement!;
-                        parent.innerHTML = `<div class="w-full h-full bg-[#e6232a] flex items-center justify-center text-white font-bold text-lg">${user.first_name?.charAt(0).toUpperCase() || 'U'}</div>`;
-                      }}
+                      onError={() => setProfileImgErrored(true)}
                     />
-                  ) : (
-                    <div className="w-full h-full bg-[#e6232a] flex items-center justify-center text-white font-bold text-lg">
-                      {user.first_name?.charAt(0).toUpperCase() || 'U'}
-                    </div>
                   )}
                 </div>
                 {/* Notification Badge - Outside the profile circle */}

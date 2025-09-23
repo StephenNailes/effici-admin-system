@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import MainLayout from "@/layouts/mainlayout";
-import axios from "axios";
+import { router } from "@inertiajs/react";
 import { motion } from "framer-motion";
 
 const STATUS_COLORS: Record<string, string> = {
@@ -34,32 +34,18 @@ function getValidActions(status: string) {
   }
 }
 
-export default function EquipmentManagement() {
-  const [requests, setRequests] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+interface Props {
+  requests: any[];
+}
+
+export default function EquipmentManagement({ requests: initialRequests }: Props) {
+  const [requests, setRequests] = useState<any[]>(initialRequests || []);
   const [error, setError] = useState("");
   const [page, setPage] = useState(1);
+  const [processing, setProcessing] = useState(false);
   const pageSize = 10; // ✅ pagination size = 10
 
-  useEffect(() => {
-    axios
-      .get("/api/equipment-requests/manage")
-      .then((res) => {
-        // Filter out completed requests
-        const activeRequests = res.data.filter((req: any) => 
-          req.status !== "completed"
-        );
-        setRequests(activeRequests);
-        setLoading(false);
-      })
-      .catch(() => {
-        setError("Failed to load equipment requests.");
-        setLoading(false);
-      });
-  }, []);
-
-  const handleAction = async (id: number, action: string) => {
-    setLoading(true);
+  const handleAction = (id: number, action: string) => {
     let newStatus = "";
     switch (action) {
       case "check_out":
@@ -77,24 +63,33 @@ export default function EquipmentManagement() {
       default:
         return;
     }
-    try {
-      await axios.patch(`/api/equipment-requests/${id}/status`, {
-        status: newStatus,
-      });
-      
-      // If the status is completed, remove from the list
-      if (newStatus === "completed") {
-        setRequests((prev) => prev.filter((r) => r.id !== id));
-      } else {
-        // Otherwise, update the status
-        setRequests((prev) =>
-          prev.map((r) => (r.id === id ? { ...r, status: newStatus } : r))
-        );
+
+    setProcessing(true);
+    
+    router.patch(`/equipment-requests/${id}/status`, 
+      { status: newStatus },
+      {
+        onStart: () => setProcessing(true),
+        onFinish: () => setProcessing(false),
+        onSuccess: () => {
+          // If the status is completed, remove from the list
+          if (newStatus === "completed") {
+            setRequests((prev) => prev.filter((r) => r.id !== id));
+          } else {
+            // Otherwise, update the status
+            setRequests((prev) =>
+              prev.map((r) => (r.id === id ? { ...r, status: newStatus } : r))
+            );
+          }
+          setError(""); // Clear any previous errors
+        },
+        onError: (errors: any) => {
+          console.error("Error updating status:", errors);
+          const errorMessage = errors.message || errors.error || "Failed to update status.";
+          setError(errorMessage);
+        }
       }
-    } catch {
-      setError("Failed to update status.");
-    }
-    setLoading(false);
+    );
   };
 
   // ✅ Pagination slice
@@ -127,7 +122,7 @@ export default function EquipmentManagement() {
               </tr>
             </thead>
             <tbody className="text-black text-sm divide-y divide-gray-100">
-                {loading ? (
+                {processing ? (
                   <tr>
                     <td
                       colSpan={6}
@@ -190,7 +185,7 @@ export default function EquipmentManagement() {
                             key={action}
                             className="px-2 py-1 rounded bg-red-600 text-white text-xs font-bold shadow hover:bg-red-700 transition"
                             onClick={() => handleAction(req.id, action)}
-                            disabled={loading}
+                            disabled={processing}
                           >
                             {action === "check_out" && "Check Out"}
                             {action === "return" && "Return"}

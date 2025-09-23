@@ -1,8 +1,46 @@
 // resources/js/Components/CommentSection.tsx
-import { useState } from 'react';
+import { useState, memo } from 'react';
 import { motion } from 'framer-motion';
 import { FaHeart, FaReply, FaPaperPlane, FaTimes } from 'react-icons/fa';
 import { usePage } from '@inertiajs/react';
+
+// Safe, memoized Avatar to avoid remounting on parent re-renders
+type AvatarProps = {
+  src?: string | null;
+  alt: string;
+  size?: number;
+  fallbackInitial?: string;
+  className?: string;
+};
+
+const Avatar = memo(({ src, alt, size = 40, fallbackInitial = 'U', className = '' }: AvatarProps) => {
+  const [errored, setErrored] = useState(false);
+  const dimension = `${size}px`;
+  const baseClasses = `rounded-full object-cover ${className}`.trim();
+
+  if (!src || errored) {
+    const textSize = size <= 32 ? 'text-xs' : size <= 40 ? 'text-sm' : 'text-base';
+    return (
+      <div
+        style={{ width: dimension, height: dimension }}
+        className={`flex items-center justify-center rounded-full bg-gray-200 text-gray-600 font-semibold ${textSize}`}
+        aria-label={alt}
+      >
+        {(fallbackInitial || 'U').toUpperCase()}
+      </div>
+    );
+  }
+
+  return (
+    <img
+      src={src}
+      alt={alt}
+      style={{ width: dimension, height: dimension }}
+      className={baseClasses}
+      onError={() => setErrored(true)}
+    />
+  );
+});
 
 interface User {
   id: number;
@@ -49,18 +87,28 @@ export default function CommentSection({
   onEditComment,
   onClose,
 }: Props) {
-  const { auth } = usePage().props as any;
-  const userFirstName = auth.user.first_name;
-  const userId = auth.user.id;
+  const pageProps = usePage().props as any;
+  const authUser = pageProps?.auth?.user ?? null;
+  const userFirstName: string = authUser?.first_name ?? 'You';
+  const userId: number | null = authUser?.id ?? null;
   // Match Sidebar logic for resolving profile picture URLs
   const getProfilePictureUrl = (profilePicture?: string | null) => {
     if (!profilePicture) return null;
-    if (profilePicture.startsWith('/storage/')) return profilePicture;
-    return `/storage/${profilePicture}`;
+    const val = profilePicture.trim();
+    if (val.startsWith('http://') || val.startsWith('https://') || val.startsWith('data:') || val.startsWith('blob:')) {
+      return val;
+    }
+    if (val.includes('/storage/')) {
+      return val.startsWith('/') ? val : `/${val}`;
+    }
+    const clean = val.replace(/^public[\\/]/, '').replace(/^storage[\\/]/, '');
+    return `/storage/${clean}`;
   };
 
-  const currentUserProfileRaw: string | null = auth.user.profile_picture || auth.user.avatarUrl || null;
+  const currentUserProfileRaw: string | null = (authUser?.profile_picture || authUser?.avatarUrl) ?? null;
   const userAvatar = getProfilePictureUrl(currentUserProfileRaw) || '/images/profile.png';
+
+  // Avatar moved to module scope and memoized
 
   const [newComment, setNewComment] = useState('');
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -145,22 +193,15 @@ export default function CommentSection({
             <div key={comment.id} className="space-y-3">
               {/* Main Comment */}
               <div className="flex gap-3 items-start">
-                {comment.user?.profile_picture || comment.user?.avatarUrl ? (
-                  <img
+                <div className="mt-1">
+                  <Avatar
                     src={getProfilePictureUrl(comment.user.profile_picture || comment.user.avatarUrl) || '/images/profile.png'}
                     alt={comment.user?.first_name || 'User'}
-                    className="w-10 h-10 rounded-full object-cover mt-1"
-                    onError={(e) => {
-                      const img = e.target as HTMLImageElement;
-                      const parent = img.parentElement!;
-                      parent.innerHTML = `<div class='flex w-10 h-10 items-center justify-center rounded-full bg-gray-200 text-gray-600 font-semibold text-sm'>${(comment.user?.first_name?.charAt(0) || 'U').toUpperCase()}</div>`;
-                    }}
+                    size={40}
+                    className=""
+                    fallbackInitial={(comment.user?.first_name?.charAt(0) || 'U')}
                   />
-                ) : (
-                  <div className="w-10 h-10 flex items-center justify-center rounded-full bg-gray-200 text-gray-600 font-semibold text-sm mt-1">
-                    {(comment.user?.first_name?.charAt(0) || 'U').toUpperCase()}
-                  </div>
-                )}
+                </div>
                 <div className="flex-1">
                   <div className="bg-gray-50 rounded-xl px-4 py-3">
                     <div className="flex items-center gap-2 mb-1">
@@ -206,7 +247,7 @@ export default function CommentSection({
                       >
                         <FaReply className="text-xs" /> Reply
                       </button>
-                      {comment.user?.id === userId && !editingId && (
+                      {userId !== null && comment.user?.id === userId && !editingId && (
                         <button
                           className="text-xs text-blue-500 hover:underline"
                           onClick={() => handleEdit(comment.id, comment.text)}
@@ -225,22 +266,12 @@ export default function CommentSection({
                       className="mt-3 ml-4"
                     >
                       <div className="flex gap-2 items-center">
-                        {userAvatar ? (
-                          <img
-                            src={userAvatar}
-                            alt={userFirstName}
-                            className="w-8 h-8 rounded-full object-cover"
-                            onError={(e) => {
-                              const img = e.target as HTMLImageElement;
-                              const parent = img.parentElement!;
-                              parent.innerHTML = `<div class='flex w-8 h-8 items-center justify-center rounded-full bg-gray-200 text-gray-600 font-semibold text-xs'>${(userFirstName?.charAt(0) || 'U').toUpperCase()}</div>`;
-                            }}
-                          />
-                        ) : (
-                          <div className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-200 text-gray-600 font-semibold text-xs">
-                            {(userFirstName?.charAt(0) || 'U').toUpperCase()}
-                          </div>
-                        )}
+                        <Avatar
+                          src={userAvatar}
+                          alt={userFirstName}
+                          size={32}
+                          fallbackInitial={(userFirstName?.charAt(0) || 'U')}
+                        />
                         <input
                           type="text"
                           value={replyText}
@@ -275,22 +306,14 @@ export default function CommentSection({
                     <div className="mt-3 ml-4 space-y-3">
                       {comment.replies.map((reply) => (
                         <div key={reply.id} className="flex gap-2 items-start">
-                          {reply.user?.profile_picture || reply.user?.avatarUrl ? (
-                            <img
+                          <div className="mt-1">
+                            <Avatar
                               src={getProfilePictureUrl(reply.user.profile_picture || reply.user.avatarUrl) || '/images/profile.png'}
                               alt={reply.user?.first_name || 'User'}
-                              className="w-8 h-8 rounded-full object-cover mt-1"
-                              onError={(e) => {
-                                const img = e.target as HTMLImageElement;
-                                const parent = img.parentElement!;
-                                parent.innerHTML = `<div class='flex w-8 h-8 items-center justify-center rounded-full bg-gray-200 text-gray-600 font-semibold text-xs'>${(reply.user?.first_name?.charAt(0) || 'U').toUpperCase()}</div>`;
-                              }}
+                              size={32}
+                              fallbackInitial={(reply.user?.first_name?.charAt(0) || 'U')}
                             />
-                          ) : (
-                            <div className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-200 text-gray-600 font-semibold text-xs mt-1">
-                              {(reply.user?.first_name?.charAt(0) || 'U').toUpperCase()}
-                            </div>
-                          )}
+                          </div>
                           <div className="flex-1">
                             <div className="bg-white border border-gray-200 rounded-lg px-3 py-2">
                               <div className="flex items-center gap-2 mb-1">
@@ -318,22 +341,12 @@ export default function CommentSection({
       {/* Add Comment Form */}
       <div className="p-6 border-t border-gray-100">
         <form onSubmit={handleSubmit} className="flex items-center gap-3">
-          {userAvatar ? (
-            <img
-              src={userAvatar}
-              alt={userFirstName}
-              className="w-10 h-10 rounded-full object-cover"
-              onError={(e) => {
-                const img = e.target as HTMLImageElement;
-                const parent = img.parentElement!;
-                parent.innerHTML = `<div class='flex w-10 h-10 items-center justify-center rounded-full bg-gray-200 text-gray-600 font-semibold text-sm'>${(userFirstName?.charAt(0) || 'U').toUpperCase()}</div>`;
-              }}
-            />
-          ) : (
-            <div className="w-10 h-10 flex items-center justify-center rounded-full bg-gray-200 text-gray-600 font-semibold text-sm">
-              {(userFirstName?.charAt(0) || 'U').toUpperCase()}
-            </div>
-          )}
+          <Avatar
+            src={userAvatar}
+            alt={userFirstName}
+            size={40}
+            fallbackInitial={(userFirstName?.charAt(0) || 'U')}
+          />
           <input
             type="text"
             value={newComment}
