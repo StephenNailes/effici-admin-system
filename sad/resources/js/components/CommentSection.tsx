@@ -47,6 +47,7 @@ interface User {
   first_name: string;
   last_name: string;
   profile_picture?: string;
+  profile_picture_url?: string;
   avatarUrl?: string;
 }
 
@@ -105,8 +106,8 @@ export default function CommentSection({
     return `/storage/${clean}`;
   };
 
-  const currentUserProfileRaw: string | null = (authUser?.profile_picture || authUser?.avatarUrl) ?? null;
-  const userAvatar = getProfilePictureUrl(currentUserProfileRaw) || '/images/profile.png';
+  const currentUserProfileRaw: string | null = (authUser?.profile_picture_url || authUser?.profile_picture || authUser?.avatarUrl) ?? null;
+  const userAvatar = authUser?.profile_picture_url || getProfilePictureUrl(currentUserProfileRaw) || '/images/profile.png';
 
   // Avatar moved to module scope and memoized
 
@@ -195,7 +196,7 @@ export default function CommentSection({
               <div className="flex gap-3 items-start">
                 <div className="mt-1">
                   <Avatar
-                    src={getProfilePictureUrl(comment.user.profile_picture || comment.user.avatarUrl) || '/images/profile.png'}
+                    src={comment.user.profile_picture_url || getProfilePictureUrl(comment.user.profile_picture || comment.user.avatarUrl) || '/images/profile.png'}
                     alt={comment.user?.first_name || 'User'}
                     size={40}
                     className=""
@@ -308,7 +309,7 @@ export default function CommentSection({
                         <div key={reply.id} className="flex gap-2 items-start">
                           <div className="mt-1">
                             <Avatar
-                              src={getProfilePictureUrl(reply.user.profile_picture || reply.user.avatarUrl) || '/images/profile.png'}
+                              src={reply.user.profile_picture_url || getProfilePictureUrl(reply.user.profile_picture || reply.user.avatarUrl) || '/images/profile.png'}
                               alt={reply.user?.first_name || 'User'}
                               size={32}
                               fallbackInitial={(reply.user?.first_name?.charAt(0) || 'U')}

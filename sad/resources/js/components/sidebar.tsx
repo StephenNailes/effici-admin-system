@@ -324,13 +324,13 @@ export default function Sidebar() {
             <div className="flex items-center gap-3">
               <div className="relative">
                 <div className="w-11 h-11 rounded-full border-2 border-[#e6232a] overflow-hidden bg-[#e6232a] flex items-center justify-center">
-                  {(!user.profile_picture || profileImgErrored) ? (
+                  {((!user.profile_picture && !user.profile_picture_url) || profileImgErrored) ? (
                     <div className="w-full h-full bg-[#e6232a] flex items-center justify-center text-white font-bold text-lg">
                       {user.first_name?.charAt(0).toUpperCase() || 'U'}
                     </div>
                   ) : (
                     <img
-                      src={getProfilePictureUrl(user.profile_picture) || '/images/profile.png'}
+                      src={user.profile_picture_url || getProfilePictureUrl(user.profile_picture) || '/images/profile.png'}
                       alt="Profile"
                       className="w-full h-full object-cover"
                       onError={() => setProfileImgErrored(true)}

@@ -38,7 +38,7 @@ class ProfileController extends Controller
         $user = Auth::user();
         
         // Delete old profile picture if exists
-        if ($user->profile_picture) {
+        if ($user->profile_picture && Storage::disk('public')->exists($user->profile_picture)) {
             Storage::disk('public')->delete($user->profile_picture);
         }
 
@@ -49,22 +49,59 @@ class ProfileController extends Controller
         $user->profile_picture = $path;
         $user->save();
 
+        if ($request->expectsJson()) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Profile picture updated successfully!',
+                'user' => [
+                    'id' => $user->id,
+                    'profile_picture' => $user->profile_picture,
+                    'profile_picture_url' => $user->profile_picture_url
+                ]
+            ]);
+        }
+
         return back()->with('success', 'Profile picture updated successfully!');
     }
 
     /**
      * Remove user's profile picture
      */
-    public function removeProfilePicture()
+    public function removeProfilePicture(Request $request)
     {
         /** @var User $user */
         $user = Auth::user();
         
-        // Delete profile picture if exists
-        if ($user->profile_picture) {
+        // Check if user has a profile picture
+        if (!$user->profile_picture) {
+            if ($request->expectsJson()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No profile picture to remove.'
+                ], 404);
+            }
+            return back()->withErrors(['profile_picture' => 'No profile picture to remove.']);
+        }
+        
+        // Delete profile picture file if it exists
+        if (Storage::disk('public')->exists($user->profile_picture)) {
             Storage::disk('public')->delete($user->profile_picture);
-            $user->profile_picture = null;
-            $user->save();
+        }
+        
+        // Update user record
+        $user->profile_picture = null;
+        $user->save();
+
+        if ($request->expectsJson()) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Profile picture removed successfully!',
+                'user' => [
+                    'id' => $user->id,
+                    'profile_picture' => null,
+                    'profile_picture_url' => null
+                ]
+            ]);
         }
 
         return back()->with('success', 'Profile picture removed successfully!');
@@ -76,7 +113,6 @@ class ProfileController extends Controller
     public function updateName(Request $request)
     {
         $request->validate([
-            'current_password' => ['required', 'current_password'],
             'first_name' => ['required', 'string', 'max:255'],
             'middle_name' => ['nullable', 'string', 'max:255'],
             'last_name' => ['required', 'string', 'max:255'],
@@ -85,10 +121,24 @@ class ProfileController extends Controller
         /** @var User $user */
         $user = Auth::user();
         
-        $user->first_name = $request->first_name;
-        $user->middle_name = $request->middle_name;
-        $user->last_name = $request->last_name;
+        $user->first_name = trim($request->first_name);
+        $user->middle_name = $request->middle_name ? trim($request->middle_name) : null;
+        $user->last_name = trim($request->last_name);
         $user->save();
+
+        if ($request->expectsJson()) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Name updated successfully!',
+                'user' => [
+                    'id' => $user->id,
+                    'first_name' => $user->first_name,
+                    'middle_name' => $user->middle_name,
+                    'last_name' => $user->last_name,
+                    'full_name' => $user->full_name
+                ]
+            ]);
+        }
 
         return back()->with('success', 'Name updated successfully!');
     }

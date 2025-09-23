@@ -65,7 +65,6 @@ export default function Profile() {
     setEmailError('');
     if (!email || !/^[\w-.]+@([\w-]+\.)+[\w-]{2,4}$/.test(email)) {
       setEmailError('Please enter a valid email address.');
-      toast.error('Please enter a valid email address.');
       return;
     }
     
@@ -79,7 +78,6 @@ export default function Profile() {
       onError: (errors) => {
         const errorMessage = errors.email || 'Failed to update email.';
         setEmailError(errorMessage);
-        toast.error(errorMessage);
       }
     });
   };
@@ -89,13 +87,11 @@ export default function Profile() {
     if (!password || password.length < 6) {
       const errorMessage = 'Password must be at least 6 characters.';
       setPasswordError(errorMessage);
-      toast.error(errorMessage);
       return;
     }
     if (password !== confirmPassword) {
       const errorMessage = 'Passwords do not match.';
       setPasswordError(errorMessage);
-      toast.error(errorMessage);
       return;
     }
     
@@ -112,7 +108,6 @@ export default function Profile() {
       onError: (errors) => {
         const errorMessage = errors.password || 'Failed to update password.';
         setPasswordError(errorMessage);
-        toast.error(errorMessage);
       }
     });
   };
@@ -127,16 +122,14 @@ export default function Profile() {
     if (!file.type.startsWith('image/')) {
       const errorMessage = 'Please select a valid image file.';
       setProfilePictureError(errorMessage);
-      toast.error(errorMessage);
       return;
     }
     
     // Validate file size (5MB limit)
     if (file.size > 5 * 1024 * 1024) {
-      const errorMessage = 'Image size must be less than 5MB.';
-      setProfilePictureError(errorMessage);
-      toast.error(errorMessage);
-      return;
+  const errorMessage = 'Image size must be less than 5MB.';
+  setProfilePictureError(errorMessage);
+  return;
     }
     
     // Create preview URL and store file
@@ -149,10 +142,14 @@ export default function Profile() {
   const handleProfilePictureSave = () => {
     if (!profilePictureFile) return;
     
+    setProfilePictureError('');
+    
     const formData = new FormData();
     formData.append('profile_picture', profilePictureFile);
     
     router.post('/profile/update-picture', formData, {
+      preserveScroll: true,
+      preserveState: false, // Allow state refresh to get updated user data
       onSuccess: (page: any) => {
         const updatedPic = (page?.props as any)?.auth?.user?.profile_picture ?? null;
         setProfilePicture(updatedPic);
@@ -163,9 +160,9 @@ export default function Profile() {
         // Flash message will be handled by FlashToaster component
       },
       onError: (errors) => {
-        const errorMessage = errors.profile_picture || 'Failed to update profile picture.';
+        console.error('Profile picture update errors:', errors);
+        const errorMessage = errors.profile_picture || errors.message || 'Failed to update profile picture.';
         setProfilePictureError(errorMessage);
-        toast.error(errorMessage);
       }
     });
   };
@@ -184,14 +181,17 @@ export default function Profile() {
     setProfilePictureError('');
     
     router.delete('/profile/remove-picture', {
-      onSuccess: () => {
+      preserveScroll: true,
+      preserveState: false, // Allow state refresh to get updated user data
+      onSuccess: (page) => {
         setProfilePicture(null);
+        setProfilePicturePreview(null);
         // Flash message will be handled by FlashToaster component
       },
       onError: (errors) => {
-        const errorMessage = errors.profile_picture || 'Failed to remove profile picture.';
+        console.error('Profile picture removal errors:', errors);
+        const errorMessage = errors.profile_picture || errors.message || 'Failed to remove profile picture.';
         setProfilePictureError(errorMessage);
-        toast.error(errorMessage);
       }
     });
   };
@@ -202,7 +202,6 @@ export default function Profile() {
     if (!firstName.trim() || !lastName.trim()) {
       const errorMessage = 'First name and last name are required.';
       setNameError(errorMessage);
-      toast.error(errorMessage);
       return;
     }
     
@@ -211,14 +210,16 @@ export default function Profile() {
       middle_name: middleName.trim(),
       last_name: lastName.trim()
     }, {
-      onSuccess: () => {
+      preserveScroll: true,
+      preserveState: false, // Allow state refresh to get updated user data
+      onSuccess: (page) => {
         setEditingName(false);
         // Flash message will be handled by FlashToaster component
       },
       onError: (errors) => {
-        const errorMessage = errors.first_name || errors.last_name || 'Failed to update name.';
+        console.error('Name update errors:', errors);
+        const errorMessage = errors.first_name || errors.last_name || errors.message || 'Failed to update name.';
         setNameError(errorMessage);
-        toast.error(errorMessage);
       }
     });
   };
