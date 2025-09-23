@@ -1,0 +1,4 @@
+*.sqlite*
+/
+database/
+.github/
