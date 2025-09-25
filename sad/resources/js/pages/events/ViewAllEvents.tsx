@@ -1,15 +1,25 @@
 // resources/js/Pages/Events/ViewAllEvents.tsx
 
 import MainLayout from '@/layouts/mainlayout';
-import { Calendar, MessageCircle, MoreHorizontal, Plus, ArrowLeft, Edit, Trash2, Bookmark, Heart } from 'lucide-react';
+import { Calendar, Plus, ArrowLeft } from 'lucide-react';
 import CommentSection from '@/components/CommentSection';
 import Modal from '@/components/Modal';
-import { useState, useRef, useEffect } from 'react';
+import PostCard from '@/components/PostCard';
+import { useState, useEffect } from 'react';
 import { usePage, router } from '@inertiajs/react';
 import { motion, AnimatePresence } from 'framer-motion';
 import axios from 'axios';
 
 // Pagination removed; pages now receive plain arrays
+
+interface PostImage {
+  id: number;
+  url: string;
+  original_name: string;
+  width: number;
+  height: number;
+  order: number;
+}
 
 interface Event {
   id: number; // add id for DB reference
@@ -24,6 +34,9 @@ interface Event {
     last_name: string;
     profile_picture?: string;
   };
+  images?: PostImage[];
+  created_at?: string;
+  updated_at?: string;
 }
 
 interface User {
@@ -81,27 +94,11 @@ export default function ViewAllEvents() {
 
   const [comments, setComments] = useState<Record<number, Comment[]>>({});
   const [modalEventId, setModalEventId] = useState<number | null>(null);
-  const [dropdownOpen, setDropdownOpen] = useState<number | null>(null);
   // Delete confirmation modal state
   const [deleteEventId, setDeleteEventId] = useState<number | null>(null);
-  // Keep a ref per event id so outside-click detection targets the correct card
-  const dropdownRefs = useRef<Record<number, HTMLDivElement | null>>({});
   
   // Like functionality state
   const [likes, setLikes] = useState<Record<number, { liked: boolean; count: number }>>({});
-
-  // Close dropdown when clicking outside
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (dropdownOpen === null) return;
-      const container = dropdownRefs.current[dropdownOpen];
-      if (container && !container.contains(event.target as Node)) {
-        setDropdownOpen(null);
-      }
-    }
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [dropdownOpen]);
 
   const addComment = async (eventId: number, payload: { commentable_id: number; commentable_type: string; text: string; parent_id?: number }) => {
     try {
@@ -229,13 +226,11 @@ export default function ViewAllEvents() {
 
   const handleEdit = (eventId: number) => {
     router.visit(`/events/${eventId}/edit`);
-    setDropdownOpen(null);
   };
 
   const handleDelete = (eventId: number) => {
     // Open themed confirmation modal instead of native confirm
     setDeleteEventId(eventId);
-    setDropdownOpen(null);
   };
 
   const confirmDeleteEvent = () => {
@@ -243,7 +238,8 @@ export default function ViewAllEvents() {
     router.delete(`/events/${deleteEventId}`, {
       onSuccess: () => {
         setDeleteEventId(null);
-        router.reload();
+        // Navigate back to index to avoid stale route and 404 resource errors
+        router.visit('/events');
       },
       onError: () => {
         setDeleteEventId(null);
@@ -264,7 +260,6 @@ export default function ViewAllEvents() {
     } catch (error) {
       console.error('Failed to bookmark event:', error);
     }
-    setDropdownOpen(null);
   };
 
   const canEditDelete = () => {
@@ -328,145 +323,44 @@ export default function ViewAllEvents() {
           >
             {items.length > 0 ? (
               items.map((event: Event) => (
-                <motion.article
-                  variants={cardVariants}
+                <PostCard
                   key={event.id}
-                  className="group relative mx-auto flex w-full max-w-lg flex-col justify-between rounded-xl border border-gray-100 bg-white/90 p-6 shadow-sm ring-1 ring-transparent backdrop-blur-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:ring-red-50"
-                >
-                  <div>
-                    <div className="mb-4 flex items-center gap-3">
-                      <div className="h-10 w-10 overflow-hidden rounded-full border-2 border-red-600 bg-red-600 text-white">
-                        {event.user?.profile_picture ? (
-                          <img
-                            src={event.user.profile_picture.startsWith('/storage/')
-                              ? event.user.profile_picture
-                              : `/storage/${event.user.profile_picture}`}
-                            alt={`${event.user?.first_name || ''} ${event.user?.last_name || ''}`}
-                            className="h-full w-full object-cover"
-                            onError={(e) => {
-                              const img = e.target as HTMLImageElement;
-                              const parent = img.parentElement!;
-                              parent.innerHTML = `<div class='flex h-full w-full items-center justify-center bg-red-600 text-white font-semibold text-sm'>${(event.user?.first_name?.charAt(0) || 'U').toUpperCase()}</div>`;
-                            }}
-                          />
-                        ) : (
-                          <div className="flex h-full w-full items-center justify-center bg-red-600 text-sm font-semibold text-white">
-                            {(event.user?.first_name?.charAt(0) || 'U').toUpperCase()}
-                          </div>
-                        )}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="truncate font-semibold text-gray-900">
-                          {event.user?.first_name || 'Unknown'} {event.user?.last_name || 'User'}
-                        </div>
-                        <div className="text-xs text-gray-500">{event.date}</div>
-                      </div>
-                      <div
-                        className="relative"
-                        ref={(el) => {
-                          dropdownRefs.current[event.id] = el;
-                        }}
-                      >
-                        <button
-                          aria-haspopup="menu"
-                          aria-expanded={dropdownOpen === event.id}
-                          className="rounded p-1 text-gray-400 hover:text-gray-600 focus:outline-none focus:ring-2 focus:ring-red-500"
-                          onClick={() => setDropdownOpen(dropdownOpen === event.id ? null : event.id)}
-                        >
-                          <MoreHorizontal className="h-5 w-5" />
-                        </button>
-                        <AnimatePresence>
-                          {dropdownOpen === event.id && (
-                            <motion.div
-                              initial={{ opacity: 0, scale: 0.98, y: -2 }}
-                              animate={{ opacity: 1, scale: 1, y: 0 }}
-                              exit={{ opacity: 0, scale: 0.98, y: -2 }}
-                              transition={{ duration: 0.12 }}
-                              className="absolute right-0 top-6 z-10 mt-1 w-48 overflow-hidden rounded-lg border border-gray-100 bg-white shadow-lg"
-                            >
-                              {canEditDelete() && (
-                                <>
-                                  <button
-                                    onClick={() => handleEdit(event.id)}
-                                    className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50"
-                                  >
-                                    <Edit className="h-4 w-4" />
-                                    Edit
-                                  </button>
-                                  <button
-                                    onClick={() => handleDelete(event.id)}
-                                    className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50"
-                                  >
-                                    <Trash2 className="h-4 w-4" />
-                                    Delete
-                                  </button>
-                                </>
-                              )}
-                              {auth.user.role === 'student' && (
-                                <button
-                                  onClick={() => handleBookmark(event.id)}
-                                  className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50"
-                                >
-                                  <Bookmark className="h-4 w-4" />
-                                  Save/Bookmark
-                                </button>
-                              )}
-                            </motion.div>
-                          )}
-                        </AnimatePresence>
-                      </div>
-                    </div>
-                    <h3 className="mb-2 line-clamp-2 text-lg font-semibold text-gray-900">{event.title}</h3>
-                    {event.description && (
-                      <p className="mb-4 line-clamp-3 text-sm leading-6 text-gray-600">{event.description}</p>
-                    )}
-                  </div>
-                  <div className="flex items-center justify-between border-t pt-3">
-                    {/* Like Button */}
-                    <button
-                      className="inline-flex items-center gap-2 text-sm font-medium text-gray-500 transition-colors hover:text-red-600"
-                      onClick={() => toggleLike(event.id)}
-                    >
-                      <Heart 
-                        className={`h-5 w-5 ${
-                          likes[event.id]?.liked 
-                            ? 'fill-red-500 text-red-500' 
-                            : 'text-gray-400'
-                        }`} 
-                      />
-                      <span>Like</span>
-                      {likes[event.id]?.count > 0 && (
-                        <span className="text-xs bg-gray-100 px-2 py-1 rounded-full">
-                          {likes[event.id].count}
-                        </span>
-                      )}
-                    </button>
-
-                    {/* Comment Button - moved to right side */}
-                    <button
-                      className="inline-flex items-center gap-2 text-sm font-medium text-gray-500 transition-colors hover:text-red-600"
-                      onClick={() => setModalEventId(event.id)}
-                    >
-                      <MessageCircle className="h-5 w-5" />
-                      {(comments[event.id] || []).length} Comments
-                    </button>
-                  </div>
-                  <Modal open={modalEventId === event.id} onClose={() => setModalEventId(null)}>
-                    <CommentSection
-                      comments={comments[event.id] || []}
-                      commentableId={event.id}
-                      commentableType="events"
-                      onAddComment={(payload) => addComment(event.id, payload)}
-                      onEditComment={(commentId, newText) => editComment(event.id, commentId, newText)}
-                      onClose={() => setModalEventId(null)}
-                    />
-                  </Modal>
-                </motion.article>
+                  post={event}
+                  type="event"
+                  date={event.date}
+                  likes={likes[event.id] || { liked: false, count: 0 }}
+                  commentsCount={(comments[event.id] || []).length}
+                  canEditDelete={canEditDelete()}
+                  onLike={() => toggleLike(event.id)}
+                  onComment={() => setModalEventId(event.id)}
+                  onEdit={() => handleEdit(event.id)}
+                  onDelete={() => handleDelete(event.id)}
+                  onBookmark={auth.user.role === 'student' ? () => handleBookmark(event.id) : undefined}
+                  onPostClick={undefined}
+                />
               ))
             ) : (
-              <p className="text-gray-500 italic">No events available.</p>
+              <div className="col-span-full text-center py-12">
+                <Calendar className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+                <p className="text-gray-500 text-lg">No events available yet.</p>
+                <p className="text-gray-400 text-sm">Check back later for upcoming events!</p>
+              </div>
             )}
           </motion.div>
+
+          {/* Comment Modal */}
+          <Modal open={modalEventId !== null} onClose={() => setModalEventId(null)}>
+            {modalEventId && (
+              <CommentSection
+                comments={comments[modalEventId] || []}
+                commentableId={modalEventId}
+                commentableType="events"
+                onAddComment={(payload) => addComment(modalEventId, payload)}
+                onEditComment={(commentId, newText) => editComment(modalEventId, commentId, newText)}
+                onClose={() => setModalEventId(null)}
+              />
+            )}
+          </Modal>
           {/* Pagination removed */}
         </section>
       </motion.div>

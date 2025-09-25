@@ -213,6 +213,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/events', [EventController::class, 'store'])->name('events.store');
     Route::get('/events/{id}/edit', [EventController::class, 'edit'])->name('events.edit');
     Route::put('/events/{id}', [EventController::class, 'update'])->name('events.update');
+    Route::post('/events/{id}', [EventController::class, 'update']); // For form-data uploads
     Route::delete('/events/{id}', [EventController::class, 'destroy'])->name('events.destroy');
     
     Route::get('/announcements', [AnnouncementController::class, 'index'])->name('announcements.index');
@@ -220,6 +221,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/announcements', [AnnouncementController::class, 'store'])->name('announcements.store');
     Route::get('/announcements/{id}/edit', [AnnouncementController::class, 'edit'])->name('announcements.edit');
     Route::put('/announcements/{id}', [AnnouncementController::class, 'update'])->name('announcements.update');
+    Route::post('/announcements/{id}', [AnnouncementController::class, 'update']); // For form-data uploads
     Route::delete('/announcements/{id}', [AnnouncementController::class, 'destroy'])->name('announcements.destroy');
     // Notification API routes (defined once)
     Route::prefix('api/notifications')->group(function () {

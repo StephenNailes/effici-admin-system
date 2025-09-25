@@ -1,15 +1,25 @@
-  // resources/js/Pages/Announcements/ViewAllAnnouncements.tsx
+// resources/js/Pages/Announcements/ViewAllAnnouncements.tsx
 
 import MainLayout from '@/layouts/mainlayout';
-import { Megaphone, MessageCircle, MoreHorizontal, Plus, ArrowLeft, Edit, Trash2, Bookmark, Heart } from 'lucide-react';
+import { Megaphone, Plus, ArrowLeft } from 'lucide-react';
 import CommentSection from '@/components/CommentSection';
 import Modal from '@/components/Modal';
+import PostCard from '@/components/PostCard';
 import { useEffect, useState, useRef } from 'react';
 import { usePage, router } from '@inertiajs/react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import axios from 'axios';
 
 // Pagination removed; pages now receive plain arrays
+
+interface PostImage {
+  id: number;
+  url: string;
+  original_name: string;
+  width: number;
+  height: number;
+  order: number;
+}
 
 interface Announcement {
   id: number;
@@ -24,6 +34,9 @@ interface Announcement {
     last_name: string;
     profile_picture?: string;
   };
+  images?: PostImage[];
+  created_at?: string;
+  updated_at?: string;
 }
 
 interface User {
@@ -247,7 +260,7 @@ export default function ViewAllAnnouncements() {
     router.delete(`/announcements/${deleteAnnouncementId}`, {
       onSuccess: () => {
         setDeleteAnnouncementId(null);
-        router.reload();
+        router.visit('/announcements');
       },
       onError: () => {
         setDeleteAnnouncementId(null);
@@ -328,147 +341,47 @@ export default function ViewAllAnnouncements() {
             className="grid gap-5 sm:gap-6 md:grid-cols-2 lg:grid-cols-3"
           >
             {items.length > 0 ? (
-              items.map((a: Announcement) => (
-                <motion.article
-                  key={a.id}
-                  variants={cardVariants}
-                  className="group relative mx-auto flex w-full max-w-lg flex-col justify-between rounded-xl border border-gray-100 bg-white/90 p-6 shadow-sm ring-1 ring-transparent backdrop-blur-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:ring-red-50"
-                >
-                  <div>
-                    <div className="mb-4 flex items-center gap-3">
-                      <div className="h-10 w-10 overflow-hidden rounded-full border-2 border-red-600 bg-red-600 text-white">
-                        {a.user?.profile_picture ? (
-                          <img
-                            src={a.user.profile_picture.startsWith('/storage/')
-                              ? a.user.profile_picture
-                              : `/storage/${a.user.profile_picture}`}
-                            alt={`${a.user?.first_name || ''} ${a.user?.last_name || ''}`}
-                            className="h-full w-full object-cover"
-                            onError={(e) => {
-                              const img = e.target as HTMLImageElement;
-                              const parent = img.parentElement!;
-                              parent.innerHTML = `<div class='flex h-full w-full items-center justify-center bg-red-600 text-white font-semibold text-sm'>${(a.user?.first_name?.charAt(0) || 'U').toUpperCase()}</div>`;
-                            }}
-                          />
-                        ) : (
-                          <div className="flex h-full w-full items-center justify-center bg-red-600 text-sm font-semibold text-white">
-                            {(a.user?.first_name?.charAt(0) || 'U').toUpperCase()}
-                          </div>
-                        )}
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="truncate font-semibold text-gray-900">
-                          {a.user?.first_name || 'Unknown'} {a.user?.last_name || 'User'}
-                        </div>
-                        <div className="text-xs text-gray-500">{a.date}</div>
-                      </div>
-                      <div
-                        className="relative"
-                        ref={(el) => {
-                          dropdownRefs.current[a.id] = el;
-                        }}
-                      >
-                        <button
-                          aria-haspopup="menu"
-                          aria-expanded={dropdownOpen === a.id}
-                          className="rounded p-1 text-gray-400 hover:text-gray-600 focus:outline-none focus:ring-2 focus:ring-red-500"
-                          onClick={() => setDropdownOpen(dropdownOpen === a.id ? null : a.id)}
-                        >
-                          <MoreHorizontal className="h-5 w-5" />
-                        </button>
-                        <AnimatePresence>
-                          {dropdownOpen === a.id && (
-                            <motion.div
-                              initial={{ opacity: 0, scale: 0.98, y: -2 }}
-                              animate={{ opacity: 1, scale: 1, y: 0 }}
-                              exit={{ opacity: 0, scale: 0.98, y: -2 }}
-                              transition={{ duration: 0.12 }}
-                              className="absolute right-0 top-6 z-10 mt-1 w-48 overflow-hidden rounded-lg border border-gray-100 bg-white shadow-lg"
-                            >
-                              {canEditDelete() && (
-                                <>
-                                  <button
-                                    onClick={() => handleEdit(a.id)}
-                                    className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50"
-                                  >
-                                    <Edit className="h-4 w-4" />
-                                    Edit
-                                  </button>
-                                  <button
-                                    onClick={() => handleDelete(a.id)}
-                                    className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50"
-                                  >
-                                    <Trash2 className="h-4 w-4" />
-                                    Delete
-                                  </button>
-                                </>
-                              )}
-                              {auth.user.role === 'student' && (
-                                <button
-                                  onClick={() => handleBookmark(a.id)}
-                                  className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50"
-                                >
-                                  <Bookmark className="h-4 w-4" />
-                                  Save/Bookmark
-                                </button>
-                              )}
-                            </motion.div>
-                          )}
-                        </AnimatePresence>
-                      </div>
-                    </div>
-                    <h3 className="mb-2 line-clamp-2 text-lg font-semibold text-gray-900">{a.title}</h3>
-                    <p className="mb-4 line-clamp-3 text-sm leading-6 text-gray-600">{a.description}</p>
-                  </div>
-                  <div className="flex items-center justify-between border-t pt-3">
-                    {/* Like Button */}
-                    <button
-                      className="inline-flex items-center gap-2 text-sm font-medium text-gray-500 transition-colors hover:text-red-600"
-                      onClick={() => toggleLike(a.id)}
-                    >
-                      <Heart 
-                        className={`h-5 w-5 ${
-                          likes[a.id]?.liked 
-                            ? 'fill-red-500 text-red-500' 
-                            : 'text-gray-400'
-                        }`} 
-                      />
-                      <span>Like</span>
-                      {likes[a.id]?.count > 0 && (
-                        <span className="text-xs bg-gray-100 px-2 py-1 rounded-full">
-                          {likes[a.id].count}
-                        </span>
-                      )}
-                    </button>
-
-                    {/* Comment Button - moved to right side */}
-                    <button
-                      className="inline-flex items-center gap-2 text-sm font-medium text-gray-500 transition-colors hover:text-red-600"
-                      onClick={() => setModalAnnouncementId(a.id)}
-                    >
-                      <MessageCircle className="h-5 w-5" />
-                      {(comments[a.id] || []).length} Comments
-                    </button>
-                  </div>
-                  <Modal open={modalAnnouncementId === a.id} onClose={() => setModalAnnouncementId(null)}>
-                    <CommentSection
-                      comments={Array.isArray(comments[a.id]) ? comments[a.id] : []}
-                      commentableId={a.id}
-                      commentableType="announcements"
-                      onAddComment={(payload) => addComment(a.id, payload)}
-                      onEditComment={(commentId, newText) => editComment(a.id, commentId, newText)}
-                      onClose={() => setModalAnnouncementId(null)}
-                    />
-                  </Modal>
-                </motion.article>
+              items.map((announcement: Announcement) => (
+                <PostCard
+                  key={announcement.id}
+                  post={announcement}
+                  type="announcement"
+                  date={announcement.date}
+                  likes={likes[announcement.id] || { liked: false, count: 0 }}
+                  commentsCount={(comments[announcement.id] || []).length}
+                  canEditDelete={canEditDelete()}
+                  onLike={() => toggleLike(announcement.id)}
+                  onComment={() => setModalAnnouncementId(announcement.id)}
+                  onEdit={() => handleEdit(announcement.id)}
+                  onDelete={() => handleDelete(announcement.id)}
+                  onBookmark={auth.user.role === 'student' ? () => handleBookmark(announcement.id) : undefined}
+                  onPostClick={undefined}
+                />
               ))
             ) : (
-              <p className="text-gray-500 italic">No announcements posted.</p>
+              <div className="col-span-full text-center py-12">
+                <Megaphone className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+                <p className="text-gray-500 text-lg">No announcements available yet.</p>
+                <p className="text-gray-400 text-sm">Check back later for important updates!</p>
+              </div>
             )}
           </motion.div>
-          {/* Pagination removed */}
         </section>
       </motion.div>
+
+      {/* Comment Modal */}
+          <Modal open={modalAnnouncementId !== null} onClose={() => setModalAnnouncementId(null)}>
+            {modalAnnouncementId && (
+              <CommentSection
+                comments={comments[modalAnnouncementId] || []}
+                commentableId={modalAnnouncementId}
+                commentableType="announcements"
+                onAddComment={(payload) => addComment(modalAnnouncementId, payload)}
+                onEditComment={(commentId, newText) => editComment(modalAnnouncementId, commentId, newText)}
+                onClose={() => setModalAnnouncementId(null)}
+              />
+            )}
+          </Modal>
       {/* Delete Confirmation Modal */}
       <Modal open={deleteAnnouncementId !== null} onClose={closeDeleteModal}>
         <div className="w-full max-w-md">

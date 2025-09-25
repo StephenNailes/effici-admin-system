@@ -155,7 +155,7 @@ export default function Register() {
                   id="confirmPassword"
                   type={showConfirmPassword ? 'text' : 'password'}
                   className="w-full px-3 py-2 pr-10 rounded-md border border-gray-300 bg-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-red-400 text-base"
-                  placeholder="Confirm password"
+                  placeholder="Confirm password"  
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   required

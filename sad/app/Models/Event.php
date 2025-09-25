@@ -25,6 +25,16 @@ class Event extends Model
         return $this->morphMany(Like::class, 'likeable');
     }
 
+    public function images(): MorphMany
+    {
+        return $this->morphMany(PostImage::class, 'imageable')->orderBy('order');
+    }
+
+    public function primaryImage(): ?PostImage
+    {
+        return $this->images()->where('order', 0)->first();
+    }
+
     public function getLikesCountAttribute()
     {
         return $this->likes()->count();

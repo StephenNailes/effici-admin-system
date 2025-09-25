@@ -1,6 +1,7 @@
 import MainLayout from '@/layouts/mainlayout';
 import { motion } from 'framer-motion';
 import { Calendar, Megaphone } from 'lucide-react';
+import { LinkifiedText } from '@/utils/linkify';
 import { useState } from 'react';
 
 interface Event {
@@ -188,13 +189,14 @@ export default function DeanDashboard({ events = [], announcements = [] }: DeanD
                       initial={{ opacity: 0, x: -20 }}
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ delay: 0.05 * index }}
-                      className="p-3 rounded-lg hover:bg-red-50 transition"
+                      className="p-3 rounded-lg hover:bg-red-50 transition cursor-pointer"
+                      onClick={() => (window.location.href = '/events')}
                     >
                       <div className="font-semibold text-black flex items-center gap-2">
                         <Calendar className="w-4 h-4 text-red-500" /> {event.title}
                       </div>
                       <div className="text-gray-500">{event.date}</div>
-                      <div className="text-black">{event.description}</div>
+                      <div className="text-black"><LinkifiedText text={event.description} /></div>
                     </motion.div>
                   ))
                 ) : (
@@ -226,13 +228,14 @@ export default function DeanDashboard({ events = [], announcements = [] }: DeanD
                       initial={{ opacity: 0, x: 20 }}
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ delay: 0.05 * index }}
-                      className="p-3 rounded-lg hover:bg-red-50 transition"
+                      className="p-3 rounded-lg hover:bg-red-50 transition cursor-pointer"
+                      onClick={() => (window.location.href = '/announcements')}
                     >
                       <div className="font-bold text-black flex items-center gap-2">
                         <Megaphone className="w-4 h-4 text-red-500" /> {a.title}
                       </div>
                       <div className="text-xs text-gray-500">{a.date}</div>
-                      <p className="text-black">{a.description}</p>
+                      <p className="text-black"><LinkifiedText text={a.description} /></p>
                     </motion.div>
                   ))
                 ) : (

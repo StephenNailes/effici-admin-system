@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { FaBell, FaTimes, FaCheck, FaExclamationTriangle, FaTrash } from 'react-icons/fa';
-import { Bell, AlertTriangle } from 'lucide-react';
+// Removed lucide-react icons to simplify and avoid unused imports
 import { router } from '@inertiajs/react';
 import axios from 'axios';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -32,6 +32,14 @@ export default function NotificationPanel({ className = '', onOpen, isOpen: exte
   const [internalIsOpen, setInternalIsOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
+
+  // Remove emoji characters for cleaner, icon-driven UI (no emoji)
+  const stripEmoji = (input: string) => {
+    if (!input) return input;
+    // Covers common emoji ranges and presentation selectors
+    const emojiRegex = /[\p{Emoji}\p{Extended_Pictographic}\uFE0F\u200D]/gu;
+    return input.replace(emojiRegex, '').replace(/\s{2,}/g, ' ').trim();
+  };
   
   // Use external isOpen if provided, otherwise use internal state
   const isOpen = externalIsOpen !== undefined ? externalIsOpen : internalIsOpen;
@@ -176,17 +184,53 @@ export default function NotificationPanel({ className = '', onOpen, isOpen: exte
     }
   };
 
-  const getPriorityColor = (priority: string) => {
+  // Choose a single, relevant icon based on notification content
+  const getNotificationIcon = (n: NotificationData) => {
+    const type = (n.type || '').toLowerCase();
+    const full = `${n.title} ${n.message}`.toLowerCase();
+    // Success/approval
+    if (type.includes('approved') || type.includes('approval') || full.includes('approved') || full.includes('success')) {
+      return <FaCheck className="w-4 h-4 text-green-600" />;
+    }
+    // Warnings/deadlines/overdue
+    if (type.includes('warning') || type.includes('deadline') || type.includes('overdue') || n.priority === 'urgent' || n.priority === 'high') {
+      return <FaExclamationTriangle className={`w-4 h-4 ${n.priority === 'urgent' ? 'text-red-600' : 'text-orange-600'}`} />;
+    }
+    // Default informational
+    return <FaBell className="w-4 h-4 text-gray-600" />;
+  };
+
+  // Use colored left border to denote category, and background only when unread
+  const getPriorityBorder = (priority: string) => {
     switch (priority) {
       case 'urgent':
-        return 'border-l-4 border-red-600 bg-red-50';
+        return 'border-l-4 border-red-600';
       case 'high':
-        return 'border-l-4 border-orange-500 bg-orange-50';
+        return 'border-l-4 border-orange-600';
       case 'low':
-        return 'border-l-4 border-gray-400 bg-gray-50';
-      default: // normal
-        return 'border-l-4 border-blue-500 bg-blue-50';
+        return 'border-l-4 border-gray-400';
+      default:
+        return 'border-l-4 border-blue-600';
     }
+  };
+
+  const getUnreadBg = (priority: string) => {
+    switch (priority) {
+      case 'urgent':
+        return 'bg-red-50';
+      case 'high':
+        return 'bg-orange-50';
+      case 'low':
+        return 'bg-gray-50';
+      default:
+        return 'bg-blue-50';
+    }
+  };
+
+  const getPriorityTag = (priority: string) => {
+    if (priority === 'urgent') return <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full uppercase bg-red-600 text-white">URGENT</span>;
+    if (priority === 'high') return <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full uppercase bg-orange-600 text-white">HIGH</span>;
+    return null;
   };
 
   return (
@@ -237,11 +281,7 @@ export default function NotificationPanel({ className = '', onOpen, isOpen: exte
             <div className="flex items-center gap-2">
               <FaBell className="w-5 h-5 text-gray-600" />
               <h3 className="font-semibold text-gray-900">Notifications</h3>
-              {urgentNotifications.length > 0 && (
-                <span className="text-xs bg-red-500 text-white px-2 py-1 rounded-full animate-pulse ml-1">
-                  PRIORITY
-                </span>
-              )}
+              {/* Removed redundant PRIORITY pill/banner per design review */}
             </div>
             <button
               onClick={() => onClose && onClose()}
@@ -253,72 +293,42 @@ export default function NotificationPanel({ className = '', onOpen, isOpen: exte
 
           {/* Notifications List */}
           <div className="max-h-72 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
-            {/* Urgent Notifications Section */}
+            {/* Urgent/High notifications first (no banner) */}
             {urgentNotifications.length > 0 && (
-              <div className="bg-red-50 border-b-2 border-red-200">
-                <div className="px-4 py-2 bg-red-100">
-                  <div className="flex items-center gap-2">
-                    <AlertTriangle className="w-4 h-4 text-red-600" />
-                    <span className="text-xs font-bold text-red-600 uppercase">PRIORITY ALERTS</span>
-                    <span className="text-xs text-red-500">(Urgent & High Priority)</span>
-                  </div>
-                </div>
+              <>
                 {urgentNotifications.map((notification) => (
                   <div
                     key={notification.id}
-                    className={`px-4 py-3 border-b cursor-pointer transition-colors ${
-                      notification.priority === 'urgent' 
-                        ? 'border-red-200 hover:bg-red-100 bg-red-50' 
-                        : 'border-orange-200 hover:bg-orange-100 bg-orange-50'
-                    }`}
+                    className={`px-4 py-3 border-b cursor-pointer transition-colors ${getPriorityBorder(notification.priority)} ${getUnreadBg(notification.priority)}`}
                     onClick={() => handleNotificationClick(notification)}
                   >
-                      <div className="flex items-start gap-3">
+                    <div className="flex items-start gap-3">
                       <div className="flex-shrink-0 mt-1">
-                        {getPriorityIcon(notification.priority)}
+                        {getNotificationIcon(notification)}
                       </div>
-                      
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between mb-1">
                           <div className="flex items-center gap-2">
-                            <p className="text-sm font-bold text-red-800">
-                              {notification.title}
-                            </p>
-                            <span className={`text-xs font-bold px-2 py-1 rounded-full uppercase ${
-                              notification.priority === 'urgent' ? 'bg-red-200 text-red-800' : 'bg-orange-200 text-orange-800'
-                            }`}>
-                              {notification.priority}
-                            </span>
+                            <p className="text-sm font-semibold text-gray-900">{stripEmoji(notification.title)}</p>
+                            {getPriorityTag(notification.priority)}
                           </div>
-                          <div className={`w-2 h-2 rounded-full flex-shrink-0 animate-pulse ${
-                            notification.priority === 'urgent' ? 'bg-red-500' : 'bg-orange-500'
-                          }`}></div>
-                        </div>                        <p className="text-sm text-red-700 mb-2 line-clamp-2">
-                          {notification.message}
-                        </p>
-                        
+                        </div>
+                        <p className="text-sm text-gray-700 mb-2 line-clamp-2">{stripEmoji(notification.message)}</p>
                         <div className="flex items-center justify-between">
-                          <p className="text-xs text-red-600">
-                            {notification.time_ago}
-                          </p>
-                          
+                          <p className="text-xs text-gray-500">{notification.time_ago}</p>
                           <div className="flex items-center gap-2">
+                            {!notification.is_read && (
+                              <button
+                                onClick={(e) => { e.stopPropagation(); markAsRead(notification.id); }}
+                                className="text-xs text-gray-700 hover:text-gray-900 flex items-center gap-1 font-medium"
+                              >
+                                <FaCheck className="w-3 h-3" />
+                                Mark as read
+                              </button>
+                            )}
                             <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                markAsRead(notification.id);
-                              }}
-                              className="text-xs text-red-600 hover:text-red-800 flex items-center gap-1 font-medium"
-                            >
-                              <FaCheck className="w-3 h-3" />
-                              Dismiss
-                            </button>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                deleteNotification(notification.id);
-                              }}
-                              className="text-xs text-red-600 hover:text-red-800 flex items-center gap-1 font-medium"
+                              onClick={(e) => { e.stopPropagation(); deleteNotification(notification.id); }}
+                              className="text-xs text-gray-400 hover:text-red-600 flex items-center gap-1 font-medium"
                               title="Delete notification"
                             >
                               <FaTrash className="w-3 h-3" />
@@ -329,7 +339,7 @@ export default function NotificationPanel({ className = '', onOpen, isOpen: exte
                     </div>
                   </div>
                 ))}
-              </div>
+              </>
             )}
 
             {/* Regular Notifications Section */}
@@ -337,30 +347,23 @@ export default function NotificationPanel({ className = '', onOpen, isOpen: exte
               regularNotifications.map((notification) => (
                 <div
                   key={notification.id}
-                  className={`px-4 py-3 border-b border-gray-100 cursor-pointer transition-colors hover:bg-gray-50
-                    ${!notification.is_read ? 'bg-blue-25' : ''}
-                    ${getPriorityColor(notification.priority)}
-                  `}
+                  className={`px-4 py-3 border-b border-gray-100 cursor-pointer transition-colors hover:bg-gray-50 ${getPriorityBorder(notification.priority)} ${!notification.is_read ? getUnreadBg(notification.priority) : 'bg-white'}`}
                   onClick={() => handleNotificationClick(notification)}
                 >
                   <div className="flex items-start gap-3">
                     <div className="flex-shrink-0 mt-1">
-                      {getPriorityIcon(notification.priority)}
+                      {getNotificationIcon(notification)}
                     </div>
                     
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between mb-1">
-                        <p className={`text-sm font-medium ${!notification.is_read ? 'text-gray-900' : 'text-gray-700'}`}>
-                          {notification.title}
-                        </p>
-                        {!notification.is_read && (
-                          <div className="w-2 h-2 bg-blue-500 rounded-full flex-shrink-0"></div>
-                        )}
+                        <div className="flex items-center gap-2">
+                          <p className={`text-sm font-medium ${!notification.is_read ? 'text-gray-900' : 'text-gray-700'}`}>{stripEmoji(notification.title)}</p>
+                          {getPriorityTag(notification.priority)}
+                        </div>
                       </div>
                       
-                      <p className="text-sm text-gray-600 mb-2 line-clamp-2">
-                        {notification.message}
-                      </p>
+                      <p className="text-sm text-gray-600 mb-2 line-clamp-2">{stripEmoji(notification.message)}</p>
                       
                       <div className="flex items-center justify-between">
                         <p className="text-xs text-gray-400">
@@ -460,30 +463,23 @@ export default function NotificationPanel({ className = '', onOpen, isOpen: exte
                       key={notification.id}
                       initial={{ opacity: 0, y: 20 }}
                       animate={{ opacity: 1, y: 0 }}
-                      className={`px-4 py-3 border-b border-gray-100 cursor-pointer transition-colors hover:bg-gray-50
-                        ${!notification.is_read ? 'bg-blue-25' : ''}
-                        ${getPriorityColor(notification.priority)}
-                      `}
+                      className={`px-4 py-3 border-b border-gray-100 cursor-pointer transition-colors hover:bg-gray-50 ${getPriorityBorder(notification.priority)} ${!notification.is_read ? getUnreadBg(notification.priority) : 'bg-white'}`}
                       onClick={() => handleNotificationClick(notification)}
                     >
                       <div className="flex items-start gap-3">
                         <div className="flex-shrink-0 mt-1">
-                          {getPriorityIcon(notification.priority)}
+                          {getNotificationIcon(notification)}
                         </div>
                         
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center justify-between mb-1">
-                            <p className={`text-sm font-medium ${!notification.is_read ? 'text-gray-900' : 'text-gray-700'}`}>
-                              {notification.title}
-                            </p>
-                            {!notification.is_read && (
-                              <div className="w-2 h-2 bg-blue-500 rounded-full flex-shrink-0"></div>
-                            )}
+                            <div className="flex items-center gap-2">
+                              <p className={`text-sm font-medium ${!notification.is_read ? 'text-gray-900' : 'text-gray-700'}`}>{stripEmoji(notification.title)}</p>
+                              {getPriorityTag(notification.priority)}
+                            </div>
                           </div>
                           
-                          <p className="text-sm text-gray-600 mb-2 line-clamp-2">
-                            {notification.message}
-                          </p>
+                          <p className="text-sm text-gray-600 mb-2 line-clamp-2">{stripEmoji(notification.message)}</p>
                           
                           <div className="flex items-center justify-between">
                             <p className="text-xs text-gray-400">

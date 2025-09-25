@@ -113,23 +113,23 @@ export default function Analytics({ analyticsData, timeRange: initialTimeRange }
 
   return (
     <MainLayout>
-      <div className="p-6 font-poppins">
-        {/* Header */}
-        <div className="mb-8">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold text-black">Analytics Dashboard</h1>
-              <p className="text-gray-600 mt-2">Comprehensive insights and metrics for activity plan approvals</p>
-            </div>
-            <div className="flex items-center gap-3">
-              <CustomDropdown />
-              <button className="flex items-center gap-2 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors duration-200">
-                <Download className="w-4 h-4" />
-                Export Report
-              </button>
+        <div className="p-6 font-poppins">
+          {/* Header - match EquipmentManagement style */}
+          <div className="mb-8">
+            <div className="flex items-center justify-between">
+              <div>
+                <h1 className="text-2xl font-bold text-red-600">Analytics Dashboard</h1>
+                <p className="text-gray-500">Comprehensive insights and metrics for request approvals</p>
+              </div>
+              <div className="flex items-center gap-3">
+                <CustomDropdown />
+                <button className="flex items-center gap-2 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors duration-200">
+                  <Download className="w-4 h-4" />
+                  Export Report
+                </button>
+              </div>
             </div>
           </div>
-        </div>
 
         {/* Overview Stats */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">

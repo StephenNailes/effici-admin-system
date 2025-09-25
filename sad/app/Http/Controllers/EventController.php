@@ -3,11 +3,14 @@
 namespace App\Http\Controllers;
 
 use App\Models\Event;
+use App\Models\PostImage;
 use App\Services\NotificationService;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
+use Intervention\Image\ImageManagerStatic as Image;
 
 class EventController extends Controller
 {
@@ -19,9 +22,39 @@ class EventController extends Controller
     }
     public function index(Request $request)
     {
-        $events = Event::with('user')
+        $events = Event::with(['user', 'images'])
             ->orderByDesc('id')
-            ->get();
+            ->get()
+            ->map(function ($event) {
+                return [
+                    'id' => $event->id,
+                    'title' => $event->title,
+                    'date' => $event->date,
+                    'description' => $event->description,
+                    'created_by' => $event->created_by,
+                    'user_id' => $event->user_id,
+                    'created_at' => $event->created_at,
+                    'updated_at' => $event->updated_at,
+                    'user' => $event->user,
+                    'primary_image' => $event->primaryImage() ? [
+                        'id' => $event->primaryImage()->id,
+                        'url' => $event->primaryImage()->url,
+                        'original_name' => $event->primaryImage()->original_name,
+                        'width' => $event->primaryImage()->width,
+                        'height' => $event->primaryImage()->height,
+                    ] : null,
+                    'images' => $event->images->map(function ($image) {
+                        return [
+                            'id' => $image->id,
+                            'url' => $image->url,
+                            'original_name' => $image->original_name,
+                            'width' => $image->width,
+                            'height' => $image->height,
+                            'order' => $image->order,
+                        ];
+                    })
+                ];
+            });
 
         return Inertia::render('events/ViewAllEvents', [
             'events' => $events,
@@ -51,6 +84,8 @@ class EventController extends Controller
             'title' => 'required|string|max:255',
             'date' => 'required|date',
             'description' => 'required|string',
+            'images' => 'nullable|array|max:5',
+            'images.*' => 'image|mimes:jpeg,jpg,png,gif|max:10240', // 10MB max per image
         ]);
 
         $event = Event::create([
@@ -60,6 +95,11 @@ class EventController extends Controller
             'created_by' => $user->role,
             'user_id' => $user->id,
         ]);
+
+        // Handle image uploads
+        if ($request->hasFile('images')) {
+            $this->handleImageUploads($request->file('images'), $event);
+        }
 
         // Notify all students about the new event
         $this->notificationService->notifyNewEventOrAnnouncement('event', $event->title, $user->role);
@@ -74,10 +114,27 @@ class EventController extends Controller
             return redirect()->route('events.index')->with('error', 'Unauthorized access');
         }
 
-        $event = Event::findOrFail($id);
+        $event = Event::with('images')->findOrFail($id);
 
         return Inertia::render('events/EditEvent', [
-            'event' => $event
+            'event' => [
+                'id' => $event->id,
+                'title' => $event->title,
+                'date' => $event->date,
+                'description' => $event->description,
+                'created_by' => $event->created_by,
+                'user_id' => $event->user_id,
+                'images' => $event->images->map(function ($image) {
+                    return [
+                        'id' => $image->id,
+                        'url' => $image->url,
+                        'original_name' => $image->original_name,
+                        'width' => $image->width,
+                        'height' => $image->height,
+                        'order' => $image->order,
+                    ];
+                })
+            ]
         ]);
     }
 
@@ -94,6 +151,10 @@ class EventController extends Controller
             'title' => 'required|string|max:255',
             'date' => 'required|date',
             'description' => 'required|string',
+            'images' => 'nullable|array|max:5',
+            'images.*' => 'image|mimes:jpeg,jpg,png,gif|max:10240',
+            'remove_images' => 'nullable|array',
+            'remove_images.*' => 'integer|exists:post_images,id',
         ]);
 
         $event->update([
@@ -101,6 +162,30 @@ class EventController extends Controller
             'date' => $validated['date'],
             'description' => $validated['description'],
         ]);
+
+        // Handle image removal
+        if ($request->has('remove_images')) {
+            // Use the morph relation to avoid morph type mismatches
+            $imagesToRemove = $event->images()->whereIn('id', $validated['remove_images'])->get();
+
+            foreach ($imagesToRemove as $image) {
+                if (Storage::disk('public')->exists($image->path)) {
+                    Storage::disk('public')->delete($image->path);
+                }
+                $image->delete();
+            }
+
+            // Reorder remaining images
+            $event->images()->orderBy('order')->get()->each(function ($image, $index) {
+                $image->update(['order' => $index]);
+            });
+        }
+
+        // Handle new image uploads
+        if ($request->hasFile('images')) {
+            $currentImageCount = $event->images()->count();
+            $this->handleImageUploads($request->file('images'), $event, $currentImageCount);
+        }
 
         return redirect()->route('events.index')->with('success', 'Event updated successfully!');
     }
@@ -114,8 +199,49 @@ class EventController extends Controller
 
         $event = Event::findOrFail($id);
 
+        // Delete associated images first
+        $this->deleteEventImages($event);
+
         $event->delete();
 
         return redirect()->route('events.index')->with('success', 'Event deleted successfully!');
+    }
+
+    private function handleImageUploads($images, $event, $startOrder = 0)
+    {
+        foreach ($images as $index => $image) {
+            // Generate unique filename
+            $filename = time() . '_' . $index . '_' . uniqid() . '.' . $image->getClientOriginalExtension();
+            
+            // Store in events folder
+            $path = $image->storeAs('events', $filename, 'public');
+            
+            // Get image dimensions (using basic PHP function to avoid dependency issues for now)
+            $fullPath = storage_path('app/public/' . $path);
+            $imageSize = getimagesize($fullPath);
+            
+            // Create PostImage record via the morph relation so morph type uses the alias from enforceMorphMap
+            $event->images()->create([
+                'path' => $path,
+                'original_name' => $image->getClientOriginalName(),
+                'mime_type' => $image->getMimeType(),
+                'size' => $image->getSize(),
+                'width' => $imageSize[0] ?? null,
+                'height' => $imageSize[1] ?? null,
+                'order' => $startOrder + $index, // Maintain order
+            ]);
+        }
+    }
+
+    private function deleteEventImages($event)
+    {
+        foreach ($event->images as $image) {
+            // Delete file from storage
+            if (Storage::disk('public')->exists($image->path)) {
+                Storage::disk('public')->delete($image->path);
+            }
+            // Delete record
+            $image->delete();
+        }
     }
 }

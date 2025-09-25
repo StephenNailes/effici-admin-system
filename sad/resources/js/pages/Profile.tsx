@@ -24,6 +24,7 @@ import {
 export default function Profile() {
   const { auth } = usePage().props as any;
   const user = auth?.user ?? {};
+  const csrfToken = (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement | null)?.content || '';
 
   // Form states 
   const [editingEmail, setEditingEmail] = useState(false);
@@ -69,7 +70,8 @@ export default function Profile() {
     }
     
     router.put('/profile/update-email', {
-      email: email
+      email: email,
+      _token: csrfToken,
     }, {
       onSuccess: () => {
         setEditingEmail(false);
@@ -97,7 +99,8 @@ export default function Profile() {
     
     router.put('/profile/update-password', {
       password: password,
-      password_confirmation: confirmPassword
+      password_confirmation: confirmPassword,
+      _token: csrfToken,
     }, {
       onSuccess: () => {
         setEditingPassword(false);
@@ -144,8 +147,9 @@ export default function Profile() {
     
     setProfilePictureError('');
     
-    const formData = new FormData();
-    formData.append('profile_picture', profilePictureFile);
+  const formData = new FormData();
+  formData.append('profile_picture', profilePictureFile);
+  if (csrfToken) formData.append('_token', csrfToken);
     
     router.post('/profile/update-picture', formData, {
       preserveScroll: true,
@@ -179,18 +183,21 @@ export default function Profile() {
 
   const handleProfilePictureRemove = () => {
     setProfilePictureError('');
-    
+    if (profilePicturePreview) {
+      URL.revokeObjectURL(profilePicturePreview);
+      setProfilePicturePreview(null);
+    }
     router.delete('/profile/remove-picture', {
+      data: { _token: csrfToken },
       preserveScroll: true,
-      preserveState: false, // Allow state refresh to get updated user data
-      onSuccess: (page) => {
+      preserveState: false,
+      onSuccess: () => {
         setProfilePicture(null);
-        setProfilePicturePreview(null);
         // Flash message will be handled by FlashToaster component
       },
-      onError: (errors) => {
+      onError: (errors: any) => {
         console.error('Profile picture removal errors:', errors);
-        const errorMessage = errors.profile_picture || errors.message || 'Failed to remove profile picture.';
+        const errorMessage = (errors as any).profile_picture || (errors as any).message || 'Failed to remove profile picture.';
         setProfilePictureError(errorMessage);
       }
     });
@@ -208,7 +215,8 @@ export default function Profile() {
     router.put('/profile/update-name', {
       first_name: firstName.trim(),
       middle_name: middleName.trim(),
-      last_name: lastName.trim()
+      last_name: lastName.trim(),
+      _token: csrfToken,
     }, {
       preserveScroll: true,
       preserveState: false, // Allow state refresh to get updated user data
