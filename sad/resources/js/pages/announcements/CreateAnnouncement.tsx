@@ -1,7 +1,8 @@
 import MainLayout from '@/layouts/mainlayout';
-import { Megaphone, ArrowLeft, Save, AlertCircle, Link, Info, Upload, X, ImageIcon } from 'lucide-react';
-import { useState } from 'react';
-import { router, useForm } from '@inertiajs/react';
+import { Megaphone, ArrowLeft, Save, AlertCircle, Link, Upload, X, ImageIcon } from 'lucide-react';
+import { useState, useMemo } from 'react';
+import { router, useForm, usePage } from '@inertiajs/react';
+import PostCard from '@/components/PostCard';
 
 export default function CreateAnnouncement() {
   const { data, setData, post, processing, errors, reset } = useForm({
@@ -14,6 +15,36 @@ export default function CreateAnnouncement() {
   const [isFormValid, setIsFormValid] = useState(false);
   const [showURLInfo, setShowURLInfo] = useState(false);
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
+  const { auth } = usePage<any>().props;
+
+  // Live preview post object
+  const previewPost = useMemo(() => {
+    const role = (auth?.user?.role || 'admin_assistant') as 'student' | 'admin_assistant' | 'dean';
+    const user = auth?.user || {};
+    const images = imagePreviews.map((url, index) => ({
+      id: index,
+      url,
+      original_name: (data.images as File[])[index]?.name || `image-${index + 1}`,
+      width: 0,
+      height: 0,
+      order: index,
+    }));
+
+    return {
+      id: 0,
+      title: data.title || '(Untitled announcement)',
+      description: data.description || '',
+      created_by: role,
+      user: {
+        id: user.id || 0,
+        first_name: user.first_name || 'Admin',
+        last_name: user.last_name || 'Assistant',
+        profile_picture: user.profile_picture || undefined,
+      },
+      images,
+      created_at: new Date().toISOString(),
+    } as any;
+  }, [auth, data.title, data.description, data.images, imagePreviews]);
 
   // Check form validity
   const checkFormValidity = () => {
@@ -115,24 +146,13 @@ export default function CreateAnnouncement() {
             Create New Announcement
           </h1>
           <p className="text-gray-500 mt-2">Share important news and updates with the community</p>
-          
-          {/* URL Info Banner */}
-          <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg max-w-2xl mx-auto">
-            <div className="flex items-start gap-2">
-              <Info className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
-              <div className="text-left">
-                <h3 className="text-sm font-semibold text-blue-800 mb-1">Pro Tip: Add Links</h3>
-                <p className="text-sm text-blue-700">
-                  Include URLs in your announcement (e.g., Google Forms, policy documents, registration links). 
-                  They will automatically become clickable links for users!
-                </p>
-              </div>
-            </div>
-          </div>
         </div>
 
-        <div className="max-w-2xl mx-auto bg-white rounded-2xl shadow-xl p-8 border border-gray-100">
-          <form onSubmit={handleSubmit} className="space-y-6">
+        {/* Two-column layout: form left, preview right */}
+        <div className="mx-auto max-w-6xl grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+          {/* Left: Form */}
+          <div className="bg-white rounded-2xl shadow-xl p-8 border border-gray-100">
+            <form onSubmit={handleSubmit} className="space-y-6">
             {/* Title Field */}
             <div>
               <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
@@ -357,13 +377,32 @@ export default function CreateAnnouncement() {
                 )}
               </button>
             </div>
-            
+
             {!isFormValid && (
               <p className="text-center text-xs text-gray-500 mt-2">
                 Please fill in all required fields to create the announcement
               </p>
             )}
-          </form>
+            </form>
+          </div>
+
+          {/* Right: Live Preview */}
+          <div className="lg:sticky lg:top-6">
+            <h2 className="text-sm font-semibold text-gray-600 mb-3">Live Preview</h2>
+            <PostCard
+              post={previewPost}
+              type="announcement"
+              date={data.date || new Date().toISOString().split('T')[0]}
+              likes={{ liked: false, count: 0 }}
+              commentsCount={0}
+              canEditDelete={false}
+              onLike={() => {}}
+              onComment={() => {}}
+              onEdit={() => {}}
+              onDelete={() => {}}
+              onPostClick={undefined}
+            />
+          </div>
         </div>
       </div>
     </MainLayout>
