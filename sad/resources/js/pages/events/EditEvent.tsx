@@ -2,6 +2,7 @@ import MainLayout from '@/layouts/mainlayout';
 import { Calendar, ArrowLeft, Save, AlertCircle, Link, Info, Upload, X, ImageIcon, Trash2 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { router, useForm } from '@inertiajs/react';
+import RedDatePicker from '@/components/RedDatePicker';
 
 interface Event {
   id: number;
@@ -216,31 +217,15 @@ export default function EditEvent({ event }: EditEventProps) {
 
             {/* Date Field */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Event Date *
-              </label>
-              <input
-                type="date"
-                value={data.date}
-                onChange={(e) => handleDataChange('date', e.target.value)}
-                min={new Date().toISOString().split('T')[0]}
-                className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 transition-all text-black outline-none ${
-                  errors.date 
-                    ? 'border-red-300 bg-red-50' 
-                    : data.date 
-                      ? 'border-green-300 bg-green-50' 
-                      : 'border-gray-300'
-                }`}
+              <RedDatePicker
+                label="Event Date"
                 required
+                value={data.date}
+                min={new Date().toISOString().split('T')[0]}
+                onChange={(val) => handleDataChange('date', val)}
+                error={errors.date}
+                helperText={!errors.date && data.date ? '✓ Date selected' : undefined}
               />
-              {errors.date ? (
-                <div className="flex items-center gap-1 text-red-500 text-sm mt-1">
-                  <AlertCircle className="w-4 h-4" />
-                  {errors.date}
-                </div>
-              ) : data.date && (
-                <p className="text-green-600 text-sm mt-1">✓ Date selected</p>
-              )}
             </div>
 
             {/* Description Field */}

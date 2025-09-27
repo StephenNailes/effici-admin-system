@@ -1,416 +1,229 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useMemo, useState } from 'react';
 import MainLayout from '@/layouts/mainlayout';
-import { TrendingUp, Calendar, BarChart3, Clock, FileText, CheckCircle, Edit, Download, Filter, ChevronDown } from 'lucide-react';
-import { router } from '@inertiajs/react';
+import { Calendar, Download } from 'lucide-react';
 import { AnalyticsProps } from '@/types/analytics';
+import { router } from '@inertiajs/react';
 
-export default function Analytics({ analyticsData, timeRange: initialTimeRange }: AnalyticsProps) {
-  const [timeRange, setTimeRange] = useState(initialTimeRange);
-  const [loading, setLoading] = useState(false);
-  const [dropdownOpen, setDropdownOpen] = useState(false);
-  const dropdownRef = useRef<HTMLDivElement>(null);
+export default function Analytics({ analyticsData }: AnalyticsProps) {
+  const { seasonalPatterns, demo } = analyticsData as (typeof analyticsData & { demo?: boolean });
+  const [toggling, setToggling] = useState(false);
 
-  // Dropdown options
-  const timeRangeOptions = [
-    { value: 'last3months', label: 'Last 3 Months' },
-    { value: 'last6months', label: 'Last 6 Months' },
-    { value: 'lastyear', label: 'Last Year' }
-  ];
-
-  // Close dropdown when clicking outside
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setDropdownOpen(false);
-      }
+  const handleToggle = () => {
+    setToggling(true);
+    const params = new URLSearchParams(window.location.search);
+    if (demo) {
+      // remove demo param
+      params.delete('demo');
+    } else {
+      params.set('demo', '1');
     }
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, []);
-
-  // Handle time range changes
-  const handleTimeRangeChange = (newTimeRange: string) => {
-    setLoading(true);
-    setTimeRange(newTimeRange);
-    setDropdownOpen(false);
-    router.get(route('admin_assistant.analytics'), 
-      { timeRange: newTimeRange }, 
-      { 
-        preserveState: true,
-        onFinish: () => setLoading(false)
+    router.get(
+      route('admin_assistant.analytics'),
+      Object.fromEntries(params.entries()),
+      {
+        preserveScroll: true,
+        onFinish: () => setToggling(false)
       }
     );
   };
 
-  // Get current option label
-  const currentOption = timeRangeOptions.find(option => option.value === timeRange);
+  // Derived values
+  const totalSubmissions = useMemo(() => seasonalPatterns.reduce((s, m) => s + m.submissions, 0), [seasonalPatterns]);
+  const maxValue = useMemo(() => Math.max(0, ...seasonalPatterns.map(m => m.submissions)), [seasonalPatterns]);
+  const activeMonths = useMemo(() => seasonalPatterns.filter(m => m.submissions > 0), [seasonalPatterns]);
 
-  // Custom Dropdown Component
-  const CustomDropdown = () => (
-    <div className="relative" ref={dropdownRef}>
-      <button
-        onClick={() => setDropdownOpen(!dropdownOpen)}
-        disabled={loading}
-        className={`
-          w-full px-4 py-2 border border-gray-300 rounded-lg bg-white text-black
-          focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500
-          disabled:opacity-50 disabled:cursor-not-allowed
-          hover:border-red-300 transition-colors duration-200
-          flex items-center justify-between min-w-[150px]
-        `}
-      >
-        <span className="text-left">{currentOption?.label || 'Select Range'}</span>
-        <ChevronDown 
-          className={`w-4 h-4 text-gray-500 transition-transform duration-200 ${
-            dropdownOpen ? 'rotate-180' : ''
-          }`}
-        />
-      </button>
-      
-      {dropdownOpen && (
-        <div className="absolute z-10 mt-1 w-full bg-white border border-gray-300 rounded-lg shadow-lg">
-          {timeRangeOptions.map((option) => (
-            <button
-              key={option.value}
-              onClick={() => handleTimeRangeChange(option.value)}
-              className={`
-                w-full px-4 py-3 text-left hover:bg-red-50 transition-colors duration-150
-                first:rounded-t-lg last:rounded-b-lg
-                ${option.value === timeRange 
-                  ? 'bg-red-500 text-white hover:bg-red-600' 
-                  : 'text-gray-700 hover:text-red-700'
-                }
-              `}
-            >
-              {option.label}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  );
+  // Data richness classification
+  const dataState: 'none' | 'low' | 'rich' = totalSubmissions === 0
+    ? 'none'
+    : activeMonths.length <= 1
+      ? 'low'
+      : 'rich';
 
-  // Extract data from props
-  const {
-    monthlyApprovalRates,
-    timeToApproval,
-    seasonalPatterns,
-    currentStatus,
-    summaryStats
-  } = analyticsData;
+  // Peak / low periods (rich data only)
+  const peakInfo = useMemo(() => {
+    if (dataState !== 'rich') return null;
+    const max = Math.max(...activeMonths.map(m => m.submissions));
+    const peakMonths = activeMonths.filter(m => m.submissions === max).map(m => m.month);
+    return { max, months: peakMonths };
+  }, [dataState, activeMonths]);
 
-  const {
-    totalSubmissions,
-    totalApproved,
-    totalRevisionRequested,
-    overallApprovalRate,
-    approvalRateTrend,
-    previousApprovalRate
-  } = summaryStats;
+  const lowInfo = useMemo(() => {
+    if (dataState !== 'rich') return null;
+    const nonZero = activeMonths.filter(m => m.submissions > 0);
+    if (nonZero.length === 0) return null;
+    const min = Math.min(...nonZero.map(m => m.submissions));
+    const lowMonths = nonZero.filter(m => m.submissions === min).map(m => m.month);
+    return { min, months: lowMonths };
+  }, [dataState, activeMonths]);
+
+  // Dynamic narrative summary (pattern-focused only; total removed)
+  const summaryText = useMemo(() => {
+    if (dataState !== 'rich') return '';
+    const peakPart = peakInfo
+      ? `${peakInfo.months.length > 1 ? 'Peak months' : 'Peak month'}: ${peakInfo.months.join(', ')} (${peakInfo.max} submission${peakInfo.max !== 1 ? 's' : ''}).`
+      : '';
+    const lowPart = lowInfo
+      ? `${lowInfo.months.length > 1 ? 'Lowest active months' : 'Lowest active month'}: ${lowInfo.months.join(', ')} (${lowInfo.min} submission${lowInfo.min !== 1 ? 's' : ''}).`
+      : '';
+    return [peakPart, lowPart].filter(Boolean).join(' ');
+  }, [dataState, peakInfo, lowInfo]);
+
+  // Color scale: neutral gray for zero, gradient blues for >0
+  const getBarColor = (value: number) => {
+    if (value === 0) return 'bg-gray-200';
+    const ratio = maxValue === 0 ? 0 : value / maxValue;
+    if (ratio > 0.85) return 'bg-blue-900';
+    if (ratio > 0.6) return 'bg-blue-700';
+    if (ratio > 0.4) return 'bg-blue-600';
+    if (ratio > 0.25) return 'bg-blue-500';
+    return 'bg-blue-400';
+  };
+  // "Nice" Y axis ticks (similar to d3 nice scale)
+  const { yTicks, niceMax } = useMemo(() => {
+    if (maxValue === 0) return { yTicks: [0], niceMax: 0 };
+    const targetTickCount = 5; // Aim for ~5 divisions
+    const rawStep = maxValue / targetTickCount;
+    const magnitude = Math.pow(10, Math.floor(Math.log10(rawStep)));
+    const candidates = [1, 2, 2.5, 5, 10];
+    let step = magnitude;
+    for (const c of candidates) {
+      const candidate = c * magnitude;
+      if (candidate >= rawStep) { step = candidate; break; }
+    }
+    const niceMax = Math.ceil(maxValue / step) * step;
+    const ticks: number[] = [];
+    for (let v = 0; v <= niceMax + 1e-9; v += step) {
+      ticks.push(Number(v.toFixed(6)));
+    }
+    return { yTicks: ticks, niceMax };
+  }, [maxValue]);
 
   return (
     <MainLayout>
-        <div className="p-6 font-poppins">
-          {/* Header - match EquipmentManagement style */}
-          <div className="mb-8">
-            <div className="flex items-center justify-between">
-              <div>
-                <h1 className="text-2xl font-bold text-red-600">Analytics Dashboard</h1>
-                <p className="text-gray-500">Comprehensive insights and metrics for request approvals</p>
-              </div>
+      <div className="p-6 font-poppins">
+        {/* Header */}
+        <div className="mb-8">
+          <div className="flex items-center justify-between">
+            <div>
               <div className="flex items-center gap-3">
-                <CustomDropdown />
-                <button className="flex items-center gap-2 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors duration-200">
-                  <Download className="w-4 h-4" />
-                  Export Report
-                </button>
+                <h1 className="text-2xl font-bold text-red-600">Analytics Dashboard</h1>
+                {demo && (
+                  <span className="px-2 py-1 text-xs font-semibold rounded-md bg-indigo-100 text-indigo-700 border border-indigo-300">DEMO DATA</span>
+                )}
               </div>
+              <p className="text-gray-500">Seasonal activity patterns and trends{demo && ' (sample dataset)'}</p>
             </div>
-          </div>
-
-        {/* Overview Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          <div className="bg-white p-6 rounded-lg shadow-sm border-l-4 border-red-500">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600">Total Submissions</p>
-                <p className="text-3xl font-bold text-black">{totalSubmissions}</p>
-                <p className="text-sm text-gray-500 mt-1">This period</p>
-              </div>
-              <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center">
-                <FileText className="w-6 h-6 text-red-500" />
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white p-6 rounded-lg shadow-sm border-l-4 border-green-500">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600">Overall Approval Rate</p>
-                <p className="text-3xl font-bold text-black">{overallApprovalRate}%</p>
-                <p className={`text-sm mt-1 ${
-                  approvalRateTrend > 0 ? 'text-green-600' : 
-                  approvalRateTrend < 0 ? 'text-red-600' : 'text-gray-600'
-                }`}>
-                  {approvalRateTrend === 0 ? 'No change from last period' : 
-                   approvalRateTrend > 0 ? `+${approvalRateTrend}% from last period` :
-                   `${approvalRateTrend}% from last period`}
-                </p>
-              </div>
-              <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
-                <CheckCircle className="w-6 h-6 text-green-500" />
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white p-6 rounded-lg shadow-sm border-l-4 border-blue-500">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600">Avg Approval Time</p>
-                <p className="text-3xl font-bold text-black">
-                  {timeToApproval.avgDays !== null ? `${timeToApproval.avgDays}d` : '--'}
-                </p>
-                <p className="text-sm text-blue-600 mt-1">
-                  {timeToApproval.avgDays !== null ? 'Average processing time' : 'No data available'}
-                </p>
-              </div>
-              <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
-                <Clock className="w-6 h-6 text-blue-500" />
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white p-6 rounded-lg shadow-sm border-l-4 border-orange-500">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600">Revision Requests</p>
-                <p className="text-3xl font-bold text-black">{totalRevisionRequested}</p>
-                <p className="text-sm text-orange-600 mt-1">Needs attention</p>
-              </div>
-              <div className="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center">
-                <Edit className="w-6 h-6 text-orange-500" />
-              </div>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={handleToggle}
+                disabled={toggling}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors duration-200 border text-sm font-medium shadow-sm ${
+                  demo
+                    ? 'bg-indigo-50 text-indigo-700 border-indigo-300 hover:bg-indigo-100'
+                    : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                } disabled:opacity-60 disabled:cursor-not-allowed`}
+                title={demo ? 'Switch to live data' : 'Show demo sample data'}
+              >
+                {toggling ? 'Switching…' : demo ? 'Use Live Data' : 'Use Demo Data'}
+              </button>
+              <button className="flex items-center gap-2 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors duration-200 text-sm font-medium">
+                <Download className="w-4 h-4" />
+                Export Report
+              </button>
             </div>
           </div>
         </div>
 
-        {/* Main Analytics Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-          
-          {/* Monthly Approval Trends */}
-          <div className="bg-white p-6 rounded-lg shadow-sm">
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-xl font-semibold text-black">Monthly Approval Trends</h3>
-              <TrendingUp className="w-5 h-5 text-red-500" />
-            </div>
-            
-            {/* Chart Area */}
-            <div className="space-y-4">
-              {monthlyApprovalRates.length > 0 ? (
-                monthlyApprovalRates.slice(-6).map((data, index) => (
-                  <div key={data.month} className="relative">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm font-medium text-gray-700">{data.month}</span>
-                      <div className="flex items-center gap-4">
-                        <span className="text-sm text-gray-600">{data.approved}/{data.total}</span>
-                        <span className="text-sm font-semibold text-black">{data.rate}%</span>
-                      </div>
-                    </div>
-                    <div className="w-full bg-gray-200 rounded-full h-3">
-                      <div 
-                        className="bg-gradient-to-r from-red-400 to-red-600 h-3 rounded-full transition-all duration-500"
-                        style={{ width: `${data.rate}%` }}
-                      ></div>
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <div className="flex items-center justify-center h-40 bg-gray-50 rounded-lg">
-                  <div className="text-center">
-                    <div className="text-gray-400 mb-2">
-                      <BarChart3 className="w-12 h-12 mx-auto" />
-                    </div>
-                    <p className="text-gray-600">No data available</p>
-                    <p className="text-sm text-gray-500">Data will appear when approvals are processed</p>
-                  </div>
-                </div>
-              )}
-            </div>
-            
-            {monthlyApprovalRates.length > 0 && (
-              <div className="mt-6 p-4 bg-gray-50 rounded-lg">
-                <div className="text-sm text-gray-600">
-                  <strong>Trend Analysis:</strong> Overall approval rate is {overallApprovalRate}% across {totalSubmissions} total submissions.
-                  {monthlyApprovalRates.length > 0 && ` Most recent month: ${monthlyApprovalRates[monthlyApprovalRates.length - 1]?.rate || 0}% approval rate.`}
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Time-to-Approval Deep Dive */}
-          <div className="bg-white p-6 rounded-lg shadow-sm">
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-xl font-semibold text-black">Approval Time Analysis</h3>
-              <Clock className="w-5 h-5 text-red-500" />
-            </div>
-            
-            {/* Key Metrics Grid */}
-            <div className="grid grid-cols-2 gap-4 mb-6">
-              <div className="text-center p-4 bg-red-50 rounded-lg">
-                <div className="text-2xl font-bold text-red-600">
-                  {timeToApproval.avgDays !== null ? `${timeToApproval.avgDays}d` : '--'}
-                </div>
-                <div className="text-sm text-gray-600">Average Time</div>
-              </div>
-              <div className="text-center p-4 bg-green-50 rounded-lg">
-                <div className="text-2xl font-bold text-green-600">
-                  {timeToApproval.medianDays !== null ? `${timeToApproval.medianDays}d` : '--'}
-                </div>
-                <div className="text-sm text-gray-600">Median Time</div>
-              </div>
-              <div className="text-center p-4 bg-blue-50 rounded-lg">
-                <div className="text-2xl font-bold text-blue-600">
-                  {timeToApproval.fastest !== null ? `${timeToApproval.fastest}d` : '--'}
-                </div>
-                <div className="text-sm text-gray-600">Fastest</div>
-              </div>
-              <div className="text-center p-4 bg-orange-50 rounded-lg">
-                <div className="text-2xl font-bold text-orange-600">
-                  {timeToApproval.slowest !== null ? `${timeToApproval.slowest}d` : '--'}
-                </div>
-                <div className="text-sm text-gray-600">Slowest</div>
-              </div>
-            </div>
-
-            {/* Distribution Chart */}
-            <div className="space-y-3">
-              <h4 className="font-semibold text-gray-700">Time Distribution</h4>
-              {timeToApproval.distribution.length > 0 ? (
-                timeToApproval.distribution.map((item, index) => (
-                  <div key={index} className="flex items-center justify-between">
-                    <span className="text-sm text-gray-600 w-20">{item.range}</span>
-                    <div className="flex-1 mx-4">
-                      <div className="w-full bg-gray-200 rounded-full h-2">
-                        <div 
-                          className="bg-red-400 h-2 rounded-full transition-all duration-300"
-                          style={{ width: `${item.percentage}%` }}
-                        ></div>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium text-black">{item.percentage}%</span>
-                      <span className="text-xs text-gray-500">({item.count})</span>
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <div className="flex items-center justify-center h-20 bg-gray-50 rounded-lg">
-                  <p className="text-gray-500">No distribution data available</p>
-                </div>
-              )}
-            </div>
-          </div>
-
-        </div>
-
-
-
-        {/* Seasonal Patterns - Full Width */}
-        <div className="bg-white p-6 rounded-lg shadow-sm mb-8">
+        {/* Seasonal Patterns */}
+  <div className="bg-white p-6 rounded-lg shadow-md mb-8">
           <div className="flex items-center justify-between mb-6">
             <h3 className="text-xl font-semibold text-black">Seasonal Activity Patterns</h3>
             <Calendar className="w-5 h-5 text-red-500" />
           </div>
-          
-          {/* Annual Heatmap */}
-          {seasonalPatterns.some(month => month.submissions > 0) ? (
-            <div className="grid grid-cols-12 gap-2 mb-6">
-              {seasonalPatterns.map((month, index) => {
-                const intensity = month.submissions > 20 ? 'high' : month.submissions > 10 ? 'medium' : 'low';
-                const colorClass = intensity === 'high' ? 'bg-red-500' : 
-                                 intensity === 'medium' ? 'bg-red-300' : 'bg-red-100';
-                const textClass = intensity === 'low' ? 'text-gray-700' : 'text-white';
-                
-                return (
-                  <div 
-                    key={month.month} 
-                    className={`${colorClass} ${textClass} p-4 rounded-lg text-center transition-all duration-200 hover:scale-105 cursor-pointer`}
-                    title={`${month.month}: ${month.submissions} submissions (${month.trend})`}
-                  >
-                    <div className="text-sm font-medium">{month.month}</div>
-                    <div className="text-lg font-bold">{month.submissions}</div>
-                    <div className="text-xs opacity-80">{month.trend}</div>
-                  </div>
-                );
-              })}
-            </div>
-          ) : (
-            <div className="flex items-center justify-center h-40 bg-gray-50 rounded-lg mb-6">
-              <div className="text-center">
-                <div className="text-gray-400 mb-2">
-                  <Calendar className="w-12 h-12 mx-auto" />
+
+          {dataState === 'rich' ? (
+            <>
+              {/* Chart (bars + axis) */}
+              <div className="relative h-64 mb-3">
+                {/* Y Axis */}
+                <div className="absolute left-0 top-0 bottom-0 w-10 flex flex-col justify-between py-1">
+                  {yTicks.slice().reverse().map(t => (
+                    <div key={t} className="text-[10px] leading-none text-black tabular-nums">{t}</div>
+                  ))}
                 </div>
-                <p className="text-gray-600">No seasonal data available</p>
-                <p className="text-sm text-gray-500">Data will appear here once submissions are tracked</p>
+                {/* Grid lines */}
+                <div className="absolute left-10 right-0 top-0 bottom-0 flex flex-col justify-between py-1 pointer-events-none">
+                  {yTicks.slice().reverse().map((t, idx) => {
+                    // Skip drawing the very bottom line; we'll render a thicker baseline separately
+                    const isBottom = idx === yTicks.length - 1;
+                    return (
+                      <div key={t} className={"w-full border-t " + (isBottom ? 'border-transparent' : 'border-gray-100')} />
+                    );
+                  })}
+                  {/* Baseline */}
+                  <div className="absolute left-0 right-0 bottom-0 h-px bg-gray-300" />
+                </div>
+                {/* Bars */}
+                <div className="absolute left-10 right-0 top-0 bottom-0 flex gap-3 px-2">
+                  {seasonalPatterns.map(m => {
+                    const heightRatio = niceMax === 0 ? 0 : m.submissions / niceMax;
+                    const adjustedRatio = m.submissions === 0 ? 0 : Math.max(0.05, heightRatio);
+                    const height = adjustedRatio * 100;
+                    return (
+                      <div
+                        key={m.month}
+                        className="flex-1 h-full flex justify-center items-end group relative focus-within:z-10"
+                        aria-label={`${m.month} ${m.submissions} submission${m.submissions !== 1 ? 's' : ''}`}
+                      >
+                        <button
+                          type="button"
+                          tabIndex={0}
+                          className={`w-full rounded-t-md transition-[height] duration-500 ease-out outline-none focus:ring-2 focus:ring-offset-1 focus:ring-indigo-400 ${getBarColor(m.submissions)}`}
+                          style={{ height: `${height}%` }}
+                          aria-describedby={`tt-${m.month}`}
+                        />
+                        <div
+                          id={`tt-${m.month}`}
+                          role="tooltip"
+                          className="absolute -top-8 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 pointer-events-none transition-opacity duration-200 text-[11px] bg-gray-900/95 text-white px-2 py-1 rounded shadow-lg whitespace-nowrap"
+                        >
+                          <span className="font-medium">{m.month}</span>: {m.submissions} submission{m.submissions !== 1 ? 's' : ''}
+                          <span className="absolute left-1/2 -bottom-1 -translate-x-1/2 w-2 h-2 rotate-45 bg-gray-900/95" />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
+              {/* Month Labels Row */}
+              <div className="flex gap-3 px-2 ml-10 mb-4 select-none">
+                {seasonalPatterns.map(m => (
+                  <div
+                    key={m.month}
+                    className="flex-1 text-center text-[11px] font-semibold text-gray-700 tracking-wide uppercase"
+                  >
+                    <span className="inline-block px-1 rounded hover:bg-gray-100 transition-colors">{m.month}</span>
+                  </div>
+                ))}
+              </div>
+              {/* Summary */}
+              <div className="mt-2 p-4 bg-gray-50 rounded-md border border-gray-200">
+                <p className="text-md text-black leading-relaxed">{summaryText}</p>
+              </div>
+            </>
+          ) : (
+            <div className="p-10 rounded-lg border border-dashed border-gray-300 bg-gray-50 text-center">
+              <p className="text-base font-semibold text-gray-700 mb-2">Not enough data to show a trend</p>
+              <p className="text-sm text-gray-500 mb-4">System will identify your peak and low seasons once you have more submissions.</p>
+              {dataState === 'low' && activeMonths[0] && (
+                <p className="text-sm text-gray-700">So far, you have {activeMonths[0].submissions} submission{activeMonths[0].submissions !== 1 ? 's' : ''} from {activeMonths[0].month}.</p>
+              )}
+              {dataState === 'none' && (
+                <p className="text-sm text-gray-700">No submissions recorded yet this year.</p>
+              )}
             </div>
           )}
-
-          {/* Insights */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {seasonalPatterns.some(month => month.submissions > 0) ? (
-              <>
-                <div className="p-4 bg-red-50 rounded-lg">
-                  <h4 className="font-semibold text-red-800 mb-2">Peak Season</h4>
-                  <p className="text-sm text-red-700">
-                    {(() => {
-                      const peakMonths = seasonalPatterns.filter(m => m.trend === 'peak');
-                      return peakMonths.length > 0 
-                        ? `${peakMonths.map(m => m.month).join('-')} shows highest activity with ${Math.max(...peakMonths.map(m => m.submissions))} submissions.`
-                        : 'Peak activity patterns will be identified with more data.';
-                    })()}
-                  </p>
-                </div>
-                <div className="p-4 bg-blue-50 rounded-lg">
-                  <h4 className="font-semibold text-blue-800 mb-2">Low Season</h4>
-                  <p className="text-sm text-blue-700">
-                    {(() => {
-                      const lowMonths = seasonalPatterns.filter(m => m.trend === 'low');
-                      return lowMonths.length > 0 
-                        ? `${lowMonths.map(m => m.month).join(', ')} show minimal activity (${Math.min(...lowMonths.map(m => m.submissions))} submissions).`
-                        : 'Low activity periods will be identified with more data.';
-                    })()}
-                  </p>
-                </div>
-                <div className="p-4 bg-green-50 rounded-lg">
-                  <h4 className="font-semibold text-green-800 mb-2">Total Activity</h4>
-                  <p className="text-sm text-green-700">
-                    {seasonalPatterns.reduce((sum, month) => sum + month.submissions, 0)} total submissions across all months this year.
-                  </p>
-                </div>
-              </>
-            ) : (
-              <>
-                <div className="p-4 bg-gray-50 rounded-lg">
-                  <h4 className="font-semibold text-gray-600 mb-2">Peak Season</h4>
-                  <p className="text-sm text-gray-500">Seasonal patterns will be identified from submission data.</p>
-                </div>
-                <div className="p-4 bg-gray-50 rounded-lg">
-                  <h4 className="font-semibold text-gray-600 mb-2">Low Season</h4>
-                  <p className="text-sm text-gray-500">Periods of lower activity will be highlighted here.</p>
-                </div>
-                <div className="p-4 bg-gray-50 rounded-lg">
-                  <h4 className="font-semibold text-gray-600 mb-2">Planning Insight</h4>
-                  <p className="text-sm text-gray-500">Trends and recommendations will appear with more data.</p>
-                </div>
-              </>
-            )}
-          </div>
         </div>
-
       </div>
     </MainLayout>
   );

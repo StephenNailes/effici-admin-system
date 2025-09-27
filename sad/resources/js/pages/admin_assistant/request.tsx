@@ -6,6 +6,8 @@ import FilterModal from "@/components/FilterModal";
 import StockConflictModal from "@/components/StockConflictModal";
 import { motion } from "framer-motion";
 import { router } from "@inertiajs/react";
+import { toast } from "react-toastify"; // global toast
+import { formatDateTime, formatTime12h, formatDateShort } from "@/lib/utils";
 
 // Add pagination state
 const PAGE_SIZE = 8;
@@ -116,6 +118,7 @@ export default function Request() {
       
       if (response.ok) {
         // Success
+        toast.success('Request approved successfully');
         fetchRequests();
         setSelected(null);
       } else {
@@ -126,15 +129,16 @@ export default function Request() {
         if (data.error === 'insufficient_stock' && data.details) {
           setStockConflictDetails(data.details);
           setStockConflictModalOpen(true);
+          toast.warning('Stock conflict detected. Review quantities.');
           return;
         }
         
         // Handle other types of errors
-        alert('An error occurred while approving the request. Please try again.');
+        toast.error('Error approving request. Please try again.');
       }
     } catch (error) {
       console.error('Network error:', error);
-      alert('Network error occurred. Please check your connection and try again.');
+      toast.error('Network error. Check your connection and try again.');
     }
   };
 
@@ -155,13 +159,14 @@ export default function Request() {
         // Success
         fetchRequests();
         setSelected(null);
+        toast.info('Revision request sent to student');
       } else {
         console.error('Error requesting revision:', data);
-        alert('An error occurred while requesting revision. Please try again.');
+        toast.error('Error requesting revision. Please try again.');
       }
     } catch (error) {
       console.error('Network error:', error);
-      alert('Network error occurred. Please check your connection and try again.');
+      toast.error('Network error. Check your connection and try again.');
     }
   };
 
@@ -187,6 +192,7 @@ export default function Request() {
     
     setStockConflictModalOpen(false);
     setStockConflictDetails(null);
+    toast.info('Revision requested with stock conflict details');
   };
 
   const getStatusBadgeColor = (status: string) => {
@@ -249,9 +255,9 @@ export default function Request() {
       const statusMatch = statusValue?.includes(term);
 
       // Date & Time
-      const dateObj = new Date(r.submitted_at);
-      const dateString = dateObj.toLocaleDateString().toLowerCase();
-      const timeString = dateObj.toLocaleTimeString().toLowerCase();
+  const dateObj = new Date(r.submitted_at);
+  const dateString = formatDateShort(dateObj).toLowerCase();
+  const timeString = formatTime12h(dateObj).toLowerCase();
       const dateMatch = dateString.includes(term);
       const timeMatch = timeString.includes(term);
 
@@ -448,7 +454,7 @@ export default function Request() {
                       {req.request_type}
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-900">
-                      {new Date(req.submitted_at).toLocaleString()}
+                      {formatDateTime(req.submitted_at)}
                     </td>
                     <td
                       className={`px-6 py-4 text-sm font-medium ${getPriorityColor(

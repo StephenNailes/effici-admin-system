@@ -1,4 +1,5 @@
 import React from 'react';
+import { formatDateTime, formatTime12h } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 import { createPortal } from 'react-dom';
 import { AlertTriangle, X, Users, Calendar, Package, Edit3 } from 'lucide-react';
@@ -45,16 +46,7 @@ export default function StockConflictModal({ open, onClose, details, onRequestRe
     onClose();
   };
 
-  const formatDateTime = (dateString: string) => {
-    return new Date(dateString).toLocaleString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-      hour: 'numeric',
-      minute: '2-digit',
-      hour12: true
-    });
-  };
+  // Deprecated local function replaced by shared utility
 
   const getStatusColor = (status: string) => {
     switch (status.toLowerCase()) {

@@ -15,6 +15,7 @@ import {
   Megaphone
 } from 'lucide-react';
 import { router, usePage } from '@inertiajs/react';
+import { formatDateShort, formatTime12h } from '@/lib/utils';
 import { LinkifiedText } from '@/utils/linkify';
 
 interface PostImage {
@@ -97,18 +98,7 @@ export default function PostCard({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const formatDate = (dateString: string) => {
-    try {
-      const date = new Date(dateString);
-      return date.toLocaleDateString('en-US', {
-        month: 'short',
-        day: 'numeric',
-        year: 'numeric'
-      });
-    } catch {
-      return dateString;
-    }
-  };
+  const formatDate = (dateString: string) => formatDateShort(dateString);
 
   const formatCreatedAt = (dateString: string) => {
     try {
@@ -117,11 +107,7 @@ export default function PostCard({
       const diffInHours = (now.getTime() - date.getTime()) / (1000 * 60 * 60);
       
       if (diffInHours < 24) {
-        return date.toLocaleTimeString('en-US', {
-          hour: 'numeric',
-          minute: '2-digit',
-          hour12: true
-        });
+        return formatTime12h(date);
       } else {
         return date.toLocaleDateString('en-US', {
           month: 'short',

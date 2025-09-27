@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { formatDateTime } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 
 interface Props {
@@ -80,7 +81,7 @@ export default function EquipmentModal({
 
           <div>
             <p className="text-sm font-medium text-gray-700">Submitted Date</p>
-            <p className="text-gray-900">{new Date(request.submitted_at).toLocaleString()}</p>
+            <p className="text-gray-900">{formatDateTime(request.submitted_at)}</p>
           </div>
 
           {/* Equipment Items (if available) */}

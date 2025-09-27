@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import MainLayout from '@/layouts/mainlayout';
 import { Search, Filter, Eye, FileText, Clock, CheckCircle, Edit, ChevronDown } from 'lucide-react';
 import { router } from '@inertiajs/react';
+import { formatDateShort, formatTime12h } from '@/lib/utils';
 
 interface RequestData {
   approval_id: number;
@@ -314,8 +315,8 @@ export default function Request() {
                         <div className="text-sm text-black">
                           {request.submitted_at ? (
                             <>
-                              <div>{new Date(request.submitted_at).toLocaleDateString()}</div>
-                              <div className="text-gray-500 text-xs">{new Date(request.submitted_at).toLocaleTimeString()}</div>
+                            <div>{formatDateShort(request.submitted_at)}</div>
+                            <div className="text-gray-500 text-xs">{formatTime12h(request.submitted_at)}</div>
                             </>
                           ) : 'N/A'}
                         </div>

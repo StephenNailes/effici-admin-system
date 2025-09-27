@@ -3,6 +3,7 @@ import { Calendar, ArrowLeft, Save, AlertCircle, Link, Upload, X, ImageIcon } fr
 import { useState, useMemo } from 'react';
 import { router, useForm, usePage } from '@inertiajs/react';
 import PostCard from '@/components/PostCard';
+import RedDatePicker from '@/components/RedDatePicker';
 
 export default function CreateEvent() {
   const { data, setData, post, processing, errors, reset } = useForm({
@@ -182,29 +183,15 @@ export default function CreateEvent() {
 
               {/* Date Field */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Event Date *</label>
-                <input
-                  type="date"
-                  value={data.date}
-                  onChange={(e) => handleDataChange('date', e.target.value)}
-                  min={new Date().toISOString().split('T')[0]}
-                  className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 transition-all text-black outline-none ${
-                    (errors as any).date
-                      ? 'border-red-300 bg-red-50'
-                      : data.date
-                        ? 'border-green-300 bg-green-50'
-                        : 'border-gray-300'
-                  }`}
+                <RedDatePicker
+                  label="Event Date"
                   required
+                  value={data.date}
+                  min={new Date().toISOString().split('T')[0]}
+                  onChange={(val) => handleDataChange('date', val)}
+                  error={(errors as any).date}
+                  helperText={!(errors as any).date && data.date ? '✓ Date selected' : undefined}
                 />
-                {(errors as any).date ? (
-                  <div className="flex items-center gap-1 text-red-500 text-sm mt-1">
-                    <AlertCircle className="w-4 h-4" />
-                    {(errors as any).date}
-                  </div>
-                ) : (
-                  data.date && <p className="text-green-600 text-sm mt-1">✓ Date selected</p>
-                )}
               </div>
 
               {/* Description Field */}

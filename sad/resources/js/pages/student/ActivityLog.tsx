@@ -2,6 +2,7 @@ import RequestDetailsModal from "@/components/RequestDetailsModal"; // adjust pa
 import MainLayout from "@/layouts/mainlayout";
 import { FaSearch, FaFilter, FaEye } from "react-icons/fa";
 import { motion } from "framer-motion";
+import { formatDateTime } from "@/lib/utils";
 import { useState } from "react";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 import { usePage } from "@inertiajs/react"; // <-- Import Inertia hook
@@ -210,14 +211,7 @@ export default function ActivityLog() {
 
                       {/* Date & Time */}
                       <td className="w-1/4 px-8 py-4">
-                        {new Date(req.date).toLocaleString("en-US", {
-                          year: "numeric",
-                          month: "long",
-                          day: "numeric",
-                          hour: "numeric",
-                          minute: "2-digit",
-                          hour12: true,
-                        })}
+                        {formatDateTime(req.date)}
                       </td>
 
                       {/* Status */}

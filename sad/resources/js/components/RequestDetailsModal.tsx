@@ -1,4 +1,5 @@
 import { motion, AnimatePresence } from "framer-motion";
+import { formatDateTime } from "@/lib/utils";
 import { FaTimes } from "react-icons/fa";
 
 type Request = {
@@ -55,14 +56,7 @@ export default function RequestDetailsModal({ request, onClose }: Props) {
               </p>
               <p>
                 <span className="font-semibold">Date & Time:</span>{" "}
-                {new Date(request.date).toLocaleString("en-US", {
-                  year: "numeric",
-                  month: "long",
-                  day: "numeric",
-                  hour: "numeric",
-                  minute: "2-digit",
-                  hour12: true,
-                })}
+                {formatDateTime(request.date)}
               </p>
               <p>
                 <span className="font-semibold">Status:</span> {request.status}
