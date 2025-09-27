@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react'
 import { router } from '@inertiajs/react'
 import { motion } from 'framer-motion'
 import axios from 'axios'
-import { toast } from 'react-toastify'
+// Note: Flash success/error messages are handled globally by FlashToaster via Inertia shared props.
 
 // Define revision type for activity plan
 interface ActivityRevision {
@@ -19,7 +19,7 @@ interface ActivityRevision {
   expected_outcome?: string
   activity_location?: string
   comment: string
-  request_type: 'activity'
+  request_type: 'activity_plan'
 }
 
 // Define revision type for equipment request
@@ -46,7 +46,8 @@ interface EquipmentRevision {
 // Define props
 interface RevisionEditProps {
   revision: ActivityRevision | EquipmentRevision
-  requestType: 'activity' | 'equipment'
+  // In backend the expected values are 'activity_plan' or 'equipment'
+  requestType: 'activity_plan' | 'equipment'
 }
 
 export default function RevisionEdit({ revision, requestType }: RevisionEditProps) {
@@ -75,7 +76,7 @@ export default function RevisionEdit({ revision, requestType }: RevisionEditProp
   }
   
   const [formData, setFormData] = useState(() => {
-    if (requestType === 'activity') {
+  if (requestType === 'activity_plan') {
       const activityRevision = revision as ActivityRevision
       return {
         activity_name: activityRevision.activity_name || '',
@@ -116,28 +117,7 @@ export default function RevisionEdit({ revision, requestType }: RevisionEditProp
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    router.post(route('student.revision.update', { id: revision.id, type: requestType }), formData, {
-      onSuccess: () => {
-        toast.success('Revision request submitted successfully!', {
-          position: "top-right",
-          autoClose: 3000,
-          hideProgressBar: false,
-          closeOnClick: true,
-          pauseOnHover: true,
-          draggable: true,
-        })
-      },
-      onError: () => {
-        toast.error('Failed to submit revision request. Please try again.', {
-          position: "top-right",
-          autoClose: 3000,
-          hideProgressBar: false,
-          closeOnClick: true,
-          pauseOnHover: true,
-          draggable: true,
-        })
-      }
-    })
+    router.post(route('student.revision.update', { id: revision.id, type: requestType }), formData)
   }
 
   const addEquipmentItem = () => {
@@ -194,7 +174,7 @@ export default function RevisionEdit({ revision, requestType }: RevisionEditProp
           className="mb-8"
         >
           <h1 className="text-3xl font-bold text-red-600 tracking-tight mb-2">
-            Revise {requestType === 'activity' ? 'Activity Plan' : 'Equipment Request'}
+            Revise {requestType === 'activity_plan' ? 'Activity Plan' : 'Equipment Request'}
           </h1>
           <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
             <p className="text-yellow-800 font-semibold">Reviewer Comment:</p>
@@ -210,7 +190,7 @@ export default function RevisionEdit({ revision, requestType }: RevisionEditProp
           className="bg-white rounded-2xl shadow-xl p-8"
         >
           <form onSubmit={handleSubmit} className="space-y-6">
-            {requestType === 'activity' ? (
+            {requestType === 'activity_plan' ? (
               // Activity Plan Form
               <>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

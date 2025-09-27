@@ -7,6 +7,8 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Http\RedirectResponse;
 use Inertia\Inertia;
 use Inertia\Response;
+use App\Services\NotificationService;
+use Illuminate\Support\Facades\Log;
 
 class RevisionController extends Controller
 {
@@ -133,7 +135,7 @@ class RevisionController extends Controller
         ]);
     }
 
-    public function update($id): RedirectResponse
+    public function update($id, NotificationService $notificationService): RedirectResponse
     {
         $userId = Auth::id();
         $requestType = request()->query('type');
@@ -158,7 +160,7 @@ class RevisionController extends Controller
             'equipment_items.*.quantity' => 'nullable|integer|min:1',
         ]);
 
-        DB::transaction(function () use ($id, $validated, $userId, $requestType) {
+        DB::transaction(function () use ($id, $validated, $userId, $requestType, $notificationService) {
             if ($requestType === 'activity_plan') {
                 // Update activity plan
                 $affectedRows = DB::table('activity_plans')
@@ -197,6 +199,33 @@ class RevisionController extends Controller
                 // Check if the approval record was updated
                 if ($approvalAffectedRows === 0) {
                     abort(404, 'Approval record not found for this activity plan.');
+                }
+
+                // Notify the student themself that their revision was submitted (optional UX feedback in panel)
+                try {
+                    $notificationService->create([
+                        'user_id' => $userId,
+                        'type' => 'revision_submission',
+                        'title' => 'Activity Plan Revision Submitted',
+                        'message' => 'Your revised activity plan has been resubmitted and is now pending review.',
+                        'data' => [
+                            'request_type' => 'activity_plan',
+                            'request_id' => $id,
+                            'status' => 'pending'
+                        ],
+                        'action_url' => '/student/requests/activity-plan',
+                        'priority' => 'normal'
+                    ]);
+                } catch (\Throwable $e) {
+                    Log::warning('Failed to create student revision submission notification', ['error' => $e->getMessage()]);
+                }
+
+                // Notify approvers (admin assistant always; dean only if there will be a dean stage)
+                try {
+                    $studentName = Auth::user()->first_name . ' ' . Auth::user()->last_name;
+                    $notificationService->notifyRequestResubmission('admin_assistant', $studentName, 'activity_plan', $id);
+                } catch (\Throwable $e) {
+                    Log::warning('Failed to notify admin assistant of activity plan resubmission', ['error' => $e->getMessage()]);
                 }
             } else {
                 // Update equipment request
@@ -256,6 +285,33 @@ class RevisionController extends Controller
                 // Check if the approval record was updated
                 if ($approvalAffectedRows === 0) {
                     abort(404, 'Approval record not found for this equipment request.');
+                }
+
+                // Notify student of their own resubmission (panel confirmation)
+                try {
+                    $notificationService->create([
+                        'user_id' => $userId,
+                        'type' => 'revision_submission',
+                        'title' => 'Equipment Request Revision Submitted',
+                        'message' => 'Your revised equipment request has been resubmitted and is now pending review.',
+                        'data' => [
+                            'request_type' => 'equipment_request',
+                            'request_id' => $id,
+                            'status' => 'pending'
+                        ],
+                        'action_url' => '/student/borrow-equipment',
+                        'priority' => 'normal'
+                    ]);
+                } catch (\Throwable $e) {
+                    Log::warning('Failed to create equipment revision submission notification', ['error' => $e->getMessage()]);
+                }
+
+                // Notify admin assistants that an equipment request was resubmitted
+                try {
+                    $studentName = Auth::user()->first_name . ' ' . Auth::user()->last_name;
+                    $notificationService->notifyRequestResubmission('admin_assistant', $studentName, 'equipment_request', $id);
+                } catch (\Throwable $e) {
+                    Log::warning('Failed to notify admin assistant of equipment request resubmission', ['error' => $e->getMessage()]);
                 }
             }
         });

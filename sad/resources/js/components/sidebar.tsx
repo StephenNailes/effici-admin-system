@@ -211,8 +211,8 @@ export default function Sidebar() {
           // 🔜 Add more requests here (e.g. Room Reservation, etc.)
         ],
       },
-      { name: 'Activity Log', href: route('activity-log.index'), routeName: 'activity-log.index', icon: <FaChartLine /> },
       { name: 'Revise Requests', href: route('student.revision'), routeName: 'student.revision', icon: <FaBook /> },
+      { name: 'Activity Log', href: route('activity-log.index'), routeName: 'activity-log.index', icon: <FaChartLine /> },
     ],
     admin_assistant: [
       { name: 'Home', href: route('admin.dashboard'), routeName: 'admin.dashboard', icon: <FaHome /> },
