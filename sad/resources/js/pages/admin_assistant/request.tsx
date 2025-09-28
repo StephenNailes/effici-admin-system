@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from "react";
 import MainLayout from "@/layouts/mainlayout";
-import { Search, Filter, Eye, FileText, Clock, CheckCircle, Edit, Check, Minus, Inbox, Loader2 } from "lucide-react";
+import { Search, Eye, FileText, Clock, CheckCircle, Edit, Check, Minus, Inbox, Loader2 } from "lucide-react";
+import RequestPriorityFilterDropdown from "@/components/RequestPriorityFilterDropdown";
 import EquipmentModal from "@/components/EquipmentModal";
-import FilterModal from "@/components/FilterModal";
 import StockConflictModal from "@/components/StockConflictModal";
 import BatchApprovalModal from "@/components/BatchApprovalModal";
 import { motion } from "framer-motion";
@@ -50,7 +50,7 @@ export default function Request() {
   const [selected, setSelected] = useState<RequestItem | null>(null);
   const [equipment, setEquipment] = useState<EquipmentItem[]>([]);
   const [equipmentLoading, setEquipmentLoading] = useState(true);
-  const [filterModalOpen, setFilterModalOpen] = useState(false);
+  // Using extracted dropdown component now
   const [filters, setFilters] = useState({ status: "", priority: "" });
   const [currentPage, setCurrentPage] = useState(1);
   const [stockConflictModalOpen, setStockConflictModalOpen] = useState(false);
@@ -456,29 +456,13 @@ export default function Request() {
             />
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5 pointer-events-none" />
           </div>
-          <motion.button
-            className="flex items-center gap-2 px-4 py-2 bg-red-50 border border-red-200 rounded-lg shadow text-red-700 font-semibold transition-colors"
-            onClick={() => setFilterModalOpen(true)}
-            whileHover={{ scale: 1.05, boxShadow: "0 4px 16px 0 rgba(0,0,0,0.08)" }}
-            whileTap={{ scale: 0.97 }}
-          >
-            <Filter className="w-5 h-5 text-red-600" />
-            <span>Filter</span>
-          </motion.button>
+          <RequestPriorityFilterDropdown
+            priority={filters.priority}
+            onChange={(value) => setFilters(prev => ({ ...prev, priority: value }))}
+          />
         </motion.div>
 
-        {/* Filter Modal */}
-        <FilterModal
-          open={filterModalOpen}
-          onClose={() => setFilterModalOpen(false)}
-          filters={filters}
-          setFilters={setFilters}
-          onApply={() => setFilterModalOpen(false)}
-          onClear={() => {
-            setFilters({ status: "", priority: "" });
-            setFilterModalOpen(false);
-          }}
-        />
+  {/* Priority filter dropdown component extracted */}
 
         {/* Batch Actions */}
         {selectedApprovals.length > 0 && (
@@ -517,7 +501,7 @@ export default function Request() {
                   />
                 </th>
                 {['Submitted by','Request Type','Date & Time','Priority','Status','Actions'].map(h => (
-                  <th key={h} className="px-6 py-3 text-[11px] font-semibold tracking-wider text-gray-600 uppercase whitespace-nowrap">{h}</th>
+                  <th key={h} className="px-6 py-3 text-[11px] font-semibold tracking-wider text-black uppercase whitespace-nowrap">{h}</th>
                 ))}
               </tr>
             </thead>
