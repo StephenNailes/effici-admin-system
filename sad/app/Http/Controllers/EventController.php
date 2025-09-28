@@ -197,12 +197,16 @@ class EventController extends Controller
             return redirect()->route('events.index')->with('error', 'Unauthorized access');
         }
 
-        $event = Event::findOrFail($id);
+        // Be tolerant to already-removed records to avoid 404s on duplicate deletes
+        $event = Event::find($id);
+        if (!$event) {
+            return redirect()->route('events.index')->with('success', 'Event deleted successfully!');
+        }
 
         // Delete associated images first
         $this->deleteEventImages($event);
 
-        $event->delete();
+    $event->delete();
 
         return redirect()->route('events.index')->with('success', 'Event deleted successfully!');
     }

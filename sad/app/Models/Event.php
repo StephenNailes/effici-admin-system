@@ -10,6 +10,22 @@ class Event extends Model
 {
     protected $fillable = ['title', 'date', 'description', 'created_by', 'user_id'];
     
+    protected static function boot()
+    {
+        parent::boot();
+
+        static::deleting(function (Event $event) {
+            // Remove related comments and likes in DB
+            $event->comments()->delete();
+            $event->likes()->delete();
+
+            // Delete images one-by-one so model events fire and files are removed from storage
+            $event->images()->get()->each(function ($image) {
+                $image->delete();
+            });
+        });
+    }
+    
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);

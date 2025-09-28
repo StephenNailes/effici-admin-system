@@ -10,13 +10,15 @@ export default function Login() {
   const [remember, setRemember] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState('')
+  const csrfToken = (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement | null)?.content || ''
 
   const togglePasswordVisibility = () => setShowPassword(!showPassword)
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
-    router.post('/login', { email, password, remember }, {
+    // Include CSRF token to satisfy Laravel's VerifyCsrfToken middleware
+    router.post('/login', { email, password, remember, _token: csrfToken }, {
       onError: (errors: any) => {
         if (errors.password) {
           setError(errors.password)

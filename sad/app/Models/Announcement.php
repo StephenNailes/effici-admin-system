@@ -10,6 +10,22 @@ class Announcement extends Model
 {
     protected $fillable = ['title', 'date', 'description', 'created_by', 'user_id'];
     
+    protected static function boot()
+    {
+        parent::boot();
+
+        static::deleting(function (Announcement $announcement) {
+            // Remove related comments and likes in DB
+            $announcement->comments()->delete();
+            $announcement->likes()->delete();
+
+            // Delete images one-by-one so model events fire and files are removed from storage
+            $announcement->images()->get()->each(function ($image) {
+                $image->delete();
+            });
+        });
+    }
+    
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);

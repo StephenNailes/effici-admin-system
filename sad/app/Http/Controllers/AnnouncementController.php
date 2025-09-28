@@ -196,12 +196,16 @@ class AnnouncementController extends Controller
             return redirect()->route('announcements.index')->with('error', 'Unauthorized access');
         }
 
-        $announcement = Announcement::findOrFail($id);
+        // Be tolerant to already-removed records to avoid 404s on duplicate deletes
+        $announcement = Announcement::find($id);
+        if (!$announcement) {
+            return redirect()->route('announcements.index')->with('success', 'Announcement deleted successfully!');
+        }
 
         // Delete associated images first
         $this->deleteAnnouncementImages($announcement);
 
-        $announcement->delete();
+    $announcement->delete();
 
         return redirect()->route('announcements.index')->with('success', 'Announcement deleted successfully!');
     }

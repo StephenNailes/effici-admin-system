@@ -258,13 +258,11 @@ export default function ViewAllAnnouncements() {
   const confirmDeleteAnnouncement = () => {
     if (deleteAnnouncementId === null) return;
     router.delete(`/announcements/${deleteAnnouncementId}`, {
-      onSuccess: () => {
+      preserveScroll: true,
+      onFinish: () => {
+        // Close the modal regardless of outcome; server redirect will navigate back to index
         setDeleteAnnouncementId(null);
-        router.visit('/announcements');
       },
-      onError: () => {
-        setDeleteAnnouncementId(null);
-      }
     });
   };
 
