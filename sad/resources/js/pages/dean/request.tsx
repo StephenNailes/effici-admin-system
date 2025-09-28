@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import MainLayout from '@/layouts/mainlayout';
-import { Search, Filter, Eye, FileText, Clock, CheckCircle, Edit, ChevronDown, Check, Minus, Inbox } from 'lucide-react';
+import { Search, Eye, FileText, Clock, CheckCircle, Edit, Check, Minus, Inbox } from 'lucide-react';
+import RequestFilterDropdown from '@/components/RequestFilterDropdown';
 import BatchApprovalModal from '@/components/BatchApprovalModal';
 import { router } from '@inertiajs/react';
 import { formatDateShort, formatTime12h } from '@/lib/utils';
@@ -25,9 +26,8 @@ export default function Request() {
   const [stats, setStats] = useState({ total: 0, pending: 0, approved: 0, underRevision: 0 });
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterOpen, setFilterOpen] = useState(false);
-  const [statusFilter, setStatusFilter] = useState('All');
-  const [priorityFilter, setPriorityFilter] = useState('All');
+  // Status filter removed (dean now filters only by priority)
+  const [priorityFilter, setPriorityFilter] = useState(''); // '' means all
   const [selectedApprovals, setSelectedApprovals] = useState<number[]>([]);
   const [batchApprovalModalOpen, setBatchApprovalModalOpen] = useState(false);
   const PAGE_SIZE = 8;
@@ -142,11 +142,9 @@ export default function Request() {
     }
     
     const matchesSearch = request.student_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         request.activity_name?.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = statusFilter === 'All' || request.approval_status === statusFilter;
-    const matchesPriority = priorityFilter === 'All' || request.priority === priorityFilter;
-    
-    return matchesSearch && matchesStatus && matchesPriority;
+      request.activity_name?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesPriority = !priorityFilter || request.priority === priorityFilter;
+    return matchesSearch && matchesPriority;
   });
 
   // Update stats to reflect filtered results
@@ -160,7 +158,7 @@ export default function Request() {
   // Pagination
   const totalPages = Math.ceil(filteredRequests.length / PAGE_SIZE);
   const paginated = filteredRequests.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
-  useEffect(() => { setCurrentPage(1); }, [searchTerm, statusFilter, priorityFilter]);
+  useEffect(() => { setCurrentPage(1); }, [searchTerm, priorityFilter]);
   useEffect(() => { if (currentPage > totalPages && totalPages > 0) setCurrentPage(totalPages); }, [totalPages, currentPage]);
 
   const getStatusBadgeColor = (status: string) => {
@@ -181,7 +179,7 @@ export default function Request() {
       case 'urgent':
         return 'text-red-600';
       case 'normal':
-        return 'text-blue-600';
+        return 'text-yellow-600';
       case 'minor':
         return 'text-green-600';
       default:
@@ -282,64 +280,22 @@ export default function Request() {
         {/* Search and Filter */}
         <div className="mb-6 flex flex-col sm:flex-row gap-4">
           <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
             <input
               type="text"
               placeholder="Search requests..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-             className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500 text-black"
+              className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-300 text-black bg-gray-50 transition-all duration-200"
             />
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5 pointer-events-none" />
           </div>
-          <div className="relative">
-            <button 
-              onClick={() => setFilterOpen(!filterOpen)}
-              className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-black"
-            >
-              <Filter className="w-5 h-5" />
-              Filter
-              <ChevronDown className="w-4 h-4" />
-            </button>
-            
-            {filterOpen && (
-              <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-10">
-                <div className="p-4 space-y-3">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
-                    <select 
-                      value={statusFilter} 
-                      onChange={(e) => setStatusFilter(e.target.value)}
-                      className="w-full border border-gray-300 rounded px-3 py-1 text-sm text-black"
-                    >
-                      <option value="All">All Status</option>
-                      <option value="pending">Pending</option>
-                      <option value="approved">Approved</option>
-                      <option value="revision_requested">Under Revision</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Priority</label>
-                    <select 
-                      value={priorityFilter} 
-                      onChange={(e) => setPriorityFilter(e.target.value)}
-                      className="w-full border border-gray-300 rounded px-3 py-1 text-sm text-black"
-                    >
-                      <option value="All">All Priority</option>
-                      <option value="urgent">Urgent</option>
-                      <option value="normal">Normal</option>
-                      <option value="minor">Minor</option>
-                    </select>
-                  </div>
-                  <button 
-                    onClick={() => setFilterOpen(false)}
-                    className="w-full bg-red-500 text-white py-1 px-3 rounded text-sm hover:bg-red-600"
-                  >
-                    Apply
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
+          <RequestFilterDropdown
+            status={''}
+            priority={priorityFilter}
+            onChangeStatus={() => { /* no-op: status removed */ }}
+            onChangePriority={(val) => setPriorityFilter(val)}
+            showStatus={false}
+          />
         </div>
 
         {/* Batch Actions */}
@@ -372,7 +328,7 @@ export default function Request() {
                     />
                   </th>
                   {['Submitted by','Activity Plan','Date & Time','Priority','Status','Actions'].map(h => (
-                    <th key={h} className="px-6 py-3 text-[11px] font-semibold tracking-wider text-gray-600 uppercase whitespace-nowrap">{h}</th>
+                    <th key={h} className="px-6 py-3 text-[11px] font-semibold tracking-wider text-black uppercase whitespace-nowrap">{h}</th>
                   ))}
                 </tr>
               </thead>
@@ -408,7 +364,7 @@ export default function Request() {
                         </div>
                       ) : 'N/A'}
                     </td>
-                    <td className="px-6 py-4 text-sm font-semibold whitespace-nowrap ${getPriorityColor(request.priority)}">
+                    <td className={`px-6 py-4 text-sm font-semibold whitespace-nowrap ${getPriorityColor(request.priority)}`}>
                       {getDisplayPriority(request.priority)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
@@ -433,7 +389,7 @@ export default function Request() {
                         <Inbox className="w-12 h-12 text-gray-300" />
                         <p className="text-sm font-medium">No activity plans match the current filters.</p>
                         <button
-                          onClick={() => { setStatusFilter('All'); setPriorityFilter('All'); setSearchTerm(''); }}
+                          onClick={() => { setPriorityFilter(''); setSearchTerm(''); }}
                           className="text-xs text-red-600 hover:underline"
                         >
                           Clear filters & search
