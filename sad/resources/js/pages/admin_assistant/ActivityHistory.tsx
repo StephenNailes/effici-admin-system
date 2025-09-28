@@ -250,6 +250,9 @@ export default function ActivityHistory() {
                 ? item.activity_purpose || "-"
                 : item.equipment_purpose || "-",
             status,
+            approverRole: item.approver_role ? item.approver_role.replace('_', ' ').split(' ').map((word: string) => word.charAt(0).toUpperCase() + word.slice(1)).join(' ') : null,
+            approverName: item.approver_name || null,
+            approvalStatus: item.approval_status,
           };
         });
         setActivities(mapped);
@@ -456,6 +459,7 @@ export default function ActivityHistory() {
                   <th className="py-3 px-6">Date Submitted</th>
                   <th className="py-3 px-6">Purpose</th>
                   <th className="py-3 px-6">Status</th>
+                  <th className="py-3 px-6">Approved By</th>
                 </tr>
               </thead>
               <tbody className="text-black text-sm divide-y divide-gray-100">
@@ -465,7 +469,7 @@ export default function ActivityHistory() {
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.4 }}
                   >
-                    <td colSpan={6} className="py-8 px-6 text-center text-gray-400">
+                    <td colSpan={7} className="py-8 px-6 text-center text-gray-400">
                       <motion.div
                         initial={{ scale: 0.95 }}
                         animate={{ scale: 1 }}
@@ -564,6 +568,31 @@ export default function ActivityHistory() {
                             );
                           }
                         })()}
+                      </td>
+                      <td className="py-3 px-6">
+                        {activity.approverName && activity.approverRole ? (
+                          <div className="flex flex-col">
+                            <span className="text-sm font-medium text-gray-900">
+                              {activity.approverName}
+                            </span>
+                            <span className="text-xs text-gray-500">
+                              {activity.approverRole}
+                            </span>
+                          </div>
+                        ) : activity.approvalStatus === 'revision_requested' && activity.approverRole ? (
+                          <div className="flex flex-col">
+                            <span className="text-sm font-medium text-orange-600">
+                              Revision by
+                            </span>
+                            <span className="text-xs text-gray-500">
+                              {activity.approverRole}
+                            </span>
+                          </div>
+                        ) : activity.approvalStatus === 'pending' ? (
+                          <span className="text-sm text-gray-400">Pending</span>
+                        ) : (
+                          <span className="text-sm text-gray-400">-</span>
+                        )}
                       </td>
                     </tr>
                   ))

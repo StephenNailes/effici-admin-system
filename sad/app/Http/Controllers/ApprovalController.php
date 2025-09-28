@@ -34,14 +34,17 @@ class ApprovalController extends Controller
             ->leftJoin('users as u', function ($join) {
                 $join->on('u.id', '=', DB::raw('COALESCE(er.user_id, ap.user_id)'));
             })
+            ->leftJoin('users as approver', 'approver.id', '=', 'ra.approver_id')
             ->select(
                 'ra.id as approval_id',
                 'ra.request_id',
                 'ra.request_type',
                 'ra.status as approval_status',
                 'ra.created_at as submitted_at',
+                'ra.approver_role',
                 DB::raw("COALESCE(er.category, ap.category) as priority"),
                 DB::raw("CONCAT(u.first_name, ' ', u.last_name) as student_name"),
+                DB::raw("CONCAT(approver.first_name, ' ', approver.last_name) as approver_name"),
                 'ap.activity_name',
                 'ap.activity_purpose',
                 'er.purpose as equipment_purpose',
@@ -96,14 +99,17 @@ class ApprovalController extends Controller
             ->leftJoin('users as u', function ($join) {
                 $join->on('u.id', '=', DB::raw('COALESCE(er.user_id, ap.user_id)'));
             })
+            ->leftJoin('users as approver', 'approver.id', '=', 'ra.approver_id')
             ->select(
                 'ra.id as approval_id',
                 'ra.request_id',
                 'ra.request_type',
                 'ra.status as approval_status',
                 'ra.created_at as submitted_at',
+                'ra.approver_role',
                 DB::raw("COALESCE(er.category, ap.category) as priority"),
                 DB::raw("CONCAT(u.first_name, ' ', u.last_name) as student_name"),
+                DB::raw("CONCAT(approver.first_name, ' ', approver.last_name) as approver_name"),
                 'ap.activity_name',
                 'ap.activity_purpose',
                 'er.purpose as equipment_purpose',
@@ -133,12 +139,13 @@ class ApprovalController extends Controller
     public function approve(Request $request, $id)
     {
         $role = optional($request->user())->role;
+        $approverId = $request->user()->id;
         if (!in_array($role, ['admin_assistant', 'dean'], true)) {
             abort(403);
         }
 
         try {
-            DB::transaction(function () use ($id, $role) {
+            DB::transaction(function () use ($id, $role, $approverId) {
             $ra = DB::table('request_approvals')->where('id', $id)->first();
             if (!$ra || $ra->approver_role !== $role) {
                 abort(403);
@@ -155,6 +162,7 @@ class ApprovalController extends Controller
             // Update current approval row
             DB::table('request_approvals')->where('id', $id)->update([
                 'status' => 'approved',
+                'approver_id' => $approverId,
                 'updated_at' => now()
             ]);
 
@@ -260,11 +268,12 @@ class ApprovalController extends Controller
     {
         $remarks = $request->input('remarks');
         $role = optional($request->user())->role;
+        $approverId = $request->user()->id;
         if (!in_array($role, ['admin_assistant', 'dean'], true)) {
             abort(403);
         }
 
-        DB::transaction(function () use ($id, $remarks, $role) {
+        DB::transaction(function () use ($id, $remarks, $role, $approverId) {
             $ra = DB::table('request_approvals')->where('id', $id)->first();
             if (!$ra || $ra->approver_role !== $role) {
                 abort(403);
@@ -281,6 +290,7 @@ class ApprovalController extends Controller
             DB::table('request_approvals')->where('id', $id)->update([
                 'status' => 'revision_requested',
                 'remarks' => $remarks,
+                'approver_id' => $approverId,
                 'updated_at' => now()
             ]);
 
@@ -423,5 +433,111 @@ class ApprovalController extends Controller
                 'suggestion' => $canApprove ? null : 'Consider requesting revision to reduce quantities or suggest alternative equipment.'
             ]
         ];
+    }
+
+    public function batchApprove(Request $request)
+    {
+        $role = optional($request->user())->role;
+        $approverId = $request->user()->id;
+        if (!in_array($role, ['admin_assistant', 'dean'], true)) {
+            abort(403, 'Unauthorized');
+        }
+
+        $validatedData = $request->validate([
+            'approval_ids' => 'required|array|min:1',
+            'approval_ids.*' => 'integer|exists:request_approvals,id'
+        ]);
+
+        $approvalIds = $validatedData['approval_ids'];
+        $results = ['successful' => [], 'failed' => []];
+
+        DB::transaction(function () use ($approvalIds, $role, $approverId, &$results) {
+            foreach ($approvalIds as $approvalId) {
+                try {
+                    $ra = DB::table('request_approvals')->where('id', $approvalId)->first();
+                    
+                    if (!$ra || $ra->approver_role !== $role || $ra->status !== 'pending') {
+                        $results['failed'][] = $approvalId;
+                        continue;
+                    }
+
+                    // For equipment requests, validate stock
+                    if ($ra->request_type === 'equipment') {
+                        $stockValidation = $this->validateEquipmentStock($ra->request_id);
+                        if (!$stockValidation['canApprove']) {
+                            $results['failed'][] = $approvalId;
+                            continue;
+                        }
+                    }
+
+                    // Update approval
+                    DB::table('request_approvals')->where('id', $approvalId)->update([
+                        'status' => 'approved',
+                        'approver_id' => $approverId,
+                        'updated_at' => now()
+                    ]);
+
+                    // Update request status
+                    if ($ra->request_type === 'equipment') {
+                        if ($role === 'admin_assistant') {
+                            // Check if dean approval exists
+                            $deanApproval = DB::table('request_approvals')
+                                ->where('request_id', $ra->request_id)
+                                ->where('request_type', 'equipment')
+                                ->where('approver_role', 'dean')
+                                ->first();
+
+                            if (!$deanApproval) {
+                                // Create dean approval
+                                DB::table('request_approvals')->insert([
+                                    'request_id' => $ra->request_id,
+                                    'request_type' => 'equipment',
+                                    'approver_role' => 'dean',
+                                    'status' => 'pending',
+                                    'created_at' => now(),
+                                    'updated_at' => now()
+                                ]);
+                            }
+                        } else { // dean
+                            DB::table('equipment_requests')->where('id', $ra->request_id)->update(['status' => 'approved']);
+                        }
+                    } else { // activity_plan
+                        if ($role === 'admin_assistant') {
+                            $deanApproval = DB::table('request_approvals')
+                                ->where('request_id', $ra->request_id)
+                                ->where('request_type', 'activity_plan')
+                                ->where('approver_role', 'dean')
+                                ->first();
+
+                            if (!$deanApproval) {
+                                DB::table('request_approvals')->insert([
+                                    'request_id' => $ra->request_id,
+                                    'request_type' => 'activity_plan',
+                                    'approver_role' => 'dean',
+                                    'status' => 'pending',
+                                    'created_at' => now(),
+                                    'updated_at' => now()
+                                ]);
+                            }
+                        } else { // dean
+                            DB::table('activity_plans')->where('id', $ra->request_id)->update(['status' => 'approved']);
+                        }
+                    }
+
+                    $results['successful'][] = $approvalId;
+
+                } catch (\Exception $e) {
+                    $results['failed'][] = $approvalId;
+                }
+            }
+        });
+
+        return response()->json([
+            'message' => 'Batch approval completed',
+            'results' => $results,
+            'total_processed' => count($approvalIds),
+            'successful_count' => count($results['successful']),
+            'failed_count' => count($results['failed'])
+        ]);
     }
 }

@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import MainLayout from '@/layouts/mainlayout';
-import { Search, Filter, Eye, FileText, Clock, CheckCircle, Edit, ChevronDown } from 'lucide-react';
+import { Search, Filter, Eye, FileText, Clock, CheckCircle, Edit, ChevronDown, Check, Minus } from 'lucide-react';
+import BatchApprovalModal from '@/components/BatchApprovalModal';
 import { router } from '@inertiajs/react';
 import { formatDateShort, formatTime12h } from '@/lib/utils';
+import { toast } from 'react-toastify';
 
 interface RequestData {
   approval_id: number;
@@ -26,6 +28,8 @@ export default function Request() {
   const [filterOpen, setFilterOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState('All');
   const [priorityFilter, setPriorityFilter] = useState('All');
+  const [selectedApprovals, setSelectedApprovals] = useState<number[]>([]);
+  const [batchApprovalModalOpen, setBatchApprovalModalOpen] = useState(false);
 
   // Fetch dean requests on component mount
   useEffect(() => {
@@ -58,6 +62,72 @@ export default function Request() {
       setStats({ total: 0, pending: 0, approved: 0, underRevision: 0 });
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Batch selection functions
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
+      const pendingApprovalIds = filteredRequests
+        .filter(req => req.approval_status === 'pending')
+        .map(req => req.approval_id);
+      setSelectedApprovals(pendingApprovalIds);
+    } else {
+      setSelectedApprovals([]);
+    }
+  };
+
+  const handleSelectIndividual = (approvalId: number, checked: boolean) => {
+    if (checked) {
+      setSelectedApprovals(prev => [...prev, approvalId]);
+    } else {
+      setSelectedApprovals(prev => prev.filter(id => id !== approvalId));
+    }
+  };
+
+  const handleBatchApprove = () => {
+    if (selectedApprovals.length === 0) {
+      toast.error('Please select requests to approve');
+      return;
+    }
+    setBatchApprovalModalOpen(true);
+  };
+
+  const confirmBatchApproval = async () => {
+    try {
+      const response = await fetch('/api/approvals/batch-approve', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+          'X-Requested-With': 'XMLHttpRequest'
+        },
+        body: JSON.stringify({
+          approval_ids: selectedApprovals
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to batch approve');
+      }
+
+      const data = await response.json();
+      
+      if (data.successful_count > 0) {
+        toast.success(`Successfully approved ${data.successful_count} requests`);
+        fetchRequests(); // Refresh the list
+        setSelectedApprovals([]); // Clear selection
+      }
+      
+      if (data.failed_count > 0) {
+        toast.warning(`${data.failed_count} requests failed to approve`);
+      }
+      
+      setBatchApprovalModalOpen(false);
+    } catch (error) {
+      console.error('Batch approval error:', error);
+      toast.error('Failed to approve requests');
+      setBatchApprovalModalOpen(false);
     }
   };
 
@@ -264,12 +334,35 @@ export default function Request() {
           </div>
         </div>
 
+        {/* Batch Actions */}
+        {selectedApprovals.length > 0 && (
+          <div className="mb-4 flex justify-between items-center p-4 bg-red-50 border border-red-200 rounded-lg">
+            <span className="text-red-700 font-medium">
+              {selectedApprovals.length} request{selectedApprovals.length > 1 ? 's' : ''} selected
+            </span>
+            <button
+              onClick={handleBatchApprove}
+              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium"
+            >
+              Batch Approve ({selectedApprovals.length})
+            </button>
+          </div>
+        )}
+
         {/* Table */}
         <div className="bg-white rounded-lg shadow-sm overflow-hidden">
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-16">
+                    <input
+                      type="checkbox"
+                      checked={selectedApprovals.length > 0 && selectedApprovals.length === filteredRequests.filter(req => req.approval_status === 'pending').length}
+                      onChange={(e) => handleSelectAll(e.target.checked)}
+                      className="rounded border-gray-300 text-red-600 focus:ring-red-500"
+                    />
+                  </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Submitted by
                   </th>
@@ -293,7 +386,7 @@ export default function Request() {
               <tbody className="bg-white divide-y divide-gray-200">
                 {loading ? (
                   <tr>
-                    <td colSpan={6} className="px-6 py-8 text-center">
+                    <td colSpan={7} className="px-6 py-8 text-center">
                       <div className="text-gray-500">
                         <Clock className="w-8 h-8 mx-auto text-gray-300 mb-4 animate-spin" />
                         <p className="text-sm">Loading requests...</p>
@@ -303,6 +396,15 @@ export default function Request() {
                 ) : filteredRequests.length > 0 ? (
                   filteredRequests.map((request) => (
                     <tr key={request.approval_id} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <input
+                          type="checkbox"
+                          checked={selectedApprovals.includes(request.approval_id)}
+                          onChange={(e) => handleSelectIndividual(request.approval_id, e.target.checked)}
+                          disabled={request.approval_status !== 'pending'}
+                          className="rounded border-gray-300 text-red-600 focus:ring-red-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                        />
+                      </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm font-medium text-black">
                           {request.student_name || 'Unknown Student'}
@@ -344,7 +446,7 @@ export default function Request() {
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={6} className="px-6 py-8 text-center">
+                    <td colSpan={7} className="px-6 py-8 text-center">
                       <div className="text-gray-500">
                         <FileText className="w-12 h-12 mx-auto text-gray-300 mb-4" />
                         <p className="text-lg font-medium mb-2">No activity plans found</p>
@@ -357,6 +459,15 @@ export default function Request() {
             </table>
           </div>
         </div>
+
+        {/* Batch Approval Modal */}
+        <BatchApprovalModal
+          isOpen={batchApprovalModalOpen}
+          onClose={() => setBatchApprovalModalOpen(false)}
+          onConfirm={confirmBatchApproval}
+          selectedRequests={selectedApprovals.map(id => ({ approval_id: id }))}
+          userRole="dean"
+        />
       </div>
     </MainLayout>
   );

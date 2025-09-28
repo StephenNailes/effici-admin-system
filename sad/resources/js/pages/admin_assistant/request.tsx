@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from "react";
 import MainLayout from "@/layouts/mainlayout";
-import { Search, Filter, Eye, FileText, Clock, CheckCircle, Edit } from "lucide-react";
+import { Search, Filter, Eye, FileText, Clock, CheckCircle, Edit, Check, Minus } from "lucide-react";
 import EquipmentModal from "@/components/EquipmentModal";
 import FilterModal from "@/components/FilterModal";
 import StockConflictModal from "@/components/StockConflictModal";
+import BatchApprovalModal from "@/components/BatchApprovalModal";
 import { motion } from "framer-motion";
 import { router } from "@inertiajs/react";
 import { toast } from "react-toastify"; // global toast
@@ -37,7 +38,6 @@ type EquipmentItem = {
 };
 
 export default function Request() {
-  const [searchInput, setSearchInput] = useState(""); // for input field
   const [searchTerm, setSearchTerm] = useState("");   // for actual search
   const [stats, setStats] = useState({
     total: 0,
@@ -54,6 +54,8 @@ export default function Request() {
   const [currentPage, setCurrentPage] = useState(1);
   const [stockConflictModalOpen, setStockConflictModalOpen] = useState(false);
   const [stockConflictDetails, setStockConflictDetails] = useState<any>(null);
+  const [selectedApprovals, setSelectedApprovals] = useState<number[]>([]);
+  const [batchApprovalModalOpen, setBatchApprovalModalOpen] = useState(false);
 
   const fetchRequests = () => {
     fetch(`/api/approvals?role=admin_assistant`, {
@@ -222,6 +224,72 @@ export default function Request() {
     }
   };
 
+  // Batch selection functions
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
+      const pendingApprovalIds = paginatedRequests
+        .filter(req => req.approval_status === 'pending')
+        .map(req => req.approval_id);
+      setSelectedApprovals(pendingApprovalIds);
+    } else {
+      setSelectedApprovals([]);
+    }
+  };
+
+  const handleSelectIndividual = (approvalId: number, checked: boolean) => {
+    if (checked) {
+      setSelectedApprovals(prev => [...prev, approvalId]);
+    } else {
+      setSelectedApprovals(prev => prev.filter(id => id !== approvalId));
+    }
+  };
+
+  const handleBatchApprove = () => {
+    if (selectedApprovals.length === 0) {
+      toast.error('Please select requests to approve');
+      return;
+    }
+    setBatchApprovalModalOpen(true);
+  };
+
+  const confirmBatchApproval = async () => {
+    try {
+      const response = await fetch('/api/approvals/batch-approve', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+          'X-Requested-With': 'XMLHttpRequest'
+        },
+        body: JSON.stringify({
+          approval_ids: selectedApprovals
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to batch approve');
+      }
+
+      const data = await response.json();
+      
+      if (data.successful_count > 0) {
+        toast.success(`Successfully approved ${data.successful_count} requests`);
+        fetchRequests(); // Refresh the list
+        setSelectedApprovals([]); // Clear selection
+      }
+      
+      if (data.failed_count > 0) {
+        toast.warning(`${data.failed_count} requests failed to approve`);
+      }
+      
+      setBatchApprovalModalOpen(false);
+    } catch (error) {
+      console.error('Batch approval error:', error);
+      toast.error('Failed to approve requests');
+      setBatchApprovalModalOpen(false);
+    }
+  };
+
   // Enhanced filtering logic for search - Show both equipment and activity plan requests
   const filteredRequests = requests
     .filter((r) => {
@@ -369,31 +437,18 @@ export default function Request() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4, ease: "easeOut" }}
         >
-          <form
-            className="relative flex-1 flex"
-            onSubmit={e => {
-              e.preventDefault();
-              setSearchTerm(searchInput);
-            }}
-          >
+          <div className="relative flex-1">
             <motion.input
               type="text"
               placeholder="Search requests..."
-              value={searchInput}
-              onChange={e => setSearchInput(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-l-lg focus:outline-none focus:ring-2 focus:ring-gray-300 text-black bg-gray-50 transition-all duration-200"
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-300 text-black bg-gray-50 transition-all duration-200"
               initial={{ boxShadow: "0 0 0 0 rgba(0,0,0,0)" }}
               whileFocus={{ boxShadow: "0 2px 8px 0 rgba(0,0,0,0.08)" }}
             />
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5 pointer-events-none" />
-            <motion.button
-              type="submit"
-              className="px-4 py-2 bg-red-600 text-white rounded-r-lg font-semibold flex items-center gap-2 shadow"
-            >
-              <Search className="w-4 h-4" />
-              Search
-            </motion.button>
-          </form>
+          </div>
           <motion.button
             className="flex items-center gap-2 px-4 py-2 bg-red-50 border border-red-200 rounded-lg shadow text-red-700 font-semibold transition-colors"
             onClick={() => setFilterModalOpen(true)}
@@ -418,11 +473,41 @@ export default function Request() {
           }}
         />
 
+        {/* Batch Actions */}
+        {selectedApprovals.length > 0 && (
+          <motion.div
+            className="mb-4 flex justify-between items-center p-4 bg-red-50 border border-red-200 rounded-lg"
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+          >
+            <span className="text-red-700 font-medium">
+              {selectedApprovals.length} request{selectedApprovals.length > 1 ? 's' : ''} selected
+            </span>
+            <motion.button
+              onClick={handleBatchApprove}
+              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium"
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+            >
+              Batch Approve ({selectedApprovals.length})
+            </motion.button>
+          </motion.div>
+        )}
+
         {/* request Table */}
         <div className="bg-white rounded-lg shadow-sm overflow-hidden" style={{ minHeight: 520, maxHeight: 520 }}>
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-black uppercase w-16">
+                  <input
+                    type="checkbox"
+                    checked={selectedApprovals.length > 0 && selectedApprovals.length === paginatedRequests.filter(req => req.approval_status === 'pending').length}
+                    onChange={(e) => handleSelectAll(e.target.checked)}
+                    className="rounded border-gray-300 text-red-600 focus:ring-red-500"
+                  />
+                </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-black uppercase">
                   Submitted by
                 </th>
@@ -447,6 +532,15 @@ export default function Request() {
               {paginatedRequests.length > 0 ? (
                 paginatedRequests.map((req) => (
                   <tr key={req.approval_id}>
+                    <td className="px-6 py-4 text-sm text-gray-900">
+                      <input
+                        type="checkbox"
+                        checked={selectedApprovals.includes(req.approval_id)}
+                        onChange={(e) => handleSelectIndividual(req.approval_id, e.target.checked)}
+                        disabled={req.approval_status !== 'pending'}
+                        className="rounded border-gray-300 text-red-600 focus:ring-red-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                      />
+                    </td>
                     <td className="px-6 py-4 text-sm text-gray-900">
                       {req.student_name}
                     </td>
@@ -545,6 +639,15 @@ export default function Request() {
           }}
           details={stockConflictDetails}
           onRequestRevision={handleStockConflictRevision}
+        />
+
+        {/* Batch Approval Modal */}
+        <BatchApprovalModal
+          isOpen={batchApprovalModalOpen}
+          onClose={() => setBatchApprovalModalOpen(false)}
+          onConfirm={confirmBatchApproval}
+          selectedRequests={selectedApprovals.map(id => ({ approval_id: id }))}
+          userRole="admin_assistant"
         />
       </div>
     </MainLayout>

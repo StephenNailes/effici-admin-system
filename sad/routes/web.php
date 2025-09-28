@@ -198,6 +198,7 @@ Route::middleware(['auth', 'verified', 'role:admin_assistant,dean'])->prefix('ap
     Route::get('/{id}', [ApprovalController::class, 'show'])->name('approvals.show');
     Route::post('/{id}/approve', [ApprovalController::class, 'approve'])->name('approvals.approve');
     Route::post('/{id}/revision', [ApprovalController::class, 'requestRevision'])->name('approvals.revision');
+    Route::post('/batch-approve', [ApprovalController::class, 'batchApprove'])->name('approvals.batch-approve');
 });
     // Equipment Management API for admin (role protected)
     Route::middleware(['auth', 'verified', 'role:admin_assistant'])->group(function () {

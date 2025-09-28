@@ -162,16 +162,19 @@ export default function ActivityLog() {
             <table className="w-full table-fixed border-separate border-spacing-0">
               <thead>
                 <tr>
-                  <th className="w-1/4 px-8 py-4 font-semibold text-base text-gray-700 border-b border-gray-200 bg-white sticky top-0 z-10 text-left">
+                  <th className="w-1/5 px-8 py-4 font-semibold text-base text-gray-700 border-b border-gray-200 bg-white sticky top-0 z-10 text-left">
                     Request Type
                   </th>
-                  <th className="w-1/4 px-8 py-4 font-semibold text-base text-gray-700 border-b border-gray-200 bg-white sticky top-0 z-10 text-left">
+                  <th className="w-1/5 px-8 py-4 font-semibold text-base text-gray-700 border-b border-gray-200 bg-white sticky top-0 z-10 text-left">
                     Date & Time
                   </th>
-                  <th className="w-1/4 px-8 py-4 font-semibold text-base text-gray-700 border-b border-gray-200 bg-white sticky top-0 z-10 text-left">
+                  <th className="w-1/5 px-8 py-4 font-semibold text-base text-gray-700 border-b border-gray-200 bg-white sticky top-0 z-10 text-left">
                     Status
                   </th>
-                  <th className="w-1/4 px-8 py-4 font-semibold text-base text-gray-700 border-b border-gray-200 bg-white sticky top-0 z-10 text-left">
+                  <th className="w-1/5 px-8 py-4 font-semibold text-base text-gray-700 border-b border-gray-200 bg-white sticky top-0 z-10 text-left">
+                    Approved By
+                  </th>
+                  <th className="w-1/5 px-8 py-4 font-semibold text-base text-gray-700 border-b border-gray-200 bg-white sticky top-0 z-10 text-left">
                     Actions
                   </th>
                 </tr>
@@ -180,7 +183,7 @@ export default function ActivityLog() {
                 {paginatedRequests.length === 0 ? (
                   <tr>
                     <td
-                      colSpan={4}
+                      colSpan={5}
                       className="px-8 py-8 text-center text-gray-400"
                     >
                       No requests found.
@@ -196,18 +199,43 @@ export default function ActivityLog() {
                       className="border-b border-gray-100 hover:bg-gray-50 transition-colors text-black"
                     >
                       {/* Request Type */}
-                      <td className="w-1/4 px-8 py-4">{req.type}</td>
+                      <td className="w-1/5 px-8 py-4">{req.type}</td>
 
                       {/* Date & Time */}
-                      <td className="w-1/4 px-8 py-4">
+                      <td className="w-1/5 px-8 py-4">
                         {formatDateTime(req.date)}
                       </td>
 
                       {/* Status */}
-                      <td className="w-1/4 px-8 py-4">{getStatusBadge(req.status)}</td>
+                      <td className="w-1/5 px-8 py-4">{getStatusBadge(req.status)}</td>
+
+                      {/* Approved By */}
+                      <td className="w-1/5 px-8 py-4">
+                        {req.approver_role && req.approval_status === 'approved' ? (
+                          <div className="flex flex-col">
+                            <span className="text-sm font-medium text-gray-900">
+                              {req.approver_name || 'Unknown'}
+                            </span>
+                            <span className="text-xs text-gray-500">
+                              {req.approver_role}
+                            </span>
+                          </div>
+                        ) : req.approval_status === 'revision_requested' ? (
+                          <div className="flex flex-col">
+                            <span className="text-sm font-medium text-orange-600">
+                              Revision by
+                            </span>
+                            <span className="text-xs text-gray-500">
+                              {req.approver_role || 'Unknown Role'}
+                            </span>
+                          </div>
+                        ) : (
+                          <span className="text-sm text-gray-400">Pending</span>
+                        )}
+                      </td>
 
                       {/* Actions */}
-                      <td className="w-1/4 px-8 py-4">
+                      <td className="w-1/5 px-8 py-4">
                         <motion.button
                           whileHover={{ scale: 1.08 }}
                           whileTap={{ scale: 0.95 }}

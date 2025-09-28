@@ -153,28 +153,100 @@ class EquipmentRequestController extends Controller
      */
     public function index()
     {
-        $requests = EquipmentRequest::with(['items.equipment'])
-            ->where('user_id', Auth::id())
-            ->orderByDesc('created_at')
-            ->get()
-            ->map(function ($req) {
-                return [
-                    'id' => $req->id,
-                    'type' => 'Equipment Request',
-                    'date' => $req->created_at->toDateTimeString(),
-                    'status' => ucfirst($req->status),
-                    'purpose' => $req->purpose,
-                    'items' => $req->items->map(function ($item) {
-                        return [
-                            'name' => $item->equipment->name ?? 'Unknown',
-                            'quantity' => $item->quantity,
-                        ];
-                    })->toArray(),
-                ];
-            });
+        // Get equipment requests with approval information
+        $equipmentRequests = DB::table('equipment_requests as er')
+            ->leftJoin('request_approvals as ra', function($join) {
+                $join->on('er.id', '=', 'ra.request_id')
+                     ->where('ra.request_type', '=', 'equipment')
+                     ->where('ra.status', '!=', 'pending');
+            })
+            ->leftJoin('users as approver', 'ra.approver_id', '=', 'approver.id')
+            ->where('er.user_id', Auth::id())
+            ->select(
+                'er.id',
+                'er.purpose',
+                'er.status',
+                'er.created_at',
+                'ra.approver_role',
+                'ra.status as approval_status',
+                'ra.updated_at as approval_date',
+                DB::raw("CONCAT(approver.first_name, ' ', approver.last_name) as approver_name")
+            )
+            ->orderByDesc('er.created_at')
+            ->get();
+
+        // Get activity plans with approval information
+        $activityPlans = DB::table('activity_plans as ap')
+            ->leftJoin('request_approvals as ra', function($join) {
+                $join->on('ap.id', '=', 'ra.request_id')
+                     ->where('ra.request_type', '=', 'activity_plan')
+                     ->where('ra.status', '!=', 'pending');
+            })
+            ->leftJoin('users as approver', 'ra.approver_id', '=', 'approver.id')
+            ->where('ap.user_id', Auth::id())
+            ->select(
+                'ap.id',
+                'ap.activity_name as purpose',
+                'ap.status',
+                'ap.created_at',
+                'ra.approver_role',
+                'ra.status as approval_status',
+                'ra.updated_at as approval_date',
+                DB::raw("CONCAT(approver.first_name, ' ', approver.last_name) as approver_name")
+            )
+            ->orderByDesc('ap.created_at')
+            ->get();
+
+        // Combine and format both types of requests
+        $allRequests = collect();
+
+        foreach ($equipmentRequests as $req) {
+            // Get equipment items for this request
+            $items = DB::table('equipment_request_items as eri')
+                ->join('equipment as e', 'eri.equipment_id', '=', 'e.id')
+                ->where('eri.equipment_request_id', $req->id)
+                ->select('e.name', 'eri.quantity')
+                ->get();
+
+            $allRequests->push([
+                'id' => $req->id,
+                'type' => 'Equipment Request',
+                'date' => $req->created_at,
+                'status' => ucfirst($req->status),
+                'purpose' => $req->purpose,
+                'approver_role' => $req->approver_role ? ucwords(str_replace('_', ' ', $req->approver_role)) : null,
+                'approver_name' => $req->approver_name,
+                'approval_status' => $req->approval_status,
+                'approval_date' => $req->approval_date,
+                'items' => $items->map(function ($item) {
+                    return [
+                        'name' => $item->name,
+                        'quantity' => $item->quantity,
+                    ];
+                })->toArray(),
+            ]);
+        }
+
+        foreach ($activityPlans as $req) {
+            $allRequests->push([
+                'id' => $req->id,
+                'type' => 'Activity Plan',
+                'date' => $req->created_at,
+                'status' => ucfirst($req->status),
+                'purpose' => $req->purpose,
+                'approver_role' => $req->approver_role ? ucwords(str_replace('_', ' ', $req->approver_role)) : null,
+                'approver_name' => $req->approver_name,
+                'approval_status' => $req->approval_status,
+                'approval_date' => $req->approval_date,
+                'items' => [], // Activity plans don't have equipment items
+            ]);
+        }
+
+        // Sort by date descending
+        $sortedRequests = $allRequests->sortByDesc('date')->values();
 
         return inertia('student/ActivityLog', [
-            'logs' => $requests,
+            'logs' => $sortedRequests,
         ]);
     }
 
