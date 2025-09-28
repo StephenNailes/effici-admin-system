@@ -4,6 +4,7 @@ import { Link } from '@inertiajs/react'
 import { ArrowLeft, ArrowRight } from "lucide-react"
 import { FaSearch, FaFilter } from "react-icons/fa"
 import { useState } from 'react'
+import FilterSelect from '@/components/FilterSelect'
 
 // Define the type of each revision
 interface Revision {
@@ -125,33 +126,23 @@ export default function Revision({ revisions = [] }: RevisionProps) {
             transition={{ duration: 0.3 }}
             className="mb-8 bg-white border border-gray-200 rounded-xl shadow p-6 flex flex-col sm:flex-row gap-4"
           >
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1">
-                Status
-              </label>
-              <select
-                value={filterStatus}
-                onChange={(e) => setFilterStatus(e.target.value)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-red-400"
-              >
-                <option value="">All</option>
-                <option value="under_revision">Under Revision</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1">
-                Request Type
-              </label>
-              <select
-                value={filterType}
-                onChange={(e) => setFilterType(e.target.value)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-red-400"
-              >
-                <option value="">All</option>
-                <option value="activity">Activity Plan</option>
-                <option value="equipment">Equipment Request</option>
-              </select>
-            </div>
+            <FilterSelect
+              label="Status"
+              value={filterStatus}
+              onChange={setFilterStatus}
+              options={[
+                { value: 'under_revision', label: 'Under Revision', colorClass: 'bg-orange-100 text-orange-700' },
+              ]}
+            />
+            <FilterSelect
+              label="Request Type"
+              value={filterType}
+              onChange={setFilterType}
+              options={[
+                { value: 'activity', label: 'Activity Plan', colorClass: 'bg-blue-100 text-blue-700' },
+                { value: 'equipment', label: 'Equipment Request', colorClass: 'bg-purple-100 text-purple-700' },
+              ]}
+            />
           </motion.div>
         )}
 

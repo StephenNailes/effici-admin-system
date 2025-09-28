@@ -6,6 +6,7 @@ import { formatDateTime } from "@/lib/utils";
 import { useState } from "react";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 import { usePage } from "@inertiajs/react"; // <-- Import Inertia hook
+import FilterSelect, { FilterOption } from "@/components/FilterSelect";
 
 export default function ActivityLog() {
   // 🔗 Get logs passed from Laravel controller
@@ -116,36 +117,24 @@ export default function ActivityLog() {
             transition={{ duration: 0.3 }}
             className="mb-8 bg-white border border-gray-200 rounded-xl shadow p-6 flex flex-col sm:flex-row gap-4"
           >
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1">
-                Status
-              </label>
-              <select
-                value={filterStatus}
-                onChange={(e) => setFilterStatus(e.target.value)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-red-400"
-              >
-                <option value="">All</option>
-                <option value="Approved">Approved</option>
-                <option value="Pending">Pending</option>
-
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1">
-                Request Type
-              </label>
-              <select
-                value={filterType}
-                onChange={(e) => setFilterType(e.target.value)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-red-400"
-              >
-                <option value="">All</option>
-                <option value="Activity Plan">Activity Plan</option>
-                <option value="Equipment Request">Equipment Request</option>
-                <option value="Budget Request">Budget Request</option>
-              </select>
-            </div>
+            <FilterSelect
+              label="Status"
+              value={filterStatus}
+              onChange={setFilterStatus}
+              options={[
+                { value: "Approved", label: "Approved", colorClass: "bg-green-100 text-green-700" },
+                { value: "Pending", label: "Pending", colorClass: "bg-yellow-100 text-yellow-700" },
+              ]}
+            />
+            <FilterSelect
+              label="Request Type"
+              value={filterType}
+              onChange={setFilterType}
+              options={[
+                { value: "Activity Plan", label: "Activity Plan", colorClass: "bg-red-100 text-red-700" },
+                { value: "Equipment Request", label: "Equipment Request", colorClass: "bg-blue-100 text-blue-700" },
+              ]}
+            />
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-1">
                 Date & Time
@@ -155,7 +144,7 @@ export default function ActivityLog() {
                 placeholder="e.g. April 1, 2025"
                 value={filterDate}
                 onChange={(e) => setFilterDate(e.target.value)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-red-400"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:border-red-400 focus:ring-2 focus:ring-red-300"
               />
             </div>
           </motion.div>
