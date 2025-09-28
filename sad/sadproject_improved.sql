@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Sep 28, 2025 at 06:57 AM
+-- Generation Time: Sep 28, 2025 at 03:50 PM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -97,12 +97,14 @@ CREATE TABLE `cache` (
 --
 
 INSERT INTO `cache` (`key`, `value`, `expiration`) VALUES
-('efficiadmin_cache_5a5b0f9b7d3f8fc84c3cef8fd8efaaa6c70d75ab', 'i:1;', 1758974349),
-('efficiadmin_cache_5a5b0f9b7d3f8fc84c3cef8fd8efaaa6c70d75ab:timer', 'i:1758974349;', 1758974349),
-('efficiadmin_cache_5c785c036466adea360111aa28563bfd556b5fba', 'i:1;', 1759035343),
-('efficiadmin_cache_5c785c036466adea360111aa28563bfd556b5fba:timer', 'i:1759035343;', 1759035343),
+('efficiadmin_cache_5a5b0f9b7d3f8fc84c3cef8fd8efaaa6c70d75ab', 'i:1;', 1759037782),
+('efficiadmin_cache_5a5b0f9b7d3f8fc84c3cef8fd8efaaa6c70d75ab:timer', 'i:1759037782;', 1759037782),
+('efficiadmin_cache_5c785c036466adea360111aa28563bfd556b5fba', 'i:1;', 1759067397),
+('efficiadmin_cache_5c785c036466adea360111aa28563bfd556b5fba:timer', 'i:1759067397;', 1759067397),
 ('efficiadmin_cache_a72b20062ec2c47ab2ceb97ac1bee818f8b6c6cb', 'i:1;', 1758975353),
-('efficiadmin_cache_a72b20062ec2c47ab2ceb97ac1bee818f8b6c6cb:timer', 'i:1758975353;', 1758975353);
+('efficiadmin_cache_a72b20062ec2c47ab2ceb97ac1bee818f8b6c6cb:timer', 'i:1758975353;', 1758975353),
+('efficiadmin_cache_b888b29826bb53dc531437e723738383d8339b56', 'i:2;', 1759066491),
+('efficiadmin_cache_b888b29826bb53dc531437e723738383d8339b56:timer', 'i:1759066491;', 1759066491);
 
 -- --------------------------------------------------------
 
@@ -159,7 +161,7 @@ INSERT INTO `equipment` (`id`, `category_id`, `name`, `description`, `is_consuma
 (1, 2, 'TV', 'Smart TV for presentations', 0, 3, 1, '2025-08-27 06:28:35', '2025-09-23 10:59:25'),
 (2, 1, 'Speaker', 'Portable speakers', 0, 5, 1, '2025-08-27 06:28:35', '2025-09-25 08:11:59'),
 (3, 2, 'Projector', 'Full HD projector', 0, 2, 1, '2025-08-27 06:28:35', '2025-09-25 07:54:23'),
-(4, 3, 'HDMI Cable', '2-meter cable', 0, 10, 1, '2025-08-27 06:28:35', '2025-09-27 04:09:25');
+(4, 3, 'HDMI Cable', '2-meter cable', 0, 10, 1, '2025-08-27 06:28:35', '2025-09-27 21:34:43');
 
 -- --------------------------------------------------------
 
@@ -250,6 +252,37 @@ CREATE TABLE `failed_jobs` (
   `exception` longtext NOT NULL,
   `failed_at` timestamp NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `invitation_tokens`
+--
+
+CREATE TABLE `invitation_tokens` (
+  `id` bigint(20) UNSIGNED NOT NULL,
+  `token` varchar(64) NOT NULL,
+  `email` varchar(255) NOT NULL,
+  `role` enum('dean','admin_assistant') NOT NULL,
+  `first_name` varchar(255) NOT NULL,
+  `middle_name` varchar(255) DEFAULT NULL,
+  `last_name` varchar(255) NOT NULL,
+  `reason` text DEFAULT NULL,
+  `invited_by` bigint(20) UNSIGNED NOT NULL,
+  `expires_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  `last_sent_at` timestamp NULL DEFAULT NULL,
+  `send_count` int(11) NOT NULL DEFAULT 1,
+  `used_at` timestamp NULL DEFAULT NULL,
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `invitation_tokens`
+--
+
+INSERT INTO `invitation_tokens` (`id`, `token`, `email`, `role`, `first_name`, `middle_name`, `last_name`, `reason`, `invited_by`, `expires_at`, `last_sent_at`, `send_count`, `used_at`, `created_at`, `updated_at`) VALUES
+(1, 'RAusGiSMdtV1SMxXrksNyxh09w7b6A4ygpsvnglitwQYOJ69QeVReUDgwI2hs5Lq', 'stephencraine245666@gmail.com', 'admin_assistant', 'stephen test', 'jimenez', 'nailes', NULL, 59, '2025-09-28 13:23:25', NULL, 1, '2025-09-28 05:23:25', '2025-09-28 05:22:26', '2025-09-28 05:23:25');
 
 -- --------------------------------------------------------
 
@@ -345,7 +378,11 @@ INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES
 (15, '2025_09_23_000002_add_user_id_to_announcements_and_events', 7),
 (16, '2025_09_23_000003_add_parent_id_to_comments_table', 7),
 (17, '2025_09_23_000004_create_likes_table', 7),
-(18, '2025_09_23_000005_add_foreign_keys_to_equipment_request_items', 8);
+(18, '2025_09_23_000005_add_foreign_keys_to_equipment_request_items', 8),
+(19, '2025_09_28_000001_create_role_current_holders_table', 9),
+(20, '2025_09_28_000002_create_role_handover_logs_table', 9),
+(21, '2025_09_28_122827_create_invitation_tokens_table', 10),
+(22, '2025_09_28_132620_add_resend_fields_to_invitation_tokens_table', 11);
 
 -- --------------------------------------------------------
 
@@ -366,17 +403,6 @@ CREATE TABLE `notifications` (
   `created_at` timestamp NULL DEFAULT NULL,
   `updated_at` timestamp NULL DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
---
--- Dumping data for table `notifications`
---
-
-INSERT INTO `notifications` (`id`, `user_id`, `type`, `title`, `message`, `data`, `action_url`, `priority`, `read_at`, `created_at`, `updated_at`) VALUES
-(60, 59, 'new_request', 'New Equipment Request', 'Stephen Craine Nailes submitted a new equipment request for review', '{\"request_type\":\"equipment\",\"request_id\":51,\"student_name\":\"Stephen Craine Nailes\",\"priority\":\"normal\"}', '/admin/requests', 'normal', '2025-09-26 04:17:08', '2025-09-26 04:15:38', '2025-09-26 04:17:08'),
-(61, 69, 'request_status_change', '📝 Equipment Request - Revision Required', 'The Admin Assistant has requested revisions to your equipment request. Please check the details and resubmit.', '{\"request_type\":\"equipment_request\",\"request_id\":51,\"status\":\"revision_requested\",\"approver_role\":\"admin_assistant\"}', '/student/borrow-equipment', 'high', '2025-09-26 04:17:22', '2025-09-26 04:17:11', '2025-09-26 04:17:22'),
-(62, 69, 'request_status_change', '✅ Equipment Request Approved', 'Great news! The Admin Assistant has approved your equipment request. You can now proceed with borrowing the requested equipment.', '{\"request_type\":\"equipment_request\",\"request_id\":51,\"status\":\"approved\",\"approver_role\":\"admin_assistant\"}', '/student/borrow-equipment', 'high', '2025-09-26 04:26:06', '2025-09-26 04:25:03', '2025-09-26 04:26:06'),
-(63, 59, 'new_request', 'New Equipment Request', 'Stephen Craine Nailes submitted a new equipment request for review', '{\"request_type\":\"equipment\",\"request_id\":52,\"student_name\":\"Stephen Craine Nailes\",\"priority\":\"normal\"}', '/admin/requests', 'normal', '2025-09-27 03:58:09', '2025-09-27 03:57:50', '2025-09-27 03:58:09'),
-(64, 69, 'request_status_change', '✅ Equipment Request Approved', 'Great news! The Admin Assistant has approved your equipment request. You can now proceed with borrowing the requested equipment.', '{\"request_type\":\"equipment_request\",\"request_id\":52,\"status\":\"approved\",\"approver_role\":\"admin_assistant\"}', '/student/borrow-equipment', 'high', '2025-09-27 04:14:53', '2025-09-27 03:58:19', '2025-09-27 04:14:53');
 
 -- --------------------------------------------------------
 
@@ -434,6 +460,52 @@ CREATE TABLE `request_approvals` (
 -- --------------------------------------------------------
 
 --
+-- Table structure for table `role_current_holders`
+--
+
+CREATE TABLE `role_current_holders` (
+  `role` enum('dean','admin_assistant') NOT NULL,
+  `user_id` bigint(20) UNSIGNED NOT NULL,
+  `switched_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `role_current_holders`
+--
+
+INSERT INTO `role_current_holders` (`role`, `user_id`, `switched_at`, `created_at`, `updated_at`) VALUES
+('dean', 60, '2025-09-28 02:43:39', '2025-09-28 02:43:39', '2025-09-28 02:43:39'),
+('admin_assistant', 80, '2025-09-28 05:23:25', '2025-09-28 02:43:39', '2025-09-28 05:23:25');
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `role_handover_logs`
+--
+
+CREATE TABLE `role_handover_logs` (
+  `id` bigint(20) UNSIGNED NOT NULL,
+  `role` enum('dean','admin_assistant') NOT NULL,
+  `from_user_id` bigint(20) UNSIGNED DEFAULT NULL,
+  `to_user_id` bigint(20) UNSIGNED NOT NULL,
+  `performed_by` bigint(20) UNSIGNED DEFAULT NULL,
+  `reason` text DEFAULT NULL,
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `role_handover_logs`
+--
+
+INSERT INTO `role_handover_logs` (`id`, `role`, `from_user_id`, `to_user_id`, `performed_by`, `reason`, `created_at`, `updated_at`) VALUES
+(1, 'admin_assistant', 59, 80, 59, NULL, '2025-09-28 05:23:25', '2025-09-28 05:23:25');
+
+-- --------------------------------------------------------
+
+--
 -- Table structure for table `sessions`
 --
 
@@ -451,7 +523,8 @@ CREATE TABLE `sessions` (
 --
 
 INSERT INTO `sessions` (`id`, `user_id`, `ip_address`, `user_agent`, `payload`, `last_activity`) VALUES
-('bMpFkDW7t1O6xYq7IJ1K5oHhwYH45Ei66jiOu3Vr', 69, '127.0.0.1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36', 'YTo0OntzOjY6Il90b2tlbiI7czo0MDoiWU9sTmpxRWhrMkhybXA2Z0d3ZVA5a2hqY1dLZWZuM2tKMEFQZ0V3aCI7czo2OiJfZmxhc2giO2E6Mjp7czozOiJvbGQiO2E6MDp7fXM6MzoibmV3IjthOjA6e319czo5OiJfcHJldmlvdXMiO2E6MTp7czozOiJ1cmwiO3M6NDI6Imh0dHA6Ly8xMjcuMC4wLjE6ODAwMC9sb2dpbj9sb2dvdXQ9c3VjY2VzcyI7fXM6NTA6ImxvZ2luX3dlYl81OWJhMzZhZGRjMmIyZjk0MDE1ODBmMDE0YzdmNThlYTRlMzA5ODlkIjtpOjY5O30=', 1759035466);
+('DezuYuPOF6rFKY5PbLhYFzYthMnOpvWZQD9xvl30', 80, '127.0.0.1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36', 'YTo1OntzOjY6Il90b2tlbiI7czo0MDoieW9VSTUyRzdkR2hSRlBVYzI1dnp4V3JqR3Fnc3F6NnlrS1JBTXhZOCI7czo5OiJfcHJldmlvdXMiO2E6MTp7czozOiJ1cmwiO3M6Mzc6Imh0dHA6Ly8xMjcuMC4wLjE6ODAwMC9hZG1pbi9kYXNoYm9hcmQiO31zOjY6Il9mbGFzaCI7YToyOntzOjM6Im9sZCI7YTowOnt9czozOiJuZXciO2E6MDp7fX1zOjUwOiJsb2dpbl93ZWJfNTliYTM2YWRkYzJiMmY5NDAxNTgwZjAxNGM3ZjU4ZWE0ZTMwOTg5ZCI7aTo4MDtzOjM6InVybCI7YToxOntzOjg6ImludGVuZGVkIjtzOjM3OiJodHRwOi8vMTI3LjAuMC4xOjgwMDAvYWRtaW4vZGFzaGJvYXJkIjt9fQ==', 1759066444),
+('z9oQW2R2zWW18S3aWEOMD7gWI7tOtWHHTEG5Ynij', NULL, '127.0.0.1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36', 'YTozOntzOjY6Il90b2tlbiI7czo0MDoiWlJLZGlnVXRxbGF6Sk45Um1mdVN3MEIzTDlHQWlST3BUVzNwWjJkWSI7czo2OiJfZmxhc2giO2E6Mjp7czozOiJvbGQiO2E6MDp7fXM6MzoibmV3IjthOjA6e319czo5OiJfcHJldmlvdXMiO2E6MTp7czozOiJ1cmwiO3M6NDI6Imh0dHA6Ly8xMjcuMC4wLjE6ODAwMC9sb2dpbj9sb2dvdXQ9c3VjY2VzcyI7fX0=', 1759067343);
 
 -- --------------------------------------------------------
 
@@ -486,9 +559,10 @@ CREATE TABLE `users` (
 --
 
 INSERT INTO `users` (`id`, `first_name`, `middle_name`, `last_name`, `email`, `email_verified_at`, `password`, `remember_token`, `created_at`, `updated_at`, `role`, `profile_picture`, `school_id_number`, `date_of_birth`, `address`, `city`, `province`, `region`, `contact_number`) VALUES
-(59, 'Admin', 'User', 'Assistant', 'admin@example.com', '2025-08-03 05:21:41', '$2y$12$LFD4leE6mimXj6mYyzLEduS1ab6aHsKFuZckp55hcHY5PWTVLyY2O', '7QfBXRzkMrfqh5l8FGGoZI7zdrB3LYQa1KqvsDg7bD1miyImIo0Zulnj1ZVW', '2025-08-03 05:21:41', '2025-09-28 04:54:41', 'admin_assistant', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL),
-(60, 'Dean', 'User', 'User', 'dean@example.com', '2025-08-03 05:22:49', '$2y$12$6hmAl4SM3Ggw5L1IULgjAe9PtoTitJUzxmDIic9R.Q2ntf/FvKr8q', 'oUbU8LNKTNty7Sdj2z6OSBQvfLQLEGa9SIWInHhOYC5u8K28jvOMZ5jElx4q', '2025-08-03 05:22:49', '2025-09-28 04:52:25', 'dean', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL),
-(69, 'Stephen Craine', 'Jimenez', 'Nailes', 'stephencraine24@gmail.com', '2025-09-08 08:49:41', '$2y$12$IPY/xRmAgsVQ491WvMP.0exv0IpKfDFLFZ7B0M7ilMuLHRZ74sKu6', NULL, '2025-09-08 08:49:15', '2025-09-25 06:49:02', 'student', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL);
+(59, 'Admin', 'User', 'Assistant', 'admin@example.com', '2025-08-03 05:21:41', '$2y$12$LFD4leE6mimXj6mYyzLEduS1ab6aHsKFuZckp55hcHY5PWTVLyY2O', 'dmDpbMrmDETaZj1Djt2YiygNV6srlbaVE3migHWhSWE45Q8XVGGbdtwPMekj', '2025-08-03 05:21:41', '2025-09-28 13:49:03', 'admin_assistant', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL),
+(60, 'Dean', 'User', 'User', 'dean@example.com', '2025-08-03 05:22:49', '$2y$12$6hmAl4SM3Ggw5L1IULgjAe9PtoTitJUzxmDIic9R.Q2ntf/FvKr8q', 'ibkkNr7jCAju738EP8PlXQoGanWgsniedm8uJTnE0Mta9Wj4gp8X6TO1hNrr', '2025-08-03 05:22:49', '2025-09-28 09:12:20', 'dean', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL),
+(69, 'Stephen Craine', 'Jimenez', 'Nailes', 'stephencraine24@gmail.com', '2025-09-08 08:49:41', '$2y$12$IPY/xRmAgsVQ491WvMP.0exv0IpKfDFLFZ7B0M7ilMuLHRZ74sKu6', NULL, '2025-09-08 08:49:15', '2025-09-25 06:49:02', 'student', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL),
+(80, 'stephen test', 'jimenez', 'nailes', 'stephencraine245666@gmail.com', '2025-09-28 05:34:02', '$2y$12$vR9cXqifQUXzwRtNEfvFyun8RzDZTZPoulnY8lwkqmkG/hbczfLcu', NULL, '2025-09-28 05:23:25', '2025-09-28 05:34:02', 'admin_assistant', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL);
 
 --
 -- Indexes for dumped tables
@@ -576,6 +650,16 @@ ALTER TABLE `failed_jobs`
   ADD UNIQUE KEY `failed_jobs_uuid_unique` (`uuid`);
 
 --
+-- Indexes for table `invitation_tokens`
+--
+ALTER TABLE `invitation_tokens`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `invitation_tokens_token_unique` (`token`),
+  ADD KEY `invitation_tokens_invited_by_foreign` (`invited_by`),
+  ADD KEY `invitation_tokens_token_expires_at_index` (`token`,`expires_at`),
+  ADD KEY `invitation_tokens_email_role_index` (`email`,`role`);
+
+--
 -- Indexes for table `jobs`
 --
 ALTER TABLE `jobs`
@@ -634,6 +718,23 @@ ALTER TABLE `request_approvals`
   ADD KEY `fk_request_approvals_approver` (`approver_id`);
 
 --
+-- Indexes for table `role_current_holders`
+--
+ALTER TABLE `role_current_holders`
+  ADD PRIMARY KEY (`role`),
+  ADD KEY `role_current_holders_user_id_index` (`user_id`);
+
+--
+-- Indexes for table `role_handover_logs`
+--
+ALTER TABLE `role_handover_logs`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `role_handover_logs_from_user_id_foreign` (`from_user_id`),
+  ADD KEY `role_handover_logs_to_user_id_foreign` (`to_user_id`),
+  ADD KEY `role_handover_logs_performed_by_foreign` (`performed_by`),
+  ADD KEY `role_handover_logs_role_created_at_index` (`role`,`created_at`);
+
+--
 -- Indexes for table `sessions`
 --
 ALTER TABLE `sessions`
@@ -682,13 +783,13 @@ ALTER TABLE `comments`
 -- AUTO_INCREMENT for table `equipment_requests`
 --
 ALTER TABLE `equipment_requests`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=53;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=55;
 
 --
 -- AUTO_INCREMENT for table `equipment_request_items`
 --
 ALTER TABLE `equipment_request_items`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=69;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=71;
 
 --
 -- AUTO_INCREMENT for table `events`
@@ -701,6 +802,12 @@ ALTER TABLE `events`
 --
 ALTER TABLE `failed_jobs`
   MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `invitation_tokens`
+--
+ALTER TABLE `invitation_tokens`
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
 
 --
 -- AUTO_INCREMENT for table `jobs`
@@ -718,13 +825,13 @@ ALTER TABLE `likes`
 -- AUTO_INCREMENT for table `migrations`
 --
 ALTER TABLE `migrations`
-  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=19;
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=23;
 
 --
 -- AUTO_INCREMENT for table `notifications`
 --
 ALTER TABLE `notifications`
-  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=65;
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=69;
 
 --
 -- AUTO_INCREMENT for table `post_images`
@@ -736,13 +843,19 @@ ALTER TABLE `post_images`
 -- AUTO_INCREMENT for table `request_approvals`
 --
 ALTER TABLE `request_approvals`
-  MODIFY `id` bigint(20) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=52;
+  MODIFY `id` bigint(20) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=54;
+
+--
+-- AUTO_INCREMENT for table `role_handover_logs`
+--
+ALTER TABLE `role_handover_logs`
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
 
 --
 -- AUTO_INCREMENT for table `users`
 --
 ALTER TABLE `users`
-  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=80;
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=81;
 
 --
 -- Constraints for dumped tables
@@ -794,6 +907,12 @@ ALTER TABLE `events`
   ADD CONSTRAINT `events_user_id_foreign` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE SET NULL;
 
 --
+-- Constraints for table `invitation_tokens`
+--
+ALTER TABLE `invitation_tokens`
+  ADD CONSTRAINT `invitation_tokens_invited_by_foreign` FOREIGN KEY (`invited_by`) REFERENCES `users` (`id`) ON DELETE CASCADE;
+
+--
 -- Constraints for table `likes`
 --
 ALTER TABLE `likes`
@@ -810,6 +929,20 @@ ALTER TABLE `notifications`
 --
 ALTER TABLE `request_approvals`
   ADD CONSTRAINT `fk_request_approvals_approver` FOREIGN KEY (`approver_id`) REFERENCES `users` (`id`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+--
+-- Constraints for table `role_current_holders`
+--
+ALTER TABLE `role_current_holders`
+  ADD CONSTRAINT `role_current_holders_user_id_foreign` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE;
+
+--
+-- Constraints for table `role_handover_logs`
+--
+ALTER TABLE `role_handover_logs`
+  ADD CONSTRAINT `role_handover_logs_from_user_id_foreign` FOREIGN KEY (`from_user_id`) REFERENCES `users` (`id`) ON DELETE SET NULL,
+  ADD CONSTRAINT `role_handover_logs_performed_by_foreign` FOREIGN KEY (`performed_by`) REFERENCES `users` (`id`) ON DELETE SET NULL,
+  ADD CONSTRAINT `role_handover_logs_to_user_id_foreign` FOREIGN KEY (`to_user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE;
 COMMIT;
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;

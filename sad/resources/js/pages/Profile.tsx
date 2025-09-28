@@ -2,7 +2,7 @@ import MainLayout from '@/layouts/mainlayout';
 import { usePage, router } from '@inertiajs/react';
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { toast } from 'react-toastify';
+// import { toast } from 'react-toastify';
 import {
   User2,
   Mail,
@@ -16,14 +16,18 @@ import {
   Pencil,
   Save,
   X,
-  ChevronDown,
   Camera,
-  Trash2
+  Trash2,
+  UserCheck,
+  ArrowRightLeft
 } from 'lucide-react';
 
+import type { PageProps, User as AppUser } from '@/types';
+
 export default function Profile() {
-  const { auth } = usePage().props as any;
-  const user = auth?.user ?? {};
+  const pageProps = usePage<PageProps>().props;
+  const authUser = pageProps.auth?.user as unknown as AppUser | undefined;
+  const user: Partial<AppUser> = authUser ?? {};
   const csrfToken = (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement | null)?.content || '';
 
   // Form states 
@@ -45,6 +49,14 @@ export default function Profile() {
   const [passwordError, setPasswordError] = useState('');
   const [profilePictureError, setProfilePictureError] = useState('');
   const [nameError, setNameError] = useState('');
+  
+  // Handover navigation state
+  const [handoverLoading, setHandoverLoading] = useState(false);
+
+  // Helper functions
+  const isHandoverEligible = () => {
+    return user.role === 'admin_assistant' || user.role === 'dean';
+  };
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -154,8 +166,9 @@ export default function Profile() {
     router.post('/profile/update-picture', formData, {
       preserveScroll: true,
       preserveState: false, // Allow state refresh to get updated user data
-      onSuccess: (page: any) => {
-        const updatedPic = (page?.props as any)?.auth?.user?.profile_picture ?? null;
+      onSuccess: (page) => {
+        type PropsWithProfile = PageProps & { auth: { user?: { profile_picture?: string | null } } };
+        const updatedPic = ((page as unknown) as { props: PropsWithProfile })?.props?.auth?.user?.profile_picture ?? null;
         setProfilePicture(updatedPic);
         if (profilePicturePreview) URL.revokeObjectURL(profilePicturePreview);
         setProfilePicturePreview(null);
@@ -187,19 +200,37 @@ export default function Profile() {
       URL.revokeObjectURL(profilePicturePreview);
       setProfilePicturePreview(null);
     }
-    router.delete('/profile/remove-picture', {
-      data: { _token: csrfToken },
+    // Use POST + method spoofing with FormData to ensure Laravel reads _method and CSRF
+    const fd = new FormData();
+    fd.append('_method', 'delete');
+    if (csrfToken) fd.append('_token', csrfToken);
+
+    router.post('/profile/remove-picture', fd, {
+      headers: {
+        'X-CSRF-TOKEN': csrfToken,
+        'X-Requested-With': 'XMLHttpRequest',
+      },
       preserveScroll: true,
       preserveState: false,
       onSuccess: () => {
         setProfilePicture(null);
         // Flash message will be handled by FlashToaster component
       },
-      onError: (errors: any) => {
+      onError: (errors) => {
         console.error('Profile picture removal errors:', errors);
-        const errorMessage = (errors as any).profile_picture || (errors as any).message || 'Failed to remove profile picture.';
+        const e = errors as Record<string, string>;
+        const errorMessage = e.profile_picture || e.message || 'Failed to remove profile picture.';
         setProfilePictureError(errorMessage);
-      }
+      },
+    });
+  };
+
+  // Handover handler: navigate to dedicated page
+  const navigateToHandoverPage = () => {
+    if (!isHandoverEligible()) return;
+    setHandoverLoading(true);
+    router.visit('/admin/handover/register', {
+      onFinish: () => setHandoverLoading(false),
     });
   };
 
@@ -417,7 +448,7 @@ export default function Profile() {
                       <Calendar className="text-[#e6232a]/80 w-5 h-5 flex-shrink-0" />
                       <div className="flex flex-col">
                         <span className="font-semibold text-gray-700 text-sm">Date of Birth</span>
-                        <span className="text-gray-900">{user.date_of_birth || '-'}</span>
+                        <span className="text-gray-900">{(user.date_of_birth as string | undefined) || '-'}</span>
                       </div>
                     </div>
                   </div>
@@ -428,7 +459,7 @@ export default function Profile() {
                       <Landmark className="text-[#e6232a]/80 w-5 h-5 flex-shrink-0" />
                       <div className="flex flex-col">
                         <span className="font-semibold text-gray-700 text-sm">School ID</span>
-                        <span className="text-gray-900">{user.school_id_number || '-'}</span>
+                        <span className="text-gray-900">{(user.school_id_number as string | undefined) || '-'}</span>
                       </div>
                     </div>
                   )}
@@ -473,7 +504,7 @@ export default function Profile() {
                           <button
                             type="button"
                             className="text-gray-500 hover:text-gray-700 transition-colors"
-                            onClick={() => { setEditingEmail(false); setEmail(user.email); setEmailError(''); }}
+                            onClick={() => { setEditingEmail(false); setEmail(user.email || ''); setEmailError(''); }}
                           >
                             <X className="w-4 h-4" />
                           </button>
@@ -482,6 +513,32 @@ export default function Profile() {
                       {emailError && <div className="text-red-500 text-xs mt-1">{emailError}</div>}
                     </div>
                   </div>
+
+                  {/* Role Handover Section - Only for admin_assistant and dean */}
+                  {isHandoverEligible() && (
+                    <div className="flex items-start gap-4 pt-4 border-t border-gray-100">
+                      <ArrowRightLeft className="text-[#e6232a]/80 w-5 h-5 flex-shrink-0 mt-1" />
+                      <div className="flex flex-col flex-grow">
+                        <span className="font-semibold text-gray-900 text-sm">Role Management</span>
+                        <span className="text-gray-900 text-sm mt-1">
+                          Current {user.role === 'admin_assistant' ? 'Admin Assistant' : 'Dean'}
+                        </span>
+                        <motion.button
+                          whileHover={{ scale: 1.02 }}
+                          whileTap={{ scale: 0.98 }}
+                          className="mt-2 bg-[#e6232a] hover:bg-[#d01e24] text-white px-3 py-2 rounded-lg inline-flex items-center gap-2 text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed w-fit"
+                          onClick={navigateToHandoverPage}
+                          disabled={handoverLoading}
+                        >
+                          <UserCheck className="w-4 h-4" />
+                          {handoverLoading ? 'Loading...' : `Hand Over ${user.role === 'admin_assistant' ? 'Admin Assistant' : 'Dean'} Role`}
+                        </motion.button>
+                        <p className="text-xs text-gray-500 mt-2">
+                          Transfer your {user.role === 'admin_assistant' ? 'admin assistant' : 'dean'} responsibilities to a newly registered user
+                        </p>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -560,7 +617,7 @@ export default function Profile() {
                     <MapPin className="text-[#e6232a]/80 w-5 h-5 flex-shrink-0" />
                     <div className="flex flex-col">
                       <span className="font-semibold text-gray-700 text-sm">Address</span>
-                      <span className="text-gray-900">{user.address || '-'}</span>
+                      <span className="text-gray-900">{(user.address as string | undefined) || '-'}</span>
                     </div>
                   </div>
 
@@ -569,7 +626,7 @@ export default function Profile() {
                     <Building2 className="text-[#e6232a]/80 w-5 h-5 flex-shrink-0" />
                     <div className="flex flex-col">
                       <span className="font-semibold text-gray-700 text-sm">City</span>
-                      <span className="text-gray-900">{user.city || '-'}</span>
+                      <span className="text-gray-900">{(user.city as string | undefined) || '-'}</span>
                     </div>
                   </div>
 
@@ -578,7 +635,7 @@ export default function Profile() {
                     <Locate className="text-[#e6232a]/80 w-5 h-5 flex-shrink-0" />
                     <div className="flex flex-col">
                       <span className="font-semibold text-gray-700 text-sm">Province</span>
-                      <span className="text-gray-900">{user.province || '-'}</span>
+                      <span className="text-gray-900">{(user.province as string | undefined) || '-'}</span>
                     </div>
                   </div>
 
@@ -587,7 +644,7 @@ export default function Profile() {
                     <Landmark className="text-[#e6232a]/80 w-5 h-5 flex-shrink-0" />
                     <div className="flex flex-col">
                       <span className="font-semibold text-gray-700 text-sm">Region</span>
-                      <span className="text-gray-900">{user.region || '-'}</span>
+                      <span className="text-gray-900">{(user.region as string | undefined) || '-'}</span>
                     </div>
                   </div>
 
@@ -596,7 +653,7 @@ export default function Profile() {
                     <Phone className="text-[#e6232a]/80 w-5 h-5 flex-shrink-0" />
                     <div className="flex flex-col">
                       <span className="font-semibold text-gray-700 text-sm">Contact Number</span>
-                      <span className="text-gray-900">{user.contact_number || '-'}</span>
+                      <span className="text-gray-900">{(user.contact_number as string | undefined) || '-'}</span>
                     </div>
                   </div>
                 </div>
@@ -604,6 +661,8 @@ export default function Profile() {
             </div>
           </div>
         </div>
+
+        {/* Handover modal removed in favor of dedicated page */}
     </MainLayout>
   );
 }

@@ -42,6 +42,13 @@ class AuthenticatedSessionController extends Controller
                 return redirect()->route('student.dashboard');
             case 'dean':
                 return redirect()->route('dean.dashboard');
+            case 'inactive_admin_assistant':
+            case 'inactive_dean':
+                // Inactive roles: logout and show message
+                Auth::logout();
+                return redirect()->route('login')->withErrors([
+                    'role' => 'Your administrative access has been revoked. Please contact the current administrator for assistance.',
+                ]);
             default:
                 // 🚨 Fallback: logout and return with error
                 Auth::logout();

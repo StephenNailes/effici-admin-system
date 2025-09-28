@@ -4,9 +4,9 @@
 
 This is a **Laravel-Inertia.js-React-TypeScript** application for an educational facility management system. The stack includes:
 - **Backend**: Laravel 12 (PHP 8.2+) with SQLite database
-- **Frontend**: React + TypeScript with Inertia.js for SPA behavior
-- **Styling**: TailwindCSS with Framer Motion animations
-- **Build Tools**: Vite with Laravel integration
+- **Frontend**: React 19 + TypeScript with Inertia.js for SPA behavior
+- **Styling**: TailwindCSS v4 with Framer Motion animations
+- **Build Tools**: Vite 7 with Laravel integration (SSR prepared)
 
 ### Key Directory Structure
 ```
@@ -27,7 +27,20 @@ sad/                           # Main application directory
 - **Admin Assistants**: Initial review and approval
 - **Deans**: Final approval authority
 
-Core entities: `User`, `ActivityPlan`, `EquipmentRequest`, `RequestApproval`
+Core entities (from current schema/models):
+- Requests & approvals: `ActivityPlan`, `EquipmentRequest`, `RequestApproval`, `EquipmentRequestItem`
+- Inventory: `Equipment`, `EquipmentCategory`
+- Users & communication: `User`, `Notification`
+- Social/content: `Announcement`, `Event`, `Comment` (polymorphic), `Like` (polymorphic), `PostImage` (polymorphic images)
+
+Status enums used in DB:
+- `ActivityPlan.status`: `pending`, `under_revision`, `approved`, `completed`
+- `EquipmentRequest.status`: `pending`, `under_revision`, `approved`, `completed`, `denied`, `cancelled`, `checked_out`, `returned`, `overdue`
+- `RequestApproval.status`: `pending`, `approved`, `revision_requested`
+
+RequestApproval scope:
+- `request_type`: `equipment` | `activity_plan`
+- `approver_role`: `admin_assistant` | `dean`
 
 ## Development Patterns
 
@@ -36,6 +49,9 @@ Core entities: `User`, `ActivityPlan`, `EquipmentRequest`, `RequestApproval`
 - **Shared data**: Global props set in `HandleInertiaRequests` middleware
 - **Page routing**: React pages in `resources/js/pages/` auto-resolved by filename
 - **Forms**: Use Inertia forms with `useForm()` hook, not Fetch API
+
+SSR:
+- SSR entry is configured (`resources/js/ssr.tsx`) and Vite SSR build is wired. Use only if needed; most flows are CSR.
 
 ### React/TypeScript Conventions
 - **File naming**: PascalCase for components (`ActivityHistory.tsx`)
@@ -47,8 +63,19 @@ Core entities: `User`, `ActivityPlan`, `EquipmentRequest`, `RequestApproval`
 ### Database & Models
 - **Complex queries**: Use Query Builder in controllers (see `ApprovalController`)
 - **Role-based data**: Filter by user role in controllers, not middleware
-- **Status normalization**: Transform `under_revision` → `"Under Revision"` in frontend
-- **Relationships**: Models use standard Laravel conventions but queries often use joins for performance
+- **Status normalization**: Map enum values to human labels in the UI (examples):
+	- `under_revision` → "Under Revision"
+	- `checked_out` → "Checked Out"
+	- `returned` → "Returned"
+	- `overdue` → "Overdue"
+	- `cancelled` → "Cancelled"
+	- `denied` → "Denied"
+- **Relationships**:
+	- Polymorphic: `Comment`, `Like`, and `PostImage` attach to `Announcement` and `Event` via morphs
+	- Approvals: `RequestApproval` targets either `EquipmentRequest` or `ActivityPlan` by `(request_type, request_id)` and tracks `approver_role`
+- **Schema notes**:
+	- IDs: Most tables use `bigIncrements`, but `equipment_requests` and `equipment_request_items` use `increments` (int). Be careful with joins/casts.
+	- The `equipment` table includes `category_id`, `is_consumable`, `total_quantity`, `is_active`. The current `Equipment` model does not expose all these fields for mass-assignment and mentions `available_quantity` which isn't in the migration.
 
 ### State Management
 - **No global state library**: Use React state + Inertia shared data
@@ -69,6 +96,10 @@ npm run dev          # Frontend dev server
 php artisan serve    # Backend server (port 8000)
 ```
 
+Convenience scripts:
+- `composer run dev` starts PHP server, queue listener, and Vite together (uses `concurrently`).
+- `composer run dev:ssr` adds SSR server (`php artisan inertia:start-ssr`) alongside.
+
 ### Common Tasks
 - **New page**: Create in `resources/js/pages/` + add route in `web.php`
 - **New model**: Use `php artisan make:model` + migration
@@ -86,18 +117,19 @@ php artisan serve    # Backend server (port 8000)
 ### File Uploads
 - **Storage**: `public/storage` symlink for user uploads
 - **Profile pictures**: Handled via `ProfileController` with validation
-- **Activity files**: Associated with activity plans via `ActivityPlanFile` model
+- **Activity files**: Associated with activity plans via `ActivityPlanFile`
+- **Post images**: Use `PostImage` polymorphic model for `Announcement` and `Event` images. Files are deleted when the image model is deleted.
 
 ### Email System
-- **Provider**: Mailtrap for testing (see `config/mail.php`)
-- **Templates**: Laravel notification classes
-- **Verification**: Built-in Laravel email verification flow
+- **Default**: `log` mailer in development (emails are written to logs)
+- **Providers configured**: SES, Postmark, Resend (see `config/mail.php` and `config/services.php`). Slack notifications config present.
+- **Verification**: Built-in Laravel email verification flow (user model implements `MustVerifyEmail`).
 
 ### Authentication
-- **System**: Laravel Breeze with Inertia
+- **System**: Laravel authentication with Inertia pages (email verification enabled)
 - **Roles**: String-based (`student`, `admin_assistant`, `dean`)  
-- **Middleware**: Standard Laravel auth, role checking in controllers
-- **Registration**: Custom fields added to default Laravel registration
+- **Middleware**: Standard Laravel auth; role checks are enforced in controllers (not middleware)
+- **Registration**: Custom profile fields stored on `users` (name parts, contact, address, school ID)
 
 ## Performance Notes
 
@@ -114,3 +146,8 @@ php artisan serve    # Backend server (port 8000)
 4. **Keep TypeScript strict** - don't use `any` types
 5. **Test role switching** when modifying approval workflows
 6. **Preserve the red color theme** in UI changes
+
+Additional guidance tied to current schema:
+- Normalize and display request statuses using the enums above; avoid introducing new ad-hoc status strings.
+- When implementing approvals, create/read `RequestApproval` records keyed by `(request_type, request_id)` and advance per `approver_role`.
+- Use polymorphic helpers for comments/likes/images to keep the content feed consistent between announcements and events.
