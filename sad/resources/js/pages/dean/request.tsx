@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import MainLayout from '@/layouts/mainlayout';
-import { Search, Filter, Eye, FileText, Clock, CheckCircle, Edit, ChevronDown, Check, Minus } from 'lucide-react';
+import { Search, Filter, Eye, FileText, Clock, CheckCircle, Edit, ChevronDown, Check, Minus, Inbox } from 'lucide-react';
 import BatchApprovalModal from '@/components/BatchApprovalModal';
 import { router } from '@inertiajs/react';
 import { formatDateShort, formatTime12h } from '@/lib/utils';
@@ -30,6 +30,8 @@ export default function Request() {
   const [priorityFilter, setPriorityFilter] = useState('All');
   const [selectedApprovals, setSelectedApprovals] = useState<number[]>([]);
   const [batchApprovalModalOpen, setBatchApprovalModalOpen] = useState(false);
+  const PAGE_SIZE = 8;
+  const [currentPage, setCurrentPage] = useState(1);
 
   // Fetch dean requests on component mount
   useEffect(() => {
@@ -154,6 +156,12 @@ export default function Request() {
     approved: filteredRequests.filter((r: RequestData) => r.approval_status === 'approved').length,
     underRevision: filteredRequests.filter((r: RequestData) => r.approval_status === 'revision_requested').length
   };
+
+  // Pagination
+  const totalPages = Math.ceil(filteredRequests.length / PAGE_SIZE);
+  const paginated = filteredRequests.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+  useEffect(() => { setCurrentPage(1); }, [searchTerm, statusFilter, priorityFilter]);
+  useEffect(() => { if (currentPage > totalPages && totalPages > 0) setCurrentPage(totalPages); }, [totalPages, currentPage]);
 
   const getStatusBadgeColor = (status: string) => {
     switch (status) {
@@ -349,114 +357,118 @@ export default function Request() {
           </div>
         )}
 
-        {/* Table */}
-        <div className="bg-white rounded-lg shadow-sm overflow-hidden">
-          <div className="overflow-x-auto">
+        {/* Table (unified layout) */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-100 flex flex-col" style={{ minHeight: 590 }}>
+          <div className="flex-1">
             <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-16">
+              <thead className="bg-gray-50/80 backdrop-blur sticky top-0 z-10">
+                <tr className="text-left">
+                  <th className="px-6 py-3 text-[11px] font-semibold tracking-wider text-gray-600 uppercase w-16">
                     <input
                       type="checkbox"
-                      checked={selectedApprovals.length > 0 && selectedApprovals.length === filteredRequests.filter(req => req.approval_status === 'pending').length}
+                      checked={selectedApprovals.length > 0 && selectedApprovals.length === paginated.filter(req => req.approval_status === 'pending').length}
                       onChange={(e) => handleSelectAll(e.target.checked)}
                       className="rounded border-gray-300 text-red-600 focus:ring-red-500"
                     />
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Submitted by
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Activity Plan
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Date & Time
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Priority
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Status
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Actions
-                  </th>
+                  {['Submitted by','Activity Plan','Date & Time','Priority','Status','Actions'].map(h => (
+                    <th key={h} className="px-6 py-3 text-[11px] font-semibold tracking-wider text-gray-600 uppercase whitespace-nowrap">{h}</th>
+                  ))}
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {loading ? (
-                  <tr>
-                    <td colSpan={7} className="px-6 py-8 text-center">
-                      <div className="text-gray-500">
-                        <Clock className="w-8 h-8 mx-auto text-gray-300 mb-4 animate-spin" />
-                        <p className="text-sm">Loading requests...</p>
-                      </div>
-                    </td>
-                  </tr>
-                ) : filteredRequests.length > 0 ? (
-                  filteredRequests.map((request) => (
-                    <tr key={request.approval_id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <input
-                          type="checkbox"
-                          checked={selectedApprovals.includes(request.approval_id)}
-                          onChange={(e) => handleSelectIndividual(request.approval_id, e.target.checked)}
-                          disabled={request.approval_status !== 'pending'}
-                          className="rounded border-gray-300 text-red-600 focus:ring-red-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                        />
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-black">
-                          {request.student_name || 'Unknown Student'}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-black">{request.activity_name || 'Activity Plan'}</div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-black">
-                          {request.submitted_at ? (
-                            <>
-                            <div>{formatDateShort(request.submitted_at)}</div>
-                            <div className="text-gray-500 text-xs">{formatTime12h(request.submitted_at)}</div>
-                            </>
-                          ) : 'N/A'}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className={`text-sm font-medium ${getPriorityColor(request.priority)}`}>
-                          {getDisplayPriority(request.priority)}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusBadgeColor(request.approval_status)}`}>
-                          {getDisplayStatus(request.approval_status)}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <button 
-                          onClick={() => router.visit(`/dean/activity-plan-approval/${request.approval_id}`)}
-                          className="inline-flex items-center px-3 py-1 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                        >
-                          <Eye className="w-5 h-5 mr-1" />
-                          View
-                        </button>
-                      </td>
+              <tbody className="bg-white divide-y divide-gray-100">
+                {loading && (
+                  [...Array(PAGE_SIZE)].map((_, i) => (
+                    <tr key={i} className="animate-pulse">
+                      <td className="px-6 py-4"><div className="h-4 w-4 bg-gray-200 rounded" /></td>
+                      {Array.from({length:6}).map((__, c) => (
+                        <td key={c} className="px-6 py-4"><div className="h-4 bg-gray-200 rounded w-24" /></td>
+                      ))}
                     </tr>
                   ))
-                ) : (
+                )}
+                {!loading && paginated.length > 0 && paginated.map(request => (
+                  <tr key={request.approval_id} className="hover:bg-red-50/60 transition-colors">
+                    <td className="px-6 py-4">
+                      <input
+                        type="checkbox"
+                        checked={selectedApprovals.includes(request.approval_id)}
+                        onChange={(e) => handleSelectIndividual(request.approval_id, e.target.checked)}
+                        disabled={request.approval_status !== 'pending'}
+                        className="rounded border-gray-300 text-red-600 focus:ring-red-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                      />
+                    </td>
+                    <td className="px-6 py-4 text-sm font-medium text-gray-900 whitespace-nowrap">{request.student_name || 'Unknown Student'}</td>
+                    <td className="px-6 py-4 text-sm text-gray-700 whitespace-nowrap">{request.activity_name || 'Activity Plan'}</td>
+                    <td className="px-6 py-4 text-sm text-gray-900 whitespace-nowrap">
+                      {request.submitted_at ? (
+                        <div className="flex flex-col">
+                          <span>{formatDateShort(request.submitted_at)}</span>
+                          <span className="text-xs text-gray-500">{formatTime12h(request.submitted_at)}</span>
+                        </div>
+                      ) : 'N/A'}
+                    </td>
+                    <td className="px-6 py-4 text-sm font-semibold whitespace-nowrap ${getPriorityColor(request.priority)}">
+                      {getDisplayPriority(request.priority)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`px-2 inline-flex items-center gap-1 text-xs leading-5 font-semibold rounded-full ${getStatusBadgeColor(request.approval_status)}`}>
+                        {getDisplayStatus(request.approval_status)}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <button
+                        onClick={() => router.visit(`/dean/activity-plan-approval/${request.approval_id}`)}
+                        className="inline-flex items-center gap-1 px-3 py-1.5 rounded-md text-xs font-medium bg-blue-50 text-blue-600 hover:bg-blue-100 transition"
+                      >
+                        <Eye className="w-4 h-4" /> View
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+                {!loading && paginated.length === 0 && (
                   <tr>
-                    <td colSpan={7} className="px-6 py-8 text-center">
-                      <div className="text-gray-500">
-                        <FileText className="w-12 h-12 mx-auto text-gray-300 mb-4" />
-                        <p className="text-lg font-medium mb-2">No activity plans found</p>
-                        <p className="text-sm">No activity plans require dean approval at this time</p>
+                    <td colSpan={7} className="p-0">
+                      <div className="flex flex-col items-center justify-center text-center gap-3 text-gray-500" style={{height: '420px'}}>
+                        <Inbox className="w-12 h-12 text-gray-300" />
+                        <p className="text-sm font-medium">No activity plans match the current filters.</p>
+                        <button
+                          onClick={() => { setStatusFilter('All'); setPriorityFilter('All'); setSearchTerm(''); }}
+                          className="text-xs text-red-600 hover:underline"
+                        >
+                          Clear filters & search
+                        </button>
                       </div>
                     </td>
                   </tr>
                 )}
               </tbody>
             </table>
+          </div>
+          {/* Pagination */}
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 px-6 py-3 border-t border-gray-100 bg-white">
+            <div className="text-[11px] text-gray-500 order-2 sm:order-1 tracking-wide">
+              {filteredRequests.length > 0 && !loading && (
+                <>Showing <span className="font-medium text-gray-700">{(currentPage - 1) * PAGE_SIZE + 1}</span>–<span className="font-medium text-gray-700">{Math.min(currentPage * PAGE_SIZE, filteredRequests.length)}</span> of <span className="font-medium text-gray-700">{filteredRequests.length}</span></>
+              )}
+              {filteredRequests.length === 0 && !loading && 'No results'}
+              {loading && 'Loading...'}
+            </div>
+            <div className="flex items-center gap-1 order-1 sm:order-2">
+              <button
+                className="h-8 px-3 rounded-md text-xs font-medium bg-gray-50 text-gray-600 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed"
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+              >Prev</button>
+              <div className="h-8 px-3 flex items-center rounded-md text-xs font-semibold text-gray-700 bg-gray-50">
+                {totalPages === 0 ? 1 : currentPage} / {totalPages || 1}
+              </div>
+              <button
+                className="h-8 px-3 rounded-md text-xs font-medium bg-gray-50 text-gray-600 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed"
+                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages || totalPages === 0}
+              >Next</button>
+            </div>
           </div>
         </div>
 

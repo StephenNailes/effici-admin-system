@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import MainLayout from "@/layouts/mainlayout";
-import { Search, Filter, Eye, FileText, Clock, CheckCircle, Edit, Check, Minus } from "lucide-react";
+import { Search, Filter, Eye, FileText, Clock, CheckCircle, Edit, Check, Minus, Inbox, Loader2 } from "lucide-react";
 import EquipmentModal from "@/components/EquipmentModal";
 import FilterModal from "@/components/FilterModal";
 import StockConflictModal from "@/components/StockConflictModal";
@@ -46,6 +46,7 @@ export default function Request() {
     underRevision: 0,
   });
   const [requests, setRequests] = useState<RequestItem[]>([]);
+  const [requestsLoading, setRequestsLoading] = useState<boolean>(false);
   const [selected, setSelected] = useState<RequestItem | null>(null);
   const [equipment, setEquipment] = useState<EquipmentItem[]>([]);
   const [equipmentLoading, setEquipmentLoading] = useState(true);
@@ -58,6 +59,7 @@ export default function Request() {
   const [batchApprovalModalOpen, setBatchApprovalModalOpen] = useState(false);
 
   const fetchRequests = () => {
+    setRequestsLoading(true);
     fetch(`/api/approvals?role=admin_assistant`, {
       method: 'GET',
       headers: {
@@ -71,12 +73,14 @@ export default function Request() {
         setStats(
           data.stats || { total: 0, pending: 0, approved: 0, underRevision: 0 }
         );
+        setRequestsLoading(false);
       })
       .catch((err) => {
         console.error("Error fetching requests:", err);
         // Fallback to empty state if API fails
         setRequests([]);
         setStats({ total: 0, pending: 0, approved: 0, underRevision: 0 });
+        setRequestsLoading(false);
       });
   };
 
@@ -290,18 +294,14 @@ export default function Request() {
     }
   };
 
-  // Enhanced filtering logic for search - Show both equipment and activity plan requests
+  // Enhanced filtering logic for search - show equipment & activity plan requests but HIDE approved ones (reverted per request)
   const filteredRequests = requests
     .filter((r) => {
-      // Show both equipment and activity plan requests
       const requestType = r.request_type?.toLowerCase();
-      
-      // Show pending equipment requests and all activity plan requests
-      if (requestType === "equipment" && r.approval_status?.toLowerCase() === "approved") {
-        return false; // Hide approved equipment requests as they're already processed
-      }
-      
-      return requestType === "equipment" || requestType === "activity" || requestType === "activity_plan";
+      if (!(requestType === "equipment" || requestType === "activity" || requestType === "activity_plan")) return false;
+      // Exclude anything already approved so the table focuses on actionable items
+      if (r.approval_status?.toLowerCase() === 'approved') return false;
+      return true;
     })
     .filter((r) => {
       const term = searchTerm.toLowerCase();
@@ -351,6 +351,13 @@ export default function Request() {
     (currentPage - 1) * PAGE_SIZE,
     currentPage * PAGE_SIZE
   );
+
+  // Adjust current page if filtering reduces total pages
+  useEffect(() => {
+    if (currentPage > totalPages && totalPages > 0) {
+      setCurrentPage(totalPages);
+    }
+  }, [totalPages, currentPage]);
 
   // Reset to first page when filters/search change
   useEffect(() => {
@@ -496,11 +503,12 @@ export default function Request() {
         )}
 
         {/* request Table */}
-        <div className="bg-white rounded-lg shadow-sm overflow-hidden" style={{ minHeight: 520, maxHeight: 520 }}>
+        <div className="bg-white rounded-lg shadow-sm border border-gray-100 flex flex-col" style={{ minHeight: 590 }}>
+          <div className="flex-1">
           <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-black uppercase w-16">
+            <thead className="bg-gray-50/80 backdrop-blur sticky top-0 z-10">
+              <tr className="text-left">
+                <th className="px-6 py-3 text-[11px] font-semibold tracking-wider text-gray-600 uppercase w-16">
                   <input
                     type="checkbox"
                     checked={selectedApprovals.length > 0 && selectedApprovals.length === paginatedRequests.filter(req => req.approval_status === 'pending').length}
@@ -508,30 +516,29 @@ export default function Request() {
                     className="rounded border-gray-300 text-red-600 focus:ring-red-500"
                   />
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-black uppercase">
-                  Submitted by
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-black uppercase">
-                  Request Type
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-black uppercase">
-                  Date & Time
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-black uppercase">
-                  Priority
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-black uppercase">
-                  Status
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-black uppercase">
-                  Actions
-                </th>
+                {['Submitted by','Request Type','Date & Time','Priority','Status','Actions'].map(h => (
+                  <th key={h} className="px-6 py-3 text-[11px] font-semibold tracking-wider text-gray-600 uppercase whitespace-nowrap">{h}</th>
+                ))}
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {paginatedRequests.length > 0 ? (
+            <tbody className="bg-white divide-y divide-gray-100">
+              {requestsLoading && (
+                [...Array(PAGE_SIZE)].map((_, i) => (
+                  <tr key={i} className="animate-pulse">
+                    <td className="px-6 py-4 text-sm text-gray-900">
+                      <div className="h-4 w-4 bg-gray-200 rounded" />
+                    </td>
+                    {Array.from({length:6}).map((__, c) => (
+                      <td key={c} className="px-6 py-4">
+                        <div className="h-4 bg-gray-200 rounded w-24" />
+                      </td>
+                    ))}
+                  </tr>
+                ))
+              )}
+              {!requestsLoading && paginatedRequests.length > 0 && (
                 paginatedRequests.map((req) => (
-                  <tr key={req.approval_id}>
+                  <tr key={req.approval_id} className="hover:bg-red-50/60 transition-colors">
                     <td className="px-6 py-4 text-sm text-gray-900">
                       <input
                         type="checkbox"
@@ -541,42 +548,30 @@ export default function Request() {
                         className="rounded border-gray-300 text-red-600 focus:ring-red-500 disabled:opacity-50 disabled:cursor-not-allowed"
                       />
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-900">
+                    <td className="px-6 py-4 text-sm text-gray-900 font-medium">
                       {req.student_name}
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-900">
-                      {req.request_type}
+                    <td className="px-6 py-4 text-sm text-gray-700 capitalize">
+                      {req.request_type?.replace('_',' ')}
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-900">
+                    <td className="px-6 py-4 text-sm text-gray-900 whitespace-nowrap">
                       {formatDateTime(req.submitted_at)}
                     </td>
-                    <td
-                      className={`px-6 py-4 text-sm font-medium ${getPriorityColor(
-                        req.priority ?? ""
-                      )}`}
-                    >
-                      {req.priority}
+                    <td className={`px-6 py-4 text-sm font-semibold ${getPriorityColor(req.priority ?? "")}`}>
+                      {req.priority || '—'}
                     </td>
-                    <td>
-                      <span
-                        className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusBadgeColor(
-                          req.approval_status
-                        )}`}
-                      >
-                        {req.approval_status === "revision_requested"
-                          ? "Under Revision"
-                          : req.approval_status}
+                    <td className="px-6 py-4">
+                      <span className={`px-2 inline-flex items-center gap-1 text-xs leading-5 font-semibold rounded-full ${getStatusBadgeColor(req.approval_status)}`}>
+                        {req.approval_status === "revision_requested" ? "Under Revision" : req.approval_status}
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-sm flex gap-2">
+                    <td className="px-6 py-4 text-sm">
                       <button
-                        className="text-blue-600 hover:underline flex items-center gap-1"
+                        className="inline-flex items-center gap-1 px-3 py-1.5 rounded-md text-xs font-medium bg-blue-50 text-blue-600 hover:bg-blue-100 transition"
                         onClick={() => {
                           if (req.request_type?.toLowerCase() === "activity" || req.request_type?.toLowerCase() === "activity_plan") {
-                            // Navigate to activity plan approval page
                             router.visit(`/admin/activity-plan-approval/${req.approval_id}`);
                           } else {
-                            // Show equipment modal
                             setSelected(req);
                           }
                         }}
@@ -586,38 +581,55 @@ export default function Request() {
                     </td>
                   </tr>
                 ))
-              ) : (
+              )}
+              {!requestsLoading && paginatedRequests.length === 0 && (
                 <tr>
-                  <td
-                    colSpan={6}
-                    className="px-6 py-4 text-center text-gray-500"
-                  >
-                    No requests found.
+                  <td colSpan={7} className="p-0">
+                    <div className="flex flex-col items-center justify-center text-center gap-3 text-gray-500" style={{height: '420px'}}>
+                      <Inbox className="w-12 h-12 text-gray-300" />
+                      <p className="text-sm font-medium">No requests match the current filters.</p>
+                      <button
+                        onClick={() => { setFilters({ status: "", priority: "" }); setSearchTerm(""); }}
+                        className="text-xs text-red-600 hover:underline"
+                      >
+                        Clear filters & search
+                      </button>
+                    </div>
                   </td>
                 </tr>
               )}
             </tbody>
           </table>
-        </div>
-        {/* Pagination Controls - moved outside table container */}
-        <div className="flex justify-end items-center px-6 py-3 bg-white border-t border-gray-200 rounded-b-lg" style={{ marginTop: "-1px" }}>
-          <button
-            className="px-3 py-1 mr-2 rounded bg-gray-100 text-gray-600 disabled:opacity-50"
-            onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-            disabled={currentPage === 1}
-          >
-            Prev
-          </button>
-          <span className="text-sm text-gray-700">
-            Page {currentPage} of {totalPages || 1}
-          </span>
-          <button
-            className="px-3 py-1 ml-2 rounded bg-gray-100 text-gray-600 disabled:opacity-50"
-            onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-            disabled={currentPage === totalPages || totalPages === 0}
-          >
-            Next
-          </button>
+          </div>
+          {/* Bottom Pagination Bar */}
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 px-6 py-3 border-t border-gray-100 bg-white">
+            <div className="text-[11px] text-gray-500 order-2 sm:order-1 tracking-wide">
+              {filteredRequests.length > 0 && !requestsLoading && (
+                <>Showing <span className="font-medium text-gray-700">{(currentPage - 1) * PAGE_SIZE + 1}</span>–<span className="font-medium text-gray-700">{Math.min(currentPage * PAGE_SIZE, filteredRequests.length)}</span> of <span className="font-medium text-gray-700">{filteredRequests.length}</span></>
+              )}
+              {filteredRequests.length === 0 && !requestsLoading && 'No results'}
+              {requestsLoading && 'Loading...'}
+            </div>
+            <div className="flex items-center gap-1 order-1 sm:order-2">
+              <button
+                className="h-8 px-3 rounded-md text-xs font-medium bg-gray-50 text-gray-600 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed"
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+              >
+                Prev
+              </button>
+              <div className="h-8 px-3 flex items-center rounded-md text-xs font-semibold text-gray-700 bg-gray-50">
+                {totalPages === 0 ? 1 : currentPage} / {totalPages || 1}
+              </div>
+              <button
+                className="h-8 px-3 rounded-md text-xs font-medium bg-gray-50 text-gray-600 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed"
+                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages || totalPages === 0}
+              >
+                Next
+              </button>
+            </div>
+          </div>
         </div>
 
         {/* Modal - Only for equipment requests */}
