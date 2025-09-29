@@ -38,11 +38,14 @@ class RegisteredUserController extends Controller
             'role'       => 'student',
         ]);
 
+        // Log the user in after registration
+        Auth::login($user);
+
         register_shutdown_function(function () use ($user) {
             event(new Registered($user));
         });
     
-        // ✅ Redirect to login with flash message
+        // Redirect to email verification page
         return redirect()->route('verification.notice');
     }
 }

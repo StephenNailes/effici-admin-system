@@ -1,6 +1,6 @@
-import React from 'react';
-import { Head, Link, useForm } from '@inertiajs/react';
-import { MailCheck, MailWarning, RefreshCw } from 'lucide-react';
+import React, { useState } from 'react';
+import { Head, Link, router } from '@inertiajs/react';
+import { MailCheck, MailWarning, RefreshCw, LogIn } from 'lucide-react';
 import type { PageProps } from '@/types';
 
 interface VerifyEmailProps extends PageProps {
@@ -8,7 +8,8 @@ interface VerifyEmailProps extends PageProps {
 }
 
 export default function VerifyEmail({ status }: VerifyEmailProps) {
-  const { post, processing } = useForm();
+  const [processing, setProcessing] = useState(false);
+  const [error, setError] = useState('');
 
   const message =
     status === 'verification-link-sent'
@@ -19,7 +20,20 @@ export default function VerifyEmail({ status }: VerifyEmailProps) {
 
   const handleResend = (e: React.FormEvent) => {
     e.preventDefault();
-    post('/email/verification-notification');
+    setProcessing(true);
+    setError('');
+    
+    router.post('/email/verification-notification', {}, {
+      preserveScroll: true,
+      preserveState: true,
+      onSuccess: () => {
+        setProcessing(false);
+      },
+      onError: (errors) => {
+        setProcessing(false);
+        setError(errors.message || Object.values(errors)[0] as string || 'An error occurred. Please try again.');
+      },
+    });
   };
 
   return (
@@ -66,13 +80,17 @@ export default function VerifyEmail({ status }: VerifyEmailProps) {
                 </button>
               </form>
 
+              {/* Proceed to Login Link */}
               <div className="text-center">
+                <p className="text-gray-600 text-sm mb-2">
+                  Already verified your email?
+                </p>
                 <Link
-                  href="/logout"
-                  method="post"
-                  className="text-sm text-gray-500 hover:text-gray-700 transition-colors"
+                  href="/login"
+                  className="inline-flex items-center justify-center gap-2 text-red-600 hover:text-red-700 font-medium py-2 px-4 rounded-lg hover:bg-red-50 transition-colors focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
                 >
-                  Log Out
+                  <LogIn className="w-4 h-4" />
+                  Proceed to Login
                 </Link>
               </div>
             </div>
@@ -81,6 +99,15 @@ export default function VerifyEmail({ status }: VerifyEmailProps) {
               <div className="bg-green-50 border border-green-200 rounded-lg p-3">
                 <p className="text-green-800 text-sm">
                   ✅ Verification email sent! Check your inbox and spam folder.
+                </p>
+              </div>
+            )}
+
+            {/* Display any errors */}
+            {error && (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                <p className="text-red-800 text-sm">
+                  ❌ {error}
                 </p>
               </div>
             )}

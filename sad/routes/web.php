@@ -75,7 +75,7 @@ Route::post('/admin/invitations/resend', [InvitationController::class, 'resend']
 // ✅ Email Verification Routes
 Route::get('/email/verify', function () {
     return Inertia::render('auth/verifyemail', [
-        'emailJustSent' => Session::get('status') === 'verification-link-sent',
+        'status' => Session::get('status'),
     ]);
 })->middleware('auth')->name('verification.notice');
 

@@ -50,6 +50,11 @@ export default function Profile() {
   const [profilePictureError, setProfilePictureError] = useState('');
   const [nameError, setNameError] = useState('');
   
+  // Non-clickable placeholder for missing values
+  const renderNotSet = (_label: string) => (
+    <span className="text-gray-400 italic">Not set</span>
+  );
+  
   // Handover navigation state
   const [handoverLoading, setHandoverLoading] = useState(false);
 
@@ -166,6 +171,10 @@ export default function Profile() {
     router.post('/profile/update-picture', formData, {
       preserveScroll: true,
       preserveState: false, // Allow state refresh to get updated user data
+      headers: {
+        'X-CSRF-TOKEN': csrfToken,
+        'X-Requested-With': 'XMLHttpRequest',
+      },
       onSuccess: (page) => {
         type PropsWithProfile = PageProps & { auth: { user?: { profile_picture?: string | null } } };
         const updatedPic = ((page as unknown) as { props: PropsWithProfile })?.props?.auth?.user?.profile_picture ?? null;
@@ -285,10 +294,10 @@ export default function Profile() {
               
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Profile Picture */}
-                <div className="flex flex-col items-center gap-4 lg:col-span-1">
+                <div className="flex flex-col items-center gap-4 lg:col-span-1 lg:self-center">
                   <div className="relative profile-dropdown-container">
                     <div 
-                      className="w-32 h-32 rounded-full overflow-hidden bg-gray-100 border-4 border-gray-200 shadow-lg cursor-pointer hover:border-[#e6232a]/50 transition-colors"
+                      className="w-36 h-36 rounded-full overflow-hidden bg-gray-100 border-4 border-gray-200 shadow-lg cursor-pointer hover:border-[#e6232a]/50 transition-colors"
                       onClick={() => !editingProfilePicture && setShowProfileDropdown(!showProfileDropdown)}
                     >
                       {(profilePicturePreview || user.profile_picture_url) ? (
@@ -448,7 +457,13 @@ export default function Profile() {
                       <Calendar className="text-[#e6232a]/80 w-5 h-5 flex-shrink-0" />
                       <div className="flex flex-col">
                         <span className="font-semibold text-gray-700 text-sm">Date of Birth</span>
-                        <span className="text-gray-900">{(user.date_of_birth as string | undefined) || '-'}</span>
+                        <span className="text-gray-900">
+                          {user.date_of_birth ? (
+                            user.date_of_birth as string
+                          ) : (
+                            renderNotSet('Date of Birth')
+                          )}
+                        </span>
                       </div>
                     </div>
                   </div>
@@ -459,7 +474,13 @@ export default function Profile() {
                       <Landmark className="text-[#e6232a]/80 w-5 h-5 flex-shrink-0" />
                       <div className="flex flex-col">
                         <span className="font-semibold text-gray-700 text-sm">School ID</span>
-                        <span className="text-gray-900">{(user.school_id_number as string | undefined) || '-'}</span>
+                        <span className="text-gray-900">
+                          {user.school_id_number ? (
+                            user.school_id_number as string
+                          ) : (
+                            renderNotSet('School ID')
+                          )}
+                        </span>
                       </div>
                     </div>
                   )}
@@ -617,7 +638,13 @@ export default function Profile() {
                     <MapPin className="text-[#e6232a]/80 w-5 h-5 flex-shrink-0" />
                     <div className="flex flex-col">
                       <span className="font-semibold text-gray-700 text-sm">Address</span>
-                      <span className="text-gray-900">{(user.address as string | undefined) || '-'}</span>
+                      <span className="text-gray-900">
+                        {user.address ? (
+                          user.address as string
+                        ) : (
+                          renderNotSet('Address')
+                        )}
+                      </span>
                     </div>
                   </div>
 
@@ -626,7 +653,13 @@ export default function Profile() {
                     <Building2 className="text-[#e6232a]/80 w-5 h-5 flex-shrink-0" />
                     <div className="flex flex-col">
                       <span className="font-semibold text-gray-700 text-sm">City</span>
-                      <span className="text-gray-900">{(user.city as string | undefined) || '-'}</span>
+                      <span className="text-gray-900">
+                        {user.city ? (
+                          user.city as string
+                        ) : (
+                          renderNotSet('City')
+                        )}
+                      </span>
                     </div>
                   </div>
 
@@ -635,7 +668,13 @@ export default function Profile() {
                     <Locate className="text-[#e6232a]/80 w-5 h-5 flex-shrink-0" />
                     <div className="flex flex-col">
                       <span className="font-semibold text-gray-700 text-sm">Province</span>
-                      <span className="text-gray-900">{(user.province as string | undefined) || '-'}</span>
+                      <span className="text-gray-900">
+                        {user.province ? (
+                          user.province as string
+                        ) : (
+                          renderNotSet('Province')
+                        )}
+                      </span>
                     </div>
                   </div>
 
@@ -644,7 +683,13 @@ export default function Profile() {
                     <Landmark className="text-[#e6232a]/80 w-5 h-5 flex-shrink-0" />
                     <div className="flex flex-col">
                       <span className="font-semibold text-gray-700 text-sm">Region</span>
-                      <span className="text-gray-900">{(user.region as string | undefined) || '-'}</span>
+                      <span className="text-gray-900">
+                        {user.region ? (
+                          user.region as string
+                        ) : (
+                          renderNotSet('Region')
+                        )}
+                      </span>
                     </div>
                   </div>
 
@@ -653,7 +698,13 @@ export default function Profile() {
                     <Phone className="text-[#e6232a]/80 w-5 h-5 flex-shrink-0" />
                     <div className="flex flex-col">
                       <span className="font-semibold text-gray-700 text-sm">Contact Number</span>
-                      <span className="text-gray-900">{(user.contact_number as string | undefined) || '-'}</span>
+                      <span className="text-gray-900">
+                        {user.contact_number ? (
+                          user.contact_number as string
+                        ) : (
+                          renderNotSet('Contact Number')
+                        )}
+                      </span>
                     </div>
                   </div>
                 </div>
