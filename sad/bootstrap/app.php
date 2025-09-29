@@ -17,17 +17,14 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware) {
         $middleware->encryptCookies(except: ['appearance', 'sidebar_state']);
 
-        // Exclude equipment-related endpoints from CSRF protection to prevent 419 errors
+        // Exclude specific GET endpoints and file uploads from CSRF protection
         $middleware->validateCsrfTokens(except: [
-            '/equipment-requests',
-            '/equipment-requests/*',
-            '/equipment/availability',
-            '/api/approvals/*',
-            '/api/equipment/*',
-            '/comments',
-            '/comments/*',
-            '/likes/toggle',
-            '/api/notifications/*'
+            '/api/equipment/all',
+            '/api/equipment/availableForStudent',
+            '/api/equipment-requests/manage',
+            // File upload endpoints that might need special handling
+            '/profile/picture',
+            '/profile/remove-picture',
         ]);
 
         $middleware->web(append: [

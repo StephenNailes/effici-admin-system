@@ -3,7 +3,7 @@
 ## Project Architecture
 
 This is a **Laravel-Inertia.js-React-TypeScript** application for an educational facility management system. The stack includes:
-- **Backend**: Laravel 12 (PHP 8.2+) with SQLite database
+- **Backend**: Laravel 12 (PHP 8.2+) with MySQL 8+/MariaDB database
 - **Frontend**: React 19 + TypeScript with Inertia.js for SPA behavior
 - **Styling**: TailwindCSS v4 with Framer Motion animations
 - **Build Tools**: Vite 7 with Laravel integration (SSR prepared)
@@ -91,6 +91,18 @@ composer install
 npm install
 cp .env.example .env
 php artisan key:generate
+
+# Configure MySQL in .env (XAMPP defaults shown)
+# DB_CONNECTION=mysql
+# DB_HOST=127.0.0.1
+# DB_PORT=3306
+# DB_DATABASE=sadproject_improved
+# DB_USERNAME=root
+# DB_PASSWORD=
+
+# Optionally create the DB (adjust credentials if needed)
+# mysql -u root -p -e "CREATE DATABASE IF NOT EXISTS sadproject_improved CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+
 php artisan migrate
 npm run dev          # Frontend dev server
 php artisan serve    # Backend server (port 8000)
@@ -133,7 +145,7 @@ Convenience scripts:
 
 ## Performance Notes
 
-- **Database**: SQLite for development, consider PostgreSQL for production
+- **Database**: MySQL 8+/MariaDB for development (XAMPP). Consider PostgreSQL for production if preferred.
 - **Assets**: Vite handles hot reload and production builds
 - **Caching**: Not extensively configured, uses Laravel defaults
 - **Pagination**: Basic implementation, could be enhanced for large datasets

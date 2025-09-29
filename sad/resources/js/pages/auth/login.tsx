@@ -10,15 +10,14 @@ export default function Login() {
   const [remember, setRemember] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState('')
-  const csrfToken = (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement | null)?.content || ''
 
   const togglePasswordVisibility = () => setShowPassword(!showPassword)
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
-    // Include CSRF token to satisfy Laravel's VerifyCsrfToken middleware
-    router.post('/login', { email, password, remember, _token: csrfToken }, {
+    // Inertia.js handles CSRF tokens automatically - no need to manually include _token
+    router.post('/login', { email, password, remember }, {
       onError: (errors: any) => {
         if (errors.password) {
           setError(errors.password)
@@ -27,7 +26,9 @@ export default function Login() {
         } else {
           setError('Login failed. Please check your credentials.')
         }
-      }
+      },
+      preserveState: true, // Keep form state on error
+      preserveScroll: true, // Keep scroll position on error
     })
   }
 
