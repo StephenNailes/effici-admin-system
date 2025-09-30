@@ -117,7 +117,7 @@ export default function RevisionEdit({ revision, requestType }: RevisionEditProp
     // Proactively ensure CSRF meta/cookie are fresh when entering the edit page
     refreshCsrfToken().catch(() => { /* noop */ })
   }, [requestType])
-
+  
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     // Refresh CSRF before submit to avoid 419 if token rotated
