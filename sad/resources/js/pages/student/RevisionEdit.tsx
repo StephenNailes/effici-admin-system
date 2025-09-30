@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import { router } from '@inertiajs/react'
 import { motion } from 'framer-motion'
 import axios from 'axios'
+import { getCsrfToken, getXsrfCookieToken, refreshCsrfToken } from '@/lib/csrf'
 // Note: Flash success/error messages are handled globally by FlashToaster via Inertia shared props.
 
 // Define revision type for activity plan
@@ -113,11 +114,28 @@ export default function RevisionEdit({ revision, requestType }: RevisionEditProp
     if (requestType === 'equipment') {
       fetchEquipment()
     }
+    // Proactively ensure CSRF meta/cookie are fresh when entering the edit page
+    refreshCsrfToken().catch(() => { /* noop */ })
   }, [requestType])
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    router.post(route('student.revision.update', { id: revision.id, type: requestType }), formData)
+    // Refresh CSRF before submit to avoid 419 if token rotated
+    await refreshCsrfToken()
+    const csrfToken = getCsrfToken()
+    const xsrfToken = getXsrfCookieToken()
+    router.post(route('student.revision.update', { id: revision.id, type: requestType }), {
+      ...formData,
+      _token: csrfToken,
+    }, {
+      headers: {
+        'X-CSRF-TOKEN': csrfToken,
+        ...(xsrfToken ? { 'X-XSRF-TOKEN': xsrfToken } : {}),
+        'X-Requested-With': 'XMLHttpRequest',
+      },
+      preserveState: true,
+      preserveScroll: true,
+    })
   }
 
   const addEquipmentItem = () => {

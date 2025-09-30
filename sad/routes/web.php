@@ -49,9 +49,6 @@ Route::get('/', function () {
 Route::middleware('guest')->group(function () {
     Route::get('/login', [AuthenticatedSessionController::class, 'create'])->name('login');
     Route::post('/login', [AuthenticatedSessionController::class, 'store'])->middleware('throttle:10,1');
-
-    Route::get('/register', [RegisteredUserController::class, 'create'])->name('register');
-    Route::post('/register', [RegisteredUserController::class, 'store'])->name('register.store')->middleware('throttle:10,1');
 });
 
 Route::post('/logout', [AuthenticatedSessionController::class, 'destroy'])
@@ -229,6 +226,62 @@ Route::middleware(['auth', 'verified'])->group(function () {
     })->whereNumber('id');
     Route::delete('/announcements/{id}', [AnnouncementController::class, 'destroy'])->name('announcements.destroy');
 
+    // Session diagnostics (dev-only; keep behind auth)
+    Route::get('/api/debug/session', function (\Illuminate\Http\Request $request) {
+        $sessionId = session()->getId();
+        $table = config('session.table', 'sessions');
+        $sessionConn = config('session.connection');
+        $dbDefault = config('database.default');
+        $exists = false;
+        try {
+            $query = \Illuminate\Support\Facades\DB::connection($sessionConn ?: $dbDefault)->table($table)->where('id', $sessionId);
+            $exists = $query->exists();
+        } catch (\Throwable $e) {
+            // ignore DB errors but report message
+            return response()->json([
+                'ok' => false,
+                'error' => 'Session table check failed',
+                'exception' => get_class($e),
+                'message' => $e->getMessage(),
+                'session' => [
+                    'id' => $sessionId,
+                    'user_id' => \Illuminate\Support\Facades\Auth::id(),
+                    'cookie' => $request->cookie(config('session.cookie')) ? 'present' : 'missing',
+                    'xsrf_cookie' => $request->cookie('XSRF-TOKEN') ? 'present' : 'missing',
+                ],
+                'config' => [
+                    'session_driver' => config('session.driver'),
+                    'session_connection' => $sessionConn,
+                    'database_default' => $dbDefault,
+                    'session_table' => $table,
+                    'same_site' => config('session.same_site'),
+                    'secure' => config('session.secure'),
+                    'domain' => config('session.domain'),
+                ],
+            ], 200);
+        }
+
+        return response()->json([
+            'ok' => true,
+            'session' => [
+                'id' => $sessionId,
+                'user_id' => \Illuminate\Support\Facades\Auth::id(),
+                'cookie' => $request->cookie(config('session.cookie')) ? 'present' : 'missing',
+                'xsrf_cookie' => $request->cookie('XSRF-TOKEN') ? 'present' : 'missing',
+                'persisted_in_db' => $exists,
+            ],
+            'config' => [
+                'session_driver' => config('session.driver'),
+                'session_connection' => $sessionConn,
+                'database_default' => $dbDefault,
+                'session_table' => $table,
+                'same_site' => config('session.same_site'),
+                'secure' => config('session.secure'),
+                'domain' => config('session.domain'),
+            ],
+        ]);
+    })->name('debug.session');
+
     // Notification API
     Route::prefix('api/notifications')->group(function () {
         Route::get('/', [App\Http\Controllers\NotificationController::class, 'index']);
@@ -254,3 +307,9 @@ Route::middleware('auth')->group(function () {
     Route::post('/likes/toggle', [LikeController::class, 'toggle'])->middleware('throttle:60,1')->name('likes.toggle');
     Route::get('/likes/{type}/{id}', [LikeController::class, 'show'])->name('likes.show');
 });
+
+// CSRF token refresh for SPA error recovery (guest-accessible)
+// Note: This route returns the current CSRF token and, via middleware, also refreshes the XSRF-TOKEN cookie.
+Route::get('/api/csrf-token', function () {
+    return response()->json(['token' => csrf_token()]);
+})->name('csrf.token');

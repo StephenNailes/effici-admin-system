@@ -6,6 +6,7 @@ import BatchApprovalModal from '@/components/BatchApprovalModal';
 import { router } from '@inertiajs/react';
 import { formatDateShort, formatTime12h } from '@/lib/utils';
 import { toast } from 'react-toastify';
+import { csrfFetch } from '@/lib/csrf';
 
 interface RequestData {
   approval_id: number;
@@ -43,11 +44,10 @@ export default function Request() {
       setLoading(true);
       
       // Fetch dean approval requests from the API
-      const response = await fetch('/api/approvals?role=dean', {
+      const response = await csrfFetch('/api/approvals?role=dean', {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
-          'X-Requested-With': 'XMLHttpRequest',
         },
       });
 
@@ -97,12 +97,10 @@ export default function Request() {
 
   const confirmBatchApproval = async () => {
     try {
-      const response = await fetch('/api/approvals/batch-approve', {
+      const response = await csrfFetch('/api/approvals/batch-approve', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
-          'X-Requested-With': 'XMLHttpRequest'
         },
         body: JSON.stringify({
           approval_ids: selectedApprovals

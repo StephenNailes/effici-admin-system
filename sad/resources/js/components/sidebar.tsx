@@ -15,12 +15,12 @@ import {
   FaCalendarAlt,   // Add for Events notification indicator
   FaBullhorn,      // Add for Announcements notification indicator
 } from 'react-icons/fa';
-import { usePage, Link } from '@inertiajs/react';
-import { Inertia } from '@inertiajs/inertia';
+import { usePage, Link, router } from '@inertiajs/react';
 import { ReactElement, useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import NotificationPanel from '@/components/NotificationPanel';
 import axios from 'axios';
+import { getCsrfToken, getXsrfCookieToken, refreshCsrfToken } from '../lib/csrf';
 
 type UserRole = 'student' | 'admin_assistant' | 'dean';
 
@@ -117,7 +117,14 @@ export default function Sidebar() {
   // Shows: urgent/high priority notifications (all users) + new/resubmitted requests (admin/dean only) + new events/announcements (students)
   const fetchNotificationBadgeCount = async () => {
     try {
-      const response = await axios.get('/api/notifications');
+      const csrfToken = getCsrfToken();
+      const response = await axios.get('/api/notifications', {
+        withCredentials: true,
+        headers: {
+          'X-CSRF-TOKEN': csrfToken,
+          'X-Requested-With': 'XMLHttpRequest'
+        }
+      });
       const notifications = response.data.notifications || [];
       
       let badgeCount = 0;
@@ -169,9 +176,21 @@ export default function Sidebar() {
     return () => clearInterval(interval);
   }, []);
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     setShowConfirm(false);
-    Inertia.post('/logout');
+    const csrfToken = getCsrfToken();
+    const xsrfToken = getXsrfCookieToken();
+    router.post('/logout', { _token: csrfToken }, {
+      headers: {
+        'X-CSRF-TOKEN': csrfToken,
+        ...(xsrfToken ? { 'X-XSRF-TOKEN': xsrfToken } : {}),
+        'X-Requested-With': 'XMLHttpRequest',
+      },
+      onSuccess: () => {
+        // After server invalidates and regenerates session, fetch a fresh token for the login page
+        refreshCsrfToken().catch(() => {/* noop */});
+      },
+    });
   };
 
   // Helper function to get notification badge for menu items

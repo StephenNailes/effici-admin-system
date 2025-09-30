@@ -66,8 +66,10 @@ export default function EquipmentManagement({ requests: initialRequests }: Props
 
     setProcessing(true);
     
+    const csrfToken = (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)?.content || '';
+    
     router.patch(`/equipment-requests/${id}/status`, 
-      { status: newStatus },
+      { status: newStatus, _token: csrfToken },
       {
         onStart: () => setProcessing(true),
         onFinish: () => setProcessing(false),

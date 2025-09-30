@@ -26,6 +26,8 @@ export default function Register() {
       return
     }
 
+    const csrfToken = (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)?.content || '';
+    
     router.post('/register', {
       first_name: firstName,
       middle_name: middleName, // <-- add this
@@ -33,6 +35,7 @@ export default function Register() {
       email,
       password,
       password_confirmation: confirmPassword,
+      _token: csrfToken
     }, {
       onError: (errors: any) => {
         setError(errors.email || errors.password || "Registration failed.")

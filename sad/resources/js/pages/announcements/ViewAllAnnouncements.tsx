@@ -257,7 +257,9 @@ export default function ViewAllAnnouncements() {
 
   const confirmDeleteAnnouncement = () => {
     if (deleteAnnouncementId === null) return;
+    const csrfToken = (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)?.content || '';
     router.delete(`/announcements/${deleteAnnouncementId}`, {
+      data: { _token: csrfToken },
       preserveScroll: true,
       onFinish: () => {
         // Close the modal regardless of outcome; server redirect will navigate back to index

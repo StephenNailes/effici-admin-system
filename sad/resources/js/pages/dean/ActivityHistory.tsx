@@ -4,6 +4,7 @@ import MainLayout from "@/layouts/mainlayout";
 import { Eye, Check, Search, ChevronDown, Filter, X, CheckCircle } from "lucide-react";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
+import { csrfFetch } from "@/lib/csrf";
 
 // Filter Modal Component
 const FilterModal = ({
@@ -185,7 +186,7 @@ export default function ActivityHistory() {
   useEffect(() => {
     setLoading(true);
     setError(null);
-    fetch("/api/approvals?role=dean")
+    csrfFetch("/api/approvals?role=dean")
       .then((res) => {
         if (!res.ok) throw new Error("Failed to fetch activities");
         return res.json();

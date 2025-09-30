@@ -7,15 +7,12 @@ import { initializeTheme } from './hooks/use-appearance';
 import './pages/auth/register';
 import { ToastContainer } from 'react-toastify';
 import axios from 'axios';
+import { installAxiosCsrf } from './lib/csrf';
 import 'react-toastify/dist/ReactToastify.css';
 const appName = import.meta.env.VITE_APP_NAME || 'Laravel';
 
-// Configure axios CSRF + AJAX headers once for the app (prevents 419 on axios requests)
-const token = document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement | null;
-if (token?.content) {
-    axios.defaults.headers.common['X-CSRF-TOKEN'] = token.content;
-}
-axios.defaults.headers.common['X-Requested-With'] = 'XMLHttpRequest';
+// Configure axios and CSRF protection globally
+installAxiosCsrf();
 
 createInertiaApp({
     title: (title) => title ? `${title} - ${appName}` : appName,

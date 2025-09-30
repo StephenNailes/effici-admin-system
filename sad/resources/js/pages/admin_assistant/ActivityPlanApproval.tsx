@@ -56,7 +56,10 @@ export default function ActivityPlanApproval({ id }: Props) {
   const handleApprove = async () => {
     setSubmitting(true);
     try {
-      await axios.post(`/api/approvals/${id}/approve`);
+      await axios.post(`/api/approvals/${id}/approve`, {}, {
+        withCredentials: true,
+        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+      });
       router.visit('/admin/requests');
     } catch (err) {
       console.error('Error approving activity plan:', err);
@@ -68,7 +71,10 @@ export default function ActivityPlanApproval({ id }: Props) {
   const handleRevision = async () => {
     setSubmitting(true);
     try {
-      await axios.post(`/api/approvals/${id}/revision`, { remarks });
+      await axios.post(`/api/approvals/${id}/revision`, { remarks }, {
+        withCredentials: true,
+        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+      });
       router.visit('/admin/requests');
     } catch (err) {
       console.error('Error requesting revision:', err);

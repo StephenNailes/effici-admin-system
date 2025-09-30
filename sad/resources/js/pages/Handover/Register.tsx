@@ -3,6 +3,7 @@ import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
 import { ArrowLeft, ArrowRightLeft, UserCheck, AlertTriangle, X } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import type { PageProps } from '@/types';
+import { getCsrfToken, getXsrfCookieToken, refreshCsrfToken } from '@/lib/csrf';
 
 type HandoverPageProps = PageProps & { role: 'dean' | 'admin_assistant'; pendingCount: number; errors?: Record<string, string> };
 
@@ -62,7 +63,18 @@ export default function HandoverRegister() {
       preserveScroll: true,
       onSuccess: () => {
         // After successful handover, log out to switch accounts
-        setTimeout(() => router.post('/logout'), 1200);
+        setTimeout(async () => {
+          await refreshCsrfToken();
+          const csrfToken = getCsrfToken();
+          const xsrfToken = getXsrfCookieToken();
+          router.post('/logout', { _token: csrfToken }, {
+            headers: {
+              'X-CSRF-TOKEN': csrfToken,
+              ...(xsrfToken ? { 'X-XSRF-TOKEN': xsrfToken } : {}),
+              'X-Requested-With': 'XMLHttpRequest',
+            },
+          });
+        }, 1200);
       },
     });
   };

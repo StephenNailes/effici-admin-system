@@ -8,6 +8,7 @@ import BatchApprovalModal from "@/components/BatchApprovalModal";
 import { motion } from "framer-motion";
 import { router } from "@inertiajs/react";
 import { toast } from "react-toastify"; // global toast
+import { csrfFetch, getCsrfToken, getXsrfCookieToken, refreshCsrfToken } from "@/lib/csrf";
 import { formatDateTime, formatTime12h, formatDateShort } from "@/lib/utils";
 
 // Add pagination state
@@ -60,11 +61,10 @@ export default function Request() {
 
   const fetchRequests = () => {
     setRequestsLoading(true);
-    fetch(`/api/approvals?role=admin_assistant`, {
+    csrfFetch(`/api/approvals?role=admin_assistant`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
-        'X-Requested-With': 'XMLHttpRequest'
       }
     })
       .then(res => res.json())
@@ -87,11 +87,10 @@ export default function Request() {
   const fetchEquipment = () => {
     setEquipmentLoading(true);
     
-    fetch(`/api/equipment/all`, {
+    csrfFetch(`/api/equipment/all`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
-        'X-Requested-With': 'XMLHttpRequest'
       }
     })
       .then(res => res.json())
@@ -112,13 +111,38 @@ export default function Request() {
 
   const handleApprove = async (id: number) => {
     try {
-      const response = await fetch(`/api/approvals/${id}/approve`, {
+      // Ensure we have a fresh CSRF token and XSRF cookie
+      await refreshCsrfToken();
+      let csrfToken = getCsrfToken();
+      let xsrfToken = getXsrfCookieToken();
+      
+      let response = await csrfFetch(`/api/approvals/${id}/approve`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-Requested-With': 'XMLHttpRequest'
-        }
+          'X-Requested-With': 'XMLHttpRequest',
+          'X-CSRF-TOKEN': csrfToken,
+          ...(xsrfToken ? { 'X-XSRF-TOKEN': xsrfToken } : {}),
+        },
+        body: JSON.stringify({ _token: csrfToken })
       });
+      
+      // Auto-retry once on 419 by refreshing token
+      if (response.status === 419) {
+        await refreshCsrfToken();
+        csrfToken = getCsrfToken();
+        xsrfToken = getXsrfCookieToken();
+        response = await csrfFetch(`/api/approvals/${id}/approve`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+            'X-CSRF-TOKEN': csrfToken,
+            ...(xsrfToken ? { 'X-XSRF-TOKEN': xsrfToken } : {}),
+          },
+          body: JSON.stringify({ _token: csrfToken })
+        });
+      }
       
       const data = await response.json();
       
@@ -150,14 +174,41 @@ export default function Request() {
 
   const handleRevision = async (id: number, remarks: string) => {
     try {
-      const response = await fetch(`/api/approvals/${id}/revision`, {
+      await refreshCsrfToken();
+      let csrfToken = getCsrfToken();
+      let xsrfToken = getXsrfCookieToken();
+      
+      let response = await csrfFetch(`/api/approvals/${id}/revision`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-Requested-With': 'XMLHttpRequest'
+          'X-Requested-With': 'XMLHttpRequest',
+          'X-CSRF-TOKEN': csrfToken,
+          ...(xsrfToken ? { 'X-XSRF-TOKEN': xsrfToken } : {}),
         },
-        body: JSON.stringify({ remarks })
+        body: JSON.stringify({ 
+          remarks,
+          _token: csrfToken,
+        })
       });
+      if (response.status === 419) {
+        await refreshCsrfToken();
+        csrfToken = getCsrfToken();
+        xsrfToken = getXsrfCookieToken();
+        response = await csrfFetch(`/api/approvals/${id}/revision`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+            'X-CSRF-TOKEN': csrfToken,
+            ...(xsrfToken ? { 'X-XSRF-TOKEN': xsrfToken } : {}),
+          },
+          body: JSON.stringify({ 
+            remarks,
+            _token: csrfToken,
+          })
+        });
+      }
       
       const data = await response.json();
       
@@ -258,17 +309,41 @@ export default function Request() {
 
   const confirmBatchApproval = async () => {
     try {
-      const response = await fetch('/api/approvals/batch-approve', {
+      await refreshCsrfToken();
+      let csrfToken = getCsrfToken();
+      let xsrfToken = getXsrfCookieToken();
+      
+      let response = await csrfFetch('/api/approvals/batch-approve', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
-          'X-Requested-With': 'XMLHttpRequest'
+          'X-Requested-With': 'XMLHttpRequest',
+          'X-CSRF-TOKEN': csrfToken,
+          ...(xsrfToken ? { 'X-XSRF-TOKEN': xsrfToken } : {}),
         },
         body: JSON.stringify({
-          approval_ids: selectedApprovals
+          approval_ids: selectedApprovals,
+          _token: csrfToken,
         })
       });
+      if (!response.ok && response.status === 419) {
+        await refreshCsrfToken();
+        csrfToken = getCsrfToken();
+        xsrfToken = getXsrfCookieToken();
+        response = await csrfFetch('/api/approvals/batch-approve', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+            'X-CSRF-TOKEN': csrfToken,
+            ...(xsrfToken ? { 'X-XSRF-TOKEN': xsrfToken } : {}),
+          },
+          body: JSON.stringify({
+            approval_ids: selectedApprovals,
+            _token: csrfToken,
+          })
+        });
+      }
 
       if (!response.ok) {
         throw new Error('Failed to batch approve');

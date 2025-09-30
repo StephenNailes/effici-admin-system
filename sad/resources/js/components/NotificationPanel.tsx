@@ -4,6 +4,7 @@ import { FaBell, FaTimes, FaCheck, FaExclamationTriangle, FaTrash } from 'react-
 // Removed lucide-react icons to simplify and avoid unused imports
 import { router } from '@inertiajs/react';
 import axios from 'axios';
+import { getCsrfToken } from '../lib/csrf';
 import { motion, AnimatePresence } from 'framer-motion';
 
 interface NotificationData {
@@ -103,7 +104,12 @@ export default function NotificationPanel({ className = '', onOpen, isOpen: exte
 
   const fetchNotifications = async () => {
     try {
-      const response = await axios.get('/api/notifications');
+      const response = await axios.get('/api/notifications', { 
+        withCredentials: true,
+        headers: {
+          'X-Requested-With': 'XMLHttpRequest'
+        }
+      });
       setNotifications(response.data.notifications || []);
       setUnreadCount(response.data.unread_count || 0);
     } catch (error) {
@@ -117,7 +123,15 @@ export default function NotificationPanel({ className = '', onOpen, isOpen: exte
 
   const markAsRead = async (notificationId: number) => {
     try {
-      await axios.post(`/api/notifications/${notificationId}/read`);
+      await axios.post(`/api/notifications/${notificationId}/read`, 
+        {}, 
+        { 
+          withCredentials: true,
+          headers: {
+            'X-Requested-With': 'XMLHttpRequest'
+          }
+        }
+      );
       setNotifications(prev => prev.map(n => 
         n.id === notificationId ? { ...n, is_read: true } : n
       ));
@@ -130,7 +144,15 @@ export default function NotificationPanel({ className = '', onOpen, isOpen: exte
   const markAllAsRead = async () => {
     try {
       setLoading(true);
-      await axios.post('/api/notifications/mark-all-read');
+      await axios.post('/api/notifications/mark-all-read', 
+        {}, 
+        { 
+          withCredentials: true,
+          headers: {
+            'X-Requested-With': 'XMLHttpRequest'
+          }
+        }
+      );
       setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
       setUnreadCount(0);
     } catch (error) {
@@ -138,11 +160,15 @@ export default function NotificationPanel({ className = '', onOpen, isOpen: exte
     } finally {
       setLoading(false);
     }
-  };
-
-  const deleteNotification = async (notificationId: number) => {
+  };  const deleteNotification = async (notificationId: number) => {
     try {
-      await axios.delete(`/api/notifications/${notificationId}`);
+      await axios.delete(`/api/notifications/${notificationId}`, { 
+        withCredentials: true,
+        data: {},
+        headers: {
+          'X-Requested-With': 'XMLHttpRequest'
+        }
+      });
       setNotifications(prev => prev.filter(n => n.id !== notificationId));
       // Update unread count if the deleted notification was unread
       const deletedNotification = notifications.find(n => n.id === notificationId);

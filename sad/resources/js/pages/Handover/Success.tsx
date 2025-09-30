@@ -3,6 +3,7 @@ import { Head, router, useForm } from '@inertiajs/react';
 import { ArrowLeft, CheckCircle, Mail, RefreshCw, Clock, LogOut } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import type { PageProps } from '@/types';
+import { getCsrfToken, getXsrfCookieToken, refreshCsrfToken } from '@/lib/csrf';
 
 interface HandoverSuccessProps extends PageProps {
     invitationEmail: string;
@@ -41,8 +42,17 @@ export default function HandoverSuccess({ invitationEmail, roleLabel, sendCount 
         });
     };
 
-    const handleLogout = () => {
-        router.post('/logout');
+    const handleLogout = async () => {
+        await refreshCsrfToken();
+        const csrfToken = getCsrfToken();
+        const xsrfToken = getXsrfCookieToken();
+        router.post('/logout', { _token: csrfToken }, {
+            headers: {
+                'X-CSRF-TOKEN': csrfToken,
+                ...(xsrfToken ? { 'X-XSRF-TOKEN': xsrfToken } : {}),
+                'X-Requested-With': 'XMLHttpRequest',
+            },
+        });
     };
 
     const formatTime = (seconds: number) => {

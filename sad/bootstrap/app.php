@@ -15,7 +15,8 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware) {
-        $middleware->encryptCookies(except: ['appearance', 'sidebar_state']);
+    // Do not encrypt the XSRF-TOKEN cookie so the browser can read it for the X-XSRF-TOKEN header
+    $middleware->encryptCookies(except: ['appearance', 'sidebar_state', 'XSRF-TOKEN']);
 
         // Exclude specific GET endpoints and file uploads from CSRF protection
         $middleware->validateCsrfTokens(except: [

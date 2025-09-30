@@ -23,7 +23,9 @@ export default function VerifyEmail({ status }: VerifyEmailProps) {
     setProcessing(true);
     setError('');
     
-    router.post('/email/verification-notification', {}, {
+    const csrfToken = (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)?.content || '';
+    
+    router.post('/email/verification-notification', { _token: csrfToken }, {
       preserveScroll: true,
       preserveState: true,
       onSuccess: () => {

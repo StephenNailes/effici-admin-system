@@ -235,7 +235,9 @@ export default function ViewAllEvents() {
 
   const confirmDeleteEvent = () => {
     if (deleteEventId === null) return;
+    const csrfToken = (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)?.content || '';
     router.delete(`/events/${deleteEventId}`, {
+      data: { _token: csrfToken },
       onSuccess: () => {
         setDeleteEventId(null);
         // Navigate back to index to avoid stale route and 404 resource errors

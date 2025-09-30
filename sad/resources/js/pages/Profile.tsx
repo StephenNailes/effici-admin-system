@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 
 import type { PageProps, User as AppUser } from '@/types';
+import { getCsrfToken, getXsrfCookieToken, refreshCsrfToken } from '@/lib/csrf';
 
 export default function Profile() {
   const pageProps = usePage<PageProps>().props;
@@ -79,17 +80,25 @@ export default function Profile() {
   }, [showProfileDropdown]);
 
   // Handlers
-  const handleEmailSave = () => {
+  const handleEmailSave = async () => {
     setEmailError('');
     if (!email || !/^[\w-.]+@([\w-]+\.)+[\w-]{2,4}$/.test(email)) {
       setEmailError('Please enter a valid email address.');
       return;
     }
-    
+    await refreshCsrfToken();
+    const freshToken = getCsrfToken();
+    const xsrf = getXsrfCookieToken();
+
     router.put('/profile/update-email', {
       email: email,
-      _token: csrfToken,
+      _token: freshToken,
     }, {
+      headers: {
+        'X-CSRF-TOKEN': freshToken,
+        ...(xsrf ? { 'X-XSRF-TOKEN': xsrf } : {}),
+        'X-Requested-With': 'XMLHttpRequest',
+      },
       onSuccess: () => {
         setEditingEmail(false);
         // Flash message will be handled by FlashToaster component
@@ -101,7 +110,7 @@ export default function Profile() {
     });
   };
 
-  const handlePasswordSave = () => {
+  const handlePasswordSave = async () => {
     setPasswordError('');
     if (!password || password.length < 6) {
       const errorMessage = 'Password must be at least 6 characters.';
@@ -113,12 +122,20 @@ export default function Profile() {
       setPasswordError(errorMessage);
       return;
     }
-    
+    await refreshCsrfToken();
+    const freshToken = getCsrfToken();
+    const xsrf = getXsrfCookieToken();
+
     router.put('/profile/update-password', {
       password: password,
       password_confirmation: confirmPassword,
-      _token: csrfToken,
+      _token: freshToken,
     }, {
+      headers: {
+        'X-CSRF-TOKEN': freshToken,
+        ...(xsrf ? { 'X-XSRF-TOKEN': xsrf } : {}),
+        'X-Requested-With': 'XMLHttpRequest',
+      },
       onSuccess: () => {
         setEditingPassword(false);
         setPassword('');
@@ -159,20 +176,25 @@ export default function Profile() {
     setEditingProfilePicture(true);
   };
 
-  const handleProfilePictureSave = () => {
+  const handleProfilePictureSave = async () => {
     if (!profilePictureFile) return;
     
     setProfilePictureError('');
     
+  await refreshCsrfToken();
+  const freshToken = getCsrfToken();
+  const xsrf = getXsrfCookieToken();
+
   const formData = new FormData();
   formData.append('profile_picture', profilePictureFile);
-  if (csrfToken) formData.append('_token', csrfToken);
+  if (freshToken) formData.append('_token', freshToken);
     
     router.post('/profile/update-picture', formData, {
       preserveScroll: true,
       preserveState: false, // Allow state refresh to get updated user data
       headers: {
-        'X-CSRF-TOKEN': csrfToken,
+        'X-CSRF-TOKEN': freshToken,
+        ...(xsrf ? { 'X-XSRF-TOKEN': xsrf } : {}),
         'X-Requested-With': 'XMLHttpRequest',
       },
       onSuccess: (page) => {
@@ -203,20 +225,25 @@ export default function Profile() {
     setProfilePictureError('');
   };
 
-  const handleProfilePictureRemove = () => {
+  const handleProfilePictureRemove = async () => {
     setProfilePictureError('');
     if (profilePicturePreview) {
       URL.revokeObjectURL(profilePicturePreview);
       setProfilePicturePreview(null);
     }
     // Use POST + method spoofing with FormData to ensure Laravel reads _method and CSRF
+    await refreshCsrfToken();
+    const freshToken = getCsrfToken();
+    const xsrf = getXsrfCookieToken();
+
     const fd = new FormData();
     fd.append('_method', 'delete');
-    if (csrfToken) fd.append('_token', csrfToken);
+    if (freshToken) fd.append('_token', freshToken);
 
     router.post('/profile/remove-picture', fd, {
       headers: {
-        'X-CSRF-TOKEN': csrfToken,
+        'X-CSRF-TOKEN': freshToken,
+        ...(xsrf ? { 'X-XSRF-TOKEN': xsrf } : {}),
         'X-Requested-With': 'XMLHttpRequest',
       },
       preserveScroll: true,
@@ -243,7 +270,7 @@ export default function Profile() {
     });
   };
 
-  const handleNameSave = () => {
+  const handleNameSave = async () => {
     setNameError('');
     
     if (!firstName.trim() || !lastName.trim()) {
@@ -251,13 +278,21 @@ export default function Profile() {
       setNameError(errorMessage);
       return;
     }
-    
+    await refreshCsrfToken();
+    const freshToken = getCsrfToken();
+    const xsrf = getXsrfCookieToken();
+
     router.put('/profile/update-name', {
       first_name: firstName.trim(),
       middle_name: middleName.trim(),
       last_name: lastName.trim(),
-      _token: csrfToken,
+      _token: freshToken,
     }, {
+      headers: {
+        'X-CSRF-TOKEN': freshToken,
+        ...(xsrf ? { 'X-XSRF-TOKEN': xsrf } : {}),
+        'X-Requested-With': 'XMLHttpRequest',
+      },
       preserveScroll: true,
       preserveState: false, // Allow state refresh to get updated user data
       onSuccess: (page) => {

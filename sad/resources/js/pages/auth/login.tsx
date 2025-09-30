@@ -3,6 +3,7 @@ import { toast } from 'react-toastify'
 import { router } from '@inertiajs/react'
 import { FiEye, FiEyeOff, FiLogIn } from 'react-icons/fi'
 import { motion } from 'framer-motion'
+import { getCsrfToken, getXsrfCookieToken, csrfFetch, refreshCsrfToken } from '@/lib/csrf'
 
 export default function Login() {
   const [email, setEmail] = useState('')
@@ -13,11 +14,20 @@ export default function Login() {
 
   const togglePasswordVisibility = () => setShowPassword(!showPassword)
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
-    // Inertia.js handles CSRF tokens automatically - no need to manually include _token
-    router.post('/login', { email, password, remember }, {
+    // Ensure we send fresh CSRF tokens via header and body
+    // Actively refresh CSRF to avoid stale meta/cookie after logout
+    await refreshCsrfToken()
+    const csrfToken = getCsrfToken()
+    const xsrfToken = getXsrfCookieToken()
+    router.post('/login', { email, password, remember, _token: csrfToken }, {
+      headers: {
+        'X-CSRF-TOKEN': csrfToken,
+        ...(xsrfToken ? { 'X-XSRF-TOKEN': xsrfToken } : {}),
+        'X-Requested-With': 'XMLHttpRequest',
+      },
       onError: (errors: any) => {
         if (errors.password) {
           setError(errors.password)
@@ -34,6 +44,8 @@ export default function Login() {
 
     // Example: Show logout success toast (call this after logout)
     useEffect(() => {
+      // Proactively ensure CSRF meta/cookie exist on first load of login page
+      refreshCsrfToken().catch(() => {/* noop */})
       const urlParams = new URLSearchParams(window.location.search)
       if (urlParams.get('logout') === 'success') {
         toast.success('Logout successful!', {
