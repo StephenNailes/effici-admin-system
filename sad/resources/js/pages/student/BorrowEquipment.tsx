@@ -179,6 +179,8 @@ export default function BorrowEquipment() {
   const { props } = usePage<PageProps>();
   const equipmentList = props.equipment || [];
   const activityPlans = props.activityPlans || [];
+  // Ensure CSRF is available for any form submissions to avoid 419
+  const csrfToken = (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement | null)?.content || '';
 
   const [availability, setAvailability] = useState<Record<number, number>>({});
   const [checking, setChecking] = useState(false);
@@ -193,6 +195,7 @@ export default function BorrowEquipment() {
     end_datetime: string;
     items: { equipment_id: number; quantity: number }[];
     category: "minor" | "normal" | "urgent";
+    _token?: string;
   }>({
     activity_plan_id: undefined,
     purpose: "",
@@ -200,6 +203,7 @@ export default function BorrowEquipment() {
     end_datetime: "",
     items: [{ equipment_id: equipmentList[0]?.id ?? 0, quantity: 1 }],
     category: "normal", // <-- Default value
+    _token: csrfToken,
   });
 
   // Functions to handle multiple equipment items
@@ -270,8 +274,12 @@ export default function BorrowEquipment() {
   function confirmAndSubmit() {
     if (!confirmChecked) return;
     setShowConfirmModal(false);
-    // Inertia handles CSRF automatically
-    router.post("/equipment-requests", data, {
+    // Send CSRF explicitly to eliminate intermittent 419s
+    router.post("/equipment-requests", { ...data, _token: csrfToken }, {
+      headers: {
+        'X-CSRF-TOKEN': csrfToken,
+        'X-Requested-With': 'XMLHttpRequest',
+      },
       onSuccess: () => {
         reset();
         setConfirmChecked(false);
