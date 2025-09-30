@@ -66,13 +66,21 @@ export default function HandoverRegister() {
         setTimeout(async () => {
           await refreshCsrfToken();
           const csrfToken = getCsrfToken();
-          const xsrfToken = getXsrfCookieToken();
           router.post('/logout', { _token: csrfToken }, {
             headers: {
               'X-CSRF-TOKEN': csrfToken,
-              ...(xsrfToken ? { 'X-XSRF-TOKEN': xsrfToken } : {}),
               'X-Requested-With': 'XMLHttpRequest',
             },
+            onError: async () => {
+              await refreshCsrfToken();
+              const fresh = getCsrfToken();
+              router.post('/logout', { _token: fresh }, {
+                headers: {
+                  'X-CSRF-TOKEN': fresh,
+                  'X-Requested-With': 'XMLHttpRequest',
+                },
+              });
+            }
           });
         }, 1200);
       },

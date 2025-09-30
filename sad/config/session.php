@@ -127,9 +127,10 @@ return [
     |
     */
 
+    // Use a unique default cookie name for this app to avoid collisions with other local apps
     'cookie' => env(
         'SESSION_COOKIE',
-        Str::slug(env('APP_NAME', 'laravel'), '_').'_session'
+        'effici_admin_system_session'
     ),
 
     /*

@@ -178,18 +178,29 @@ export default function Sidebar() {
 
   const handleLogout = async () => {
     setShowConfirm(false);
+    // Ensure we have a fresh CSRF token before logout
+    await refreshCsrfToken();
     const csrfToken = getCsrfToken();
-    const xsrfToken = getXsrfCookieToken();
     router.post('/logout', { _token: csrfToken }, {
       headers: {
         'X-CSRF-TOKEN': csrfToken,
-        ...(xsrfToken ? { 'X-XSRF-TOKEN': xsrfToken } : {}),
         'X-Requested-With': 'XMLHttpRequest',
       },
       onSuccess: () => {
-        // After server invalidates and regenerates session, fetch a fresh token for the login page
+        // After logout, refresh CSRF/meta so the login page is ready
         refreshCsrfToken().catch(() => {/* noop */});
       },
+      onError: async (errors) => {
+        // Retry once on CSRF mismatch by refreshing token
+        await refreshCsrfToken();
+        const fresh = getCsrfToken();
+        router.post('/logout', { _token: fresh }, {
+          headers: {
+            'X-CSRF-TOKEN': fresh,
+            'X-Requested-With': 'XMLHttpRequest',
+          },
+        });
+      }
     });
   };
 

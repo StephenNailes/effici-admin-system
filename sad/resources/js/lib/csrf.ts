@@ -30,12 +30,10 @@ export function getCsrfToken(): string {
 
 export function csrfFetch(input: RequestInfo | URL, init: RequestInit = {}): Promise<Response> {
   const metaToken = getCsrfMetaToken();
-  const xsrfToken = getXsrfCookieToken();
   const headers = new Headers(init.headers || {});
   // Always identify as AJAX and attach both CSRF headers
   headers.set('X-Requested-With', 'XMLHttpRequest');
   if (metaToken) headers.set('X-CSRF-TOKEN', metaToken);
-  if (xsrfToken) headers.set('X-XSRF-TOKEN', xsrfToken);
 
   return fetch(input, {
     ...init,
@@ -49,24 +47,22 @@ export function installAxiosCsrf() {
   // Ensure cookies flow for same-origin requests
   axios.defaults.withCredentials = true;
   axios.defaults.headers.common['X-Requested-With'] = 'XMLHttpRequest';
-  // Make sure axios uses Laravel's default cookie/header names for XSRF
-  (axios.defaults as any).xsrfCookieName = 'XSRF-TOKEN';
-  (axios.defaults as any).xsrfHeaderName = 'X-XSRF-TOKEN';
+  // Disable axios automatic XSRF header injection to avoid cross-app cookie collisions in dev
+  (axios.defaults as any).xsrfCookieName = 'XSRF-TOKEN-EFFICI-DISABLED';
+  (axios.defaults as any).xsrfHeaderName = 'X-XSRF-TOKEN-DISABLED';
 
   axios.interceptors.request.use(
     (config) => {
       const metaToken = getCsrfMetaToken();
-      const xsrfToken = getXsrfCookieToken();
-      if (metaToken || xsrfToken) {
+      if (metaToken) {
         // Ensure headers exist
         config.headers = config.headers ?? {};
         // Set both headers so either mechanism passes
         if (metaToken) (config.headers as any)['X-CSRF-TOKEN'] = metaToken;
-        if (xsrfToken) (config.headers as any)['X-XSRF-TOKEN'] = xsrfToken;
 
         // For mutating requests, also include _token in body when feasible
         const method = (config.method || '').toLowerCase();
-        if (['post', 'put', 'patch', 'delete'].includes(method) && metaToken) {
+  if (['post', 'put', 'patch', 'delete'].includes(method) && metaToken) {
           try {
             if (config.data && typeof config.data === 'object' && config.data !== null) {
               if (config.data instanceof FormData) {
