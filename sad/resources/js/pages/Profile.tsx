@@ -309,7 +309,7 @@ export default function Profile() {
 
   return (
     <MainLayout>
-      <div className="p-8 font-poppins h-screen overflow-hidden text-black">
+      <div className="p-8 font-poppins text-black overflow-y-auto max-h-screen">
         {/* Header */}
         <div className="mb-8 flex flex-col gap-1">
           <h1 className="text-3xl font-bold text-red-600 tracking-tight">
@@ -320,7 +320,7 @@ export default function Profile() {
           </p>
         </div>
 
-        <div className="grid gap-6">
+        <div className="grid gap-6 pb-8">
             {/* Card 1: Basic Information */}
             <div className="bg-white rounded-xl shadow-lg border border-gray-100 p-8">
               <h2 className="text-xl font-bold text-gray-800 mb-6 pb-3 border-b border-gray-100">
@@ -412,8 +412,9 @@ export default function Profile() {
                 <div className="lg:col-span-2 space-y-6">
                   {/* Name and Date of Birth Row */}
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    {/* Name */}
-                    <div className="flex items-start gap-4">
+                    {/* Name + School ID stacked in left column */}
+                    <div className="flex flex-col gap-6">
+                      <div className="flex items-start gap-4">
                       <User2 className="text-[#e6232a]/80 w-5 h-5 flex-shrink-0 mt-1" />
                       <div className="flex flex-col flex-grow">
                         <span className="font-semibold text-gray-700 text-sm mb-1">Name</span>
@@ -485,11 +486,29 @@ export default function Profile() {
                           </motion.form>
                         )}
                       </div>
+                      </div>
+
+                      {/* School ID Row - Only show for students; placed under Name for consistent spacing */}
+                      {user.role === 'student' && (
+                        <div className="flex items-center gap-4">
+                          <Landmark className="text-[#e6232a]/80 w-5 h-5 flex-shrink-0" />
+                          <div className="flex flex-col">
+                            <span className="font-semibold text-gray-700 text-sm">School ID</span>
+                            <span className="text-gray-900">
+                              {user.school_id_number ? (
+                                user.school_id_number as string
+                              ) : (
+                                renderNotSet('School ID')
+                              )}
+                            </span>
+                          </div>
+                        </div>
+                      )}
                     </div>
 
                     {/* Date of Birth */}
-                    <div className="flex items-center gap-4">
-                      <Calendar className="text-[#e6232a]/80 w-5 h-5 flex-shrink-0" />
+                    <div className="flex items-start gap-4">
+                      <Calendar className="text-[#e6232a]/80 w-5 h-5 flex-shrink-0 mt-1" />
                       <div className="flex flex-col">
                         <span className="font-semibold text-gray-700 text-sm">Date of Birth</span>
                         <span className="text-gray-900">
@@ -499,26 +518,22 @@ export default function Profile() {
                             renderNotSet('Date of Birth')
                           )}
                         </span>
+                        {/* Verify Student Officer Status button for students only */}
+                        {user.role === 'student' && (
+                          <motion.button
+                            whileHover={{ scale: 1.02 }}
+                            whileTap={{ scale: 0.98 }}
+                            onClick={() => router.visit('/student/role-request')}
+                            className="mt-3 inline-flex items-center gap-2 text-sm bg-[#e6232a] hover:bg-[#d01e24] text-white px-3 py-2 rounded-lg w-fit"
+                          >
+                            <UserCheck className="w-4 h-4" /> Verify Officer Status
+                          </motion.button>
+                        )}
                       </div>
                     </div>
                   </div>
 
-                  {/* School ID Row - Only show for students */}
-                  {user.role === 'student' && (
-                    <div className="flex items-center gap-4">
-                      <Landmark className="text-[#e6232a]/80 w-5 h-5 flex-shrink-0" />
-                      <div className="flex flex-col">
-                        <span className="font-semibold text-gray-700 text-sm">School ID</span>
-                        <span className="text-gray-900">
-                          {user.school_id_number ? (
-                            user.school_id_number as string
-                          ) : (
-                            renderNotSet('School ID')
-                          )}
-                        </span>
-                      </div>
-                    </div>
-                  )}
+                  
 
                   {/* Email Row - Only editable for admin_assistant and dean */}
                   <div className="flex items-start gap-4">

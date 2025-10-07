@@ -33,7 +33,7 @@ Route::get('/', function () {
     if (Auth::check()) {
         $role = Auth::user()->role ?? null;
         return match ($role) {
-            'student' => redirect()->route('student.dashboard'),
+            'student', 'student_officer' => redirect()->route('student.dashboard'),
             'admin_assistant' => redirect()->route('admin.dashboard'),
             'dean' => redirect()->route('dean.dashboard'),
             'inactive_admin_assistant', 'inactive_dean' => redirect()->route('login')->withErrors([
@@ -107,6 +107,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     // Profile page
     Route::get('/profile', [App\Http\Controllers\ProfileController::class, 'show'])->name('profile');
+    // Role request routes (student self-service)
+    Route::get('/student/role-request', [App\Http\Controllers\RoleUpdateRequestController::class, 'create'])->name('student.role-request.create');
+    Route::post('/student/role-request', [App\Http\Controllers\RoleUpdateRequestController::class, 'store'])->name('student.role-request.store');
     
     // Profile update routes
     Route::post('/profile/update-picture', [App\Http\Controllers\ProfileController::class, 'updateProfilePicture'])->name('profile.update-picture');
@@ -119,17 +122,19 @@ Route::middleware(['auth', 'verified'])->group(function () {
 // 🟩 Student Routes
 Route::middleware(['auth', 'verified'])->prefix('student')->group(function () {
 
-    // Activity Plan
-    Route::get('/requests/activity-plan', [ActivityPlanController::class, 'index'])
-        ->name('student.requests.activity-plan');
-    Route::post('/requests/activity-plan', [ActivityPlanController::class, 'store'])
-        ->name('student.requests.activity-plan.store');
-    Route::get('/requests/activity-plan/{id}', [ActivityPlanController::class, 'show'])
-        ->name('student.requests.activity-plan.show');
-    Route::patch('/requests/activity-plan/{id}', [ActivityPlanController::class, 'update'])
-        ->name('student.requests.activity-plan.update');
-    Route::delete('/requests/activity-plan/{id}', [ActivityPlanController::class, 'destroy'])
-        ->name('student.requests.activity-plan.destroy');
+    // Activity Plan (Student Officer only)
+    Route::middleware(['role:student_officer'])->group(function () {
+        Route::get('/requests/activity-plan', [ActivityPlanController::class, 'index'])
+            ->name('student.requests.activity-plan');
+        Route::post('/requests/activity-plan', [ActivityPlanController::class, 'store'])
+            ->name('student.requests.activity-plan.store');
+        Route::get('/requests/activity-plan/{id}', [ActivityPlanController::class, 'show'])
+            ->name('student.requests.activity-plan.show');
+        Route::patch('/requests/activity-plan/{id}', [ActivityPlanController::class, 'update'])
+            ->name('student.requests.activity-plan.update');
+        Route::delete('/requests/activity-plan/{id}', [ActivityPlanController::class, 'destroy'])
+            ->name('student.requests.activity-plan.destroy');
+    });
 
     // Generated documents for activity plan
     Route::post('/requests/activity-plan/{id}/generate', [DocumentController::class, 'generate'])
@@ -167,6 +172,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
 // 🟩 Admin + Dean Request Pages (role protected)
 Route::middleware(['auth', 'verified', 'role:admin_assistant,dean'])->group(function () {
     Route::get('/admin/requests', fn () => Inertia::render('admin_assistant/request'))->name('admin.requests');
+    // Admin Assistant: role update requests management
+    Route::get('/admin/role-requests', [App\Http\Controllers\RoleUpdateRequestController::class, 'index'])->middleware('role:admin_assistant')->name('admin.role-requests');
+    Route::patch('/admin/role-requests/{id}', [App\Http\Controllers\RoleUpdateRequestController::class, 'update'])->middleware('role:admin_assistant')->name('admin.role-requests.update');
     Route::get('/admin/activity-plan-approval/{id}', fn ($id) => Inertia::render('admin_assistant/ActivityPlanApproval', ['id' => $id]))->name('admin.activity-plan-approval');
     Route::get('/admin/equipment-management', [EquipmentRequestController::class, 'equipmentManagement'])->name('admin.equipment-management');
     Route::patch('/equipment-requests/{id}/status', [EquipmentRequestController::class, 'updateStatus'])->name('equipment-requests.update-status');
@@ -205,6 +213,8 @@ Route::middleware(['auth', 'verified', 'role:admin_assistant'])->group(function 
 
 // 🟩 Events + Announcements
 Route::middleware(['auth', 'verified'])->group(function () {
+    // Calendar (simple landing page)
+    Route::get('/calendar', fn () => Inertia::render('Calendar'))->name('calendar');
     Route::get('/events', [EventController::class, 'index'])->name('events.index');
     Route::get('/events/create', [EventController::class, 'create'])->name('events.create');
     Route::post('/events', [EventController::class, 'store'])->name('events.store');

@@ -14,6 +14,7 @@ import {
   FaBell,          // Add for Notifications
   FaCalendarAlt,   // Add for Events notification indicator
   FaBullhorn,      // Add for Announcements notification indicator
+  FaUserShield,    // Add for Role Management
 } from 'react-icons/fa';
 import { usePage, Link, router } from '@inertiajs/react';
 import { ReactElement, useState, useRef, useEffect } from 'react';
@@ -21,8 +22,9 @@ import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import NotificationPanel from '@/components/NotificationPanel';
 import axios from 'axios';
 import { getCsrfToken, getXsrfCookieToken, refreshCsrfToken } from '../lib/csrf';
+import RoleAccessModal from './RoleAccessModal';
 
-type UserRole = 'student' | 'admin_assistant' | 'dean';
+type UserRole = 'student' | 'student_officer' | 'admin_assistant' | 'dean';
 
 interface MenuItem {
   name: string;
@@ -88,6 +90,8 @@ export default function Sidebar() {
   const [eventNotificationCount, setEventNotificationCount] = useState(0);
   const [announcementNotificationCount, setAnnouncementNotificationCount] = useState(0);
   const [profileImgErrored, setProfileImgErrored] = useState(false);
+  const [roleAccessModalOpen, setRoleAccessModalOpen] = useState(false);
+  const [blockedFeature, setBlockedFeature] = useState({ name: '', requiredRole: '' });
 
   // Store requestOpen state in localStorage to persist across navigation
   const [requestOpen, setRequestOpen] = useState(() => {
@@ -212,6 +216,15 @@ export default function Sidebar() {
     return 0;
   };
 
+  // Handle restricted navigation for regular students
+  const handleNavigation = (e: React.MouseEvent, child: { name: string; href: string }) => {
+    if (role === 'student' && child.name === 'Activity Plan') {
+      e.preventDefault();
+      setBlockedFeature({ name: 'Activity Plan', requiredRole: 'Student Officer' });
+      setRoleAccessModalOpen(true);
+    }
+  };
+
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (dropdownRef.current && !(dropdownRef.current as any).contains(event.target)) {
@@ -241,20 +254,38 @@ export default function Sidebar() {
           // 🔜 Add more requests here (e.g. Room Reservation, etc.)
         ],
       },
+      { name: 'Calendar', href: route('calendar'), routeName: 'calendar', icon: <FaCalendarAlt /> },
+      { name: 'Revise Requests', href: route('student.revision'), routeName: 'student.revision', icon: <FaBook /> },
+      { name: 'Activity Log', href: route('activity-log.index'), routeName: 'activity-log.index', icon: <FaChartLine /> },
+    ],
+    student_officer: [
+      { name: 'Home', href: route('student.dashboard'), routeName: 'student.dashboard', icon: <FaHome /> },
+      {
+        name: 'Request Forms',
+        icon: <FaFileAlt />,
+        children: [
+          { name: 'Activity Plan', href: route('student.requests.activity-plan'), routeName: 'student.requests.activity-plan', icon: <FaClipboardList /> },
+          { name: 'Borrow Equipment', href: route('student.borrow-equipment'), routeName: 'student.borrow-equipment', icon: <FaToolbox /> },
+        ],
+      },
+      { name: 'Calendar', href: route('calendar'), routeName: 'calendar', icon: <FaCalendarAlt /> },
       { name: 'Revise Requests', href: route('student.revision'), routeName: 'student.revision', icon: <FaBook /> },
       { name: 'Activity Log', href: route('activity-log.index'), routeName: 'activity-log.index', icon: <FaChartLine /> },
     ],
     admin_assistant: [
       { name: 'Home', href: route('admin.dashboard'), routeName: 'admin.dashboard', icon: <FaHome /> },
       { name: 'Request Management', href: route('admin.requests'), routeName: 'admin.requests', icon: <FaFileAlt /> },
-      { name: 'Equipment Management', href: route('admin.equipment-management'), routeName: 'admin.equipment-management', icon: <FaToolbox /> },
+  { name: 'Equipment Management', href: route('admin.equipment-management'), routeName: 'admin.equipment-management', icon: <FaToolbox /> },
+  { name: 'Role Management', href: route('admin.role-requests'), routeName: 'admin.role-requests', icon: <FaUserShield /> },
       { name: 'Analytics', href: route('admin_assistant.analytics'), routeName: 'admin_assistant.analytics', icon: <FaChartBar /> },
       { name: 'Activity History', href: route('admin.activity-history'), routeName: 'admin.activity-history', icon: <FaChartLine /> },
+      { name: 'Calendar', href: route('calendar'), routeName: 'calendar', icon: <FaCalendarAlt /> },
     ],
     dean: [
       { name: 'Home', href: route('dean.dashboard'), routeName: 'dean.dashboard', icon: <FaHome /> },
       { name: 'Requests', href: route('dean.requests'), routeName: 'dean.requests', icon: <FaFileAlt /> },
       { name: 'Activity History', href: route('dean.activity-history'), routeName: 'dean.activity-history', icon: <FaChartLine /> },
+      { name: 'Calendar', href: route('calendar'), routeName: 'calendar', icon: <FaCalendarAlt /> },
     ],
   };
 
@@ -348,8 +379,10 @@ export default function Sidebar() {
                                 transition={prefersReducedMotion ? { duration: 0 } : { duration: 0.2 }}
                                 className="ml-8 mt-2 flex flex-col gap-2"
                               >
-                                {item.children.map((child) => {
+                                {item.children
+                                  .map((child) => {
                                   const childActive = isActiveItem(child);
+                                  const isLocked = role === 'student' && child.name === 'Activity Plan';
                                   return (
                                     <div key={child.name} className="relative">
                                       {childActive && (
@@ -359,12 +392,15 @@ export default function Sidebar() {
                                         href={child.href}
                                         preserveState={false}
                                         aria-current={childActive ? 'page' : undefined}
+                                        onClick={(e) => handleNavigation(e, child)}
                                         className={`relative flex items-center px-4 py-2 rounded-lg text-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/90 focus-visible:ring-offset-2 focus-visible:ring-offset-[#d71f27]
                                           ${childActive ? 'font-semibold' : 'hover:bg-white/10'}
+                                          ${isLocked ? 'opacity-60' : ''}
                                         `}
                                       >
                                         {child.icon && <span className="text-base mr-2">{child.icon}</span>}
                                         {child.name}
+                                        {isLocked && <FaLock className="ml-auto w-3 h-3" />}
                                       </Link>
                                     </div>
                                   );
@@ -377,6 +413,7 @@ export default function Sidebar() {
                             <div className="ml-8 mt-2 flex flex-col gap-2">
                               {item.children.map((child) => {
                                 const childActive = isActiveItem(child);
+                                const isLocked = role === 'student' && child.name === 'Activity Plan';
                                 return (
                                   <div key={child.name} className="relative">
                                     {childActive && (
@@ -386,12 +423,15 @@ export default function Sidebar() {
                                       href={child.href}
                                       preserveState={false}
                                       aria-current={childActive ? 'page' : undefined}
+                                      onClick={(e) => handleNavigation(e, child)}
                                       className={`relative flex items-center px-4 py-2 rounded-lg text-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/90 focus-visible:ring-offset-2 focus-visible:ring-offset-[#d71f27]
                                         ${childActive ? 'font-semibold' : 'hover:bg-white/10'}
+                                        ${isLocked ? 'opacity-60' : ''}
                                       `}
                                     >
                                       {child.icon && <span className="text-base mr-2">{child.icon}</span>}
                                       {child.name}
+                                      {isLocked && <FaLock className="ml-auto w-3 h-3" />}
                                     </Link>
                                   </div>
                                 );
@@ -568,6 +608,14 @@ export default function Sidebar() {
           </div>
         </div>
       )}
+
+      {/* Role Access Modal */}
+      <RoleAccessModal 
+        isOpen={roleAccessModalOpen}
+        onClose={() => setRoleAccessModalOpen(false)}
+        requiredRole={blockedFeature.requiredRole}
+        featureName={blockedFeature.name}
+      />
     </>
   );
 }

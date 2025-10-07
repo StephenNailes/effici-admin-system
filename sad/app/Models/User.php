@@ -23,7 +23,7 @@ class User extends Authenticatable implements MustVerifyEmail
         'last_name',
         'email',
         'password',
-        'role', // student | admin_assistant | dean
+    'role', // student | student_officer | admin_assistant | dean
         'profile_picture',
         'school_id_number',
         'date_of_birth',
@@ -119,6 +119,11 @@ class User extends Authenticatable implements MustVerifyEmail
     public function isStudent(): bool
     {
         return $this->role === 'student';
+    }
+
+    public function isStudentOfficer(): bool
+    {
+        return $this->role === 'student_officer';
     }
 
     public function isAssistant(): bool

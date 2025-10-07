@@ -4,7 +4,6 @@ import { FaBell, FaTimes, FaCheck, FaExclamationTriangle, FaTrash } from 'react-
 // Removed lucide-react icons to simplify and avoid unused imports
 import { router } from '@inertiajs/react';
 import axios from 'axios';
-import { getCsrfToken } from '../lib/csrf';
 import { motion, AnimatePresence } from 'framer-motion';
 
 interface NotificationData {
@@ -104,12 +103,8 @@ export default function NotificationPanel({ className = '', onOpen, isOpen: exte
 
   const fetchNotifications = async () => {
     try {
-      const response = await axios.get('/api/notifications', { 
-        withCredentials: true,
-        headers: {
-          'X-Requested-With': 'XMLHttpRequest'
-        }
-      });
+      // The axios interceptor will automatically add CSRF token and headers
+      const response = await axios.get('/api/notifications');
       setNotifications(response.data.notifications || []);
       setUnreadCount(response.data.unread_count || 0);
     } catch (error) {
@@ -123,19 +118,15 @@ export default function NotificationPanel({ className = '', onOpen, isOpen: exte
 
   const markAsRead = async (notificationId: number) => {
     try {
-      await axios.post(`/api/notifications/${notificationId}/read`, 
-        {}, 
-        { 
-          withCredentials: true,
-          headers: {
-            'X-Requested-With': 'XMLHttpRequest'
-          }
-        }
-      );
-      setNotifications(prev => prev.map(n => 
-        n.id === notificationId ? { ...n, is_read: true } : n
-      ));
-      setUnreadCount(prev => Math.max(0, prev - 1));
+      // The axios interceptor will automatically add CSRF token
+      const response = await axios.post(`/api/notifications/${notificationId}/read`);
+      
+      if (response.data.success) {
+        setNotifications(prev => prev.map(n => 
+          n.id === notificationId ? { ...n, is_read: true } : n
+        ));
+        setUnreadCount(prev => Math.max(0, prev - 1));
+      }
     } catch (error) {
       console.error('Error marking notification as read:', error);
     }
@@ -144,36 +135,32 @@ export default function NotificationPanel({ className = '', onOpen, isOpen: exte
   const markAllAsRead = async () => {
     try {
       setLoading(true);
-      await axios.post('/api/notifications/mark-all-read', 
-        {}, 
-        { 
-          withCredentials: true,
-          headers: {
-            'X-Requested-With': 'XMLHttpRequest'
-          }
-        }
-      );
-      setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
-      setUnreadCount(0);
+      // The axios interceptor will automatically add CSRF token
+      const response = await axios.post('/api/notifications/mark-all-read');
+      
+      if (response.data.success) {
+        setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
+        setUnreadCount(0);
+      }
     } catch (error) {
       console.error('Error marking all notifications as read:', error);
+      // Optionally show a user-friendly error message
+      alert('Failed to mark notifications as read. Please try again.');
     } finally {
       setLoading(false);
     }
   };  const deleteNotification = async (notificationId: number) => {
     try {
-      await axios.delete(`/api/notifications/${notificationId}`, { 
-        withCredentials: true,
-        data: {},
-        headers: {
-          'X-Requested-With': 'XMLHttpRequest'
+      // The axios interceptor will automatically add CSRF token
+      const response = await axios.delete(`/api/notifications/${notificationId}`);
+      
+      if (response.data.success) {
+        setNotifications(prev => prev.filter(n => n.id !== notificationId));
+        // Update unread count if the deleted notification was unread
+        const deletedNotification = notifications.find(n => n.id === notificationId);
+        if (deletedNotification && !deletedNotification.is_read) {
+          setUnreadCount(prev => Math.max(0, prev - 1));
         }
-      });
-      setNotifications(prev => prev.filter(n => n.id !== notificationId));
-      // Update unread count if the deleted notification was unread
-      const deletedNotification = notifications.find(n => n.id === notificationId);
-      if (deletedNotification && !deletedNotification.is_read) {
-        setUnreadCount(prev => Math.max(0, prev - 1));
       }
     } catch (error) {
       console.error('Error deleting notification:', error);

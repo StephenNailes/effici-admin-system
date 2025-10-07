@@ -20,6 +20,9 @@ class ActivityPlanController extends Controller
 
     public function store(Request $request)
     {
+        if (Auth::user()?->role !== 'student_officer') {
+            abort(403, 'Only Student Officers can create activity plans.');
+        }
         $validated = $request->validate([
             'activity_name' => 'required|string|max:255',
             'activity_purpose' => 'required|string',
@@ -90,6 +93,9 @@ class ActivityPlanController extends Controller
 
     public function index()
     {
+        if (Auth::user()?->role !== 'student_officer') {
+            abort(403);
+        }
         $plans = ActivityPlan::where('user_id', Auth::id())->get();
         return inertia('student/ActivityPlan', [
             'plans' => $plans
@@ -98,6 +104,9 @@ class ActivityPlanController extends Controller
 
     public function show($id)
     {
+        if (Auth::user()?->role !== 'student_officer') {
+            abort(403);
+        }
         $plan = ActivityPlan::where('id', $id)
             ->where('user_id', Auth::id())
             ->firstOrFail();
@@ -109,6 +118,9 @@ class ActivityPlanController extends Controller
 
     public function update(Request $request, $id)
     {
+        if (Auth::user()?->role !== 'student_officer') {
+            abort(403);
+        }
         $validated = $request->validate([
             'activity_name' => 'required|string|max:255',
             'activity_purpose' => 'required|string',
@@ -156,6 +168,9 @@ class ActivityPlanController extends Controller
 
     public function destroy($id)
     {
+        if (Auth::user()?->role !== 'student_officer') {
+            abort(403);
+        }
         $plan = ActivityPlan::where('id', $id)
             ->where('user_id', Auth::id())
             ->firstOrFail();

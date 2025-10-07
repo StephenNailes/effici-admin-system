@@ -366,4 +366,50 @@ class NotificationService
 
         return false;
     }
+
+    /**
+     * Notify admin assistants about a new student role update request
+     */
+    public function notifyNewRoleUpdateRequest(string $studentName, int $roleRequestId): void
+    {
+        $admins = User::where('role', 'admin_assistant')->get();
+        foreach ($admins as $admin) {
+            $this->create([
+                'user_id' => $admin->id,
+                'type' => 'role_update_request',
+                'title' => '🔍 New Officer Verification Request',
+                'message' => "$studentName submitted details to verify their Student Officer status",
+                'data' => [
+                    'request_id' => $roleRequestId,
+                    'requested_role' => 'student_officer',
+                ],
+                'action_url' => "/admin/role-requests",
+                'priority' => 'normal',
+            ]);
+        }
+    }
+
+    /**
+     * Notify student about decision on their officer verification request
+     */
+    public function notifyRoleUpdateDecision(int $studentUserId, string $status, int $roleRequestId): void
+    {
+        $title = $status === 'approved' ? '✅ Officer Status Verified' : '❌ Verification Not Approved';
+        $message = $status === 'approved'
+            ? 'Your Student Officer status has been verified! You now have access to Activity Plan features.'
+            : 'Your officer verification request was not approved. Please contact the Admin Assistant for more information.';
+
+        $this->create([
+            'user_id' => $studentUserId,
+            'type' => 'role_update_decision',
+            'title' => $title,
+            'message' => $message,
+            'data' => [
+                'request_id' => $roleRequestId,
+                'status' => $status,
+            ],
+            'action_url' => '/profile',
+            'priority' => $status === 'approved' ? 'high' : 'normal',
+        ]);
+    }
 }

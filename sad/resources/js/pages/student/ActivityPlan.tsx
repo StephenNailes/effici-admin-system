@@ -1,273 +1,1200 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useCallback, useRef, useLayoutEffect } from "react";
 import MainLayout from "@/layouts/mainlayout";
-import { motion } from "framer-motion";
-import { useForm } from "@inertiajs/react";
+import uicLogo from "/public/images/uic-logo.png";
+import tuvCertified from "/public/images/tuv-certified.jpg";
+import uicFooter from "/public/images/uic-footer.jpg";
 import {
-  Activity,
-  Calendar,
-  Users,
-  MapPin,
-  ListChecks,
-  Target,
-  CheckCircle2,
-  AlertCircle,
+  Undo2,
+  Redo2,
+  Bold as BoldIcon,
+  Italic as ItalicIcon,
+  Underline as UnderlineIcon,
+  AlignLeft,
+  AlignCenter,
+  AlignRight,
+  AlignJustify,
+  Link as LinkIcon,
+  List as BulletListIcon,
+  ListOrdered as NumberListIcon,
+  Printer as PrinterIcon,
 } from "lucide-react";
-import DatePicker from "react-datepicker";
-import "react-datepicker/dist/react-datepicker.css";
-import "./datepicker-theme.css"; // Import your custom theme
 
-type Category = "minor" | "normal" | "urgent";
+/*---------- Types ----------*/
+type Member = { name: string; role: string };
+type Signatory = { name: string; position: string };
+type SignatoriesMap = Record<string, Signatory[]>;
 
-// Hoisted minimalist input components to avoid remounting on each render
-const InputWithIcon: React.FC<
-  React.InputHTMLAttributes<HTMLInputElement> & { icon: React.ReactNode }
-> = ({ icon, ...props }) => (
-  <div className="relative">
-    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-red-400">{icon}</span>
-    <input
-      {...props}
-      className="w-full pl-10 p-3 rounded-xl bg-gray-50 border border-black/20 hover:border-black/40 focus:border-black focus:ring-2 focus:ring-black/10 outline-none transition-all duration-200 placeholder:text-gray-400 text-black"
-      style={{ boxShadow: "none" }}
-    />
-  </div>
+/*---------- Small inline SVG Icons ----------*/
+type IconProps = React.SVGProps<SVGSVGElement>;
+
+const IconPin = (props: IconProps) => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+    <path d="M20 10c0 6-8 12-8 12S4 16 4 10a8 8 0 1 1 16 0Z" />
+    <circle cx="12" cy="10" r="3" />
+  </svg>
 );
 
-const TextareaWithIcon: React.FC<
-  React.TextareaHTMLAttributes<HTMLTextAreaElement> & { icon: React.ReactNode }
-> = ({ icon, ...props }) => (
-  <div className="relative">
-    <span className="absolute left-3 top-3 text-red-400">{icon}</span>
-    <textarea
-      {...props}
-      className="w-full pl-10 p-3 rounded-xl bg-gray-50 border border-black/20 hover:border-black/40 focus:border-black focus:ring-2 focus:ring-black/10 outline-none transition-all duration-200 placeholder:text-gray-400 text-black"
-      style={{ boxShadow: "none" }}
-    />
-  </div>
+const IconPhone = (props: IconProps) => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+    <path d="M22 16.92v2a2 2 0 0 1-2.18 2A19 19 0 0 1 3.08 4.18 2 2 0 0 1 5.1 2h2a2 2 0 0 1 2 1.72c.1.78.27 1.55.5 2.3a2 2 0 0 1-.45 2.11L8.6 9.5a16 16 0 0 0 6 6l1.37-1.37a2 2 0 0 1 2.11-.45c.75.23 1.52.4 2.3.5A2 2 0 0 1 22 16.92Z" />
+  </svg>
 );
 
-const DatePickerWithIcon: React.FC<{
-  icon: React.ReactNode;
-  selected: Date | null;
-  onChange: (date: Date | null) => void;
-  placeholder: string;
-  required?: boolean;
-}> = ({ icon, selected, onChange, placeholder, required }) => (
-  <div className="relative">
-    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-red-400 pointer-events-none">{icon}</span>
-    <DatePicker
-      selected={selected}
-      onChange={onChange}
-      showTimeSelect
-      timeFormat="HH:mm"
-      timeIntervals={15}
-      dateFormat="yyyy-MM-dd HH:mm"
-      placeholderText={placeholder}
-      className="w-full pl-10 p-3 rounded-xl bg-gray-50 border border-black/20 hover:border-black/40 focus:border-black focus:ring-2 focus:ring-black/10 outline-none transition-all duration-200 placeholder:text-gray-400 text-black"
-      required={required}
-    />
-  </div>
+const IconPrinter = (props: IconProps) => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+    <path d="M6 9V4h12v5" />
+    <rect x="6" y="9" width="12" height="8" rx="2" />
+    <path d="M6 17h12M8 13h2m4 0h4" />
+  </svg>
 );
 
-const InputNoIcon: React.FC<React.InputHTMLAttributes<HTMLInputElement>> = (
-  props
-) => (
-  <input
-    {...props}
-    className="w-full p-3 rounded-xl bg-gray-50 border border-black/20 hover:border-black/40 focus:border-black focus:ring-2 focus:ring-black/10 outline-none transition-all duration-200 placeholder:text-gray-400 text-black"
-    style={{ boxShadow: "none" }}
-  />
+const IconGlobe = (props: IconProps) => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+    <circle cx="12" cy="12" r="10" />
+    <path d="M2 12h20" />
+    <path d="M12 2a16 16 0 0 1 0 20a16 16 0 0 1 0-20Z" />
+  </svg>
 );
 
-const TextareaNoIcon: React.FC<
-  React.TextareaHTMLAttributes<HTMLTextAreaElement>
-> = (props) => (
-  <textarea
-    {...props}
-    className="w-full p-3 rounded-xl bg-gray-50 border border-black/20 hover:border-black/40 focus:border-black focus:ring-2 focus:ring-black/10 outline-none transition-all duration-200 placeholder:text-gray-400 text-black"
-    style={{ boxShadow: "none" }}
-  />
+const IconMail = (props: IconProps) => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+    <rect x="3" y="5" width="18" height="14" rx="2" />
+    <path d="M3 7l9 6 9-6" />
+  </svg>
 );
 
-const DatePickerNoIcon: React.FC<{
-  selected: Date | null;
-  onChange: (date: Date | null) => void;
-  placeholder: string;
-  required?: boolean;
-}> = ({ selected, onChange, placeholder, required }) => (
-  <DatePicker
-    selected={selected}
-    onChange={onChange}
-    showTimeSelect
-    timeFormat="HH:mm"
-    timeIntervals={15}
-    dateFormat="yyyy-MM-dd HH:mm"
-    placeholderText={placeholder}
-    className="w-full p-3 rounded-xl bg-gray-50 border border-black/20 hover:border-black/40 focus:border-black focus:ring-2 focus:ring-black/10 outline-none transition-all duration-200 placeholder:text-gray-400 text-black"
-    required={required}
-  />
+/*---------- Styling (CSS) ----------*/
+const GlobalStyles = () => (
+  <style>{`
+    /* Removed page-level Tailwind import to avoid conflicting resets with app Tailwind */
+    /* Fonts loaded globally by app; no @import needed here to avoid side effects */
+    
+    :root { --brand-pink: #FF67D3; }
+    /* Force base text color to black within Activity Plan scope */
+    .ap-scope, .ap-scope .App, .ap-scope .page, .ap-scope .main-text, .ap-scope .static-content, .ap-scope .editable-content, .ap-scope .signatories-container, .ap-scope .sidebar, .ap-scope .page-footer, .ap-scope .formatting-toolbar {
+      color: #000;
+    }
+    /* Override Tailwind utilities ONLY inside Activity Plan scope */
+    .ap-scope .text-gray-50, .ap-scope .text-gray-100, .ap-scope .text-gray-200, .ap-scope .text-gray-300, .ap-scope .text-gray-400,
+    .ap-scope .text-gray-500, .ap-scope .text-gray-600, .ap-scope .text-gray-700, .ap-scope .text-gray-800, .ap-scope .text-gray-900 { color: #000 !important; }
+    .ap-scope .text-pink-50, .ap-scope .text-pink-100, .ap-scope .text-pink-200, .ap-scope .text-pink-300, .ap-scope .text-pink-400,
+    .ap-scope .text-pink-500, .ap-scope .text-pink-600, .ap-scope .text-pink-700, .ap-scope .text-pink-800, .ap-scope .text-pink-900 { color: var(--brand-pink) !important; }
+    .ap-scope .border-pink-50, .ap-scope .border-pink-100, .ap-scope .border-pink-200, .ap-scope .border-pink-300, .ap-scope .border-pink-400,
+    .ap-scope .border-pink-500, .ap-scope .border-pink-600, .ap-scope .border-pink-700, .ap-scope .border-pink-800, .ap-scope .border-pink-900 { border-color: var(--brand-pink) !important; }
+    .ap-scope .bg-pink-50, .ap-scope .bg-pink-100, .ap-scope .bg-pink-200, .ap-scope .bg-pink-300, .ap-scope .bg-pink-400,
+    .ap-scope .bg-pink-500, .ap-scope .bg-pink-600, .ap-scope .bg-pink-700, .ap-scope .bg-pink-800, .ap-scope .bg-pink-900 { background-color: var(--brand-pink) !important; }
+    .ap-scope .hover\:bg-pink-50:hover, .ap-scope .hover\:bg-pink-100:hover, .ap-scope .hover\:bg-pink-200:hover, .ap-scope .hover\:bg-pink-300:hover, .ap-scope .hover\:bg-pink-400:hover,
+    .ap-scope .hover\:bg-pink-500:hover, .ap-scope .hover\:bg-pink-600:hover, .ap-scope .hover\:bg-pink-700:hover, .ap-scope .hover\:bg-pink-800:hover, .ap-scope .hover\:bg-pink-900:hover { background-color: var(--brand-pink) !important; }
+    .ap-scope .hover\:text-pink-50:hover, .ap-scope .hover\:text-pink-100:hover, .ap-scope .hover\:text-pink-200:hover, .ap-scope .hover\:text-pink-300:hover, .ap-scope .hover\:text-pink-400:hover,
+    .ap-scope .hover\:text-pink-500:hover, .ap-scope .hover\:text-pink-600:hover, .ap-scope .hover\:text-pink-700:hover, .ap-scope .hover\:text-pink-800:hover, .ap-scope .hover\:text-pink-900:hover { color: var(--brand-pink) !important; }
+
+  /* Header exception: let gray text be gray in the screen-only header to match BorrowEquipment */
+  .ap-scope .ap-screen-header .text-gray-600 { color: #4b5563 !important; }
+
+    /* --- Base Styles (scoped) --- */
+    /* Avoid affecting MainLayout header and screen-only header; keep Times inside document areas only via specific blocks below */
+    /* Ensure Poppins applies where requested, overriding the Times base */
+    .ap-scope .font-poppins { 
+      font-family: 'Poppins', ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji" !important;
+      font-weight: 400 !important; /* explicit normal weight */
+    }
+    .ap-scope .font-poppins.font-bold {
+      font-weight: 700 !important; /* explicit bold */
+    }
+    .ap-scope .App {
+      background-color: #ffffff; /* remove gray background */
+      padding: 2rem 0;
+    }
+
+    /* --- Page Layout for Screen View --- */
+    .ap-scope .page {
+      background: white; 
+      width: 210mm; 
+      height: 297mm; 
+      max-height: 297mm;
+      margin: 20px auto; 
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08); /* subtle shadow on screen */
+      border: 1px solid #d1d5db; /* gray outline for screen */
+      box-sizing: border-box; 
+      display: flex; 
+      flex-direction: column;
+      page-break-after: always; 
+      page-break-inside: avoid; 
+      overflow: hidden;
+      padding: 0mm;
+    }
+    /* Zoom wrapper: centers scaled pages; toolbar stays unscaled */
+    .ap-scope .pages-viewport { display: flex; justify-content: center; }
+    .ap-scope .pages-scale-wrapper { display: inline-block; transform-origin: top center; }
+  /* Screen-only page header handled via Tailwind classes in markup; no scoped CSS needed */
+    .ap-scope #page-header {
+      padding-left: 6mm;
+      padding-right: 13mm;
+      padding-top: 6mm;
+    }
+    .ap-scope .page-content {
+      padding-left: 6mm;
+      padding-right: 13mm;
+    }
+    .ap-scope .page-footer { 
+      flex-shrink: 0; 
+      padding: 0 13mm 5mm 6mm;
+      position: relative;
+    }
+  .ap-scope .page-content { 
+        display: flex; 
+        flex: 1;
+        overflow: hidden;
+    }
+    .ap-scope .main-text { 
+      flex: 1; 
+      padding-left: 1.5rem; 
+      position: relative; 
+      overflow-y: hidden;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+    .ap-scope .editable-content, .ap-scope .static-content { 
+      outline: none; 
+      line-height: 1.5; 
+    }
+    .ap-scope .static-content { 
+      cursor: text; 
+    }
+    .ap-scope .editable-content:focus { 
+      box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1); 
+      border-radius: 4px; 
+    }
+    .ap-scope .sidebar { 
+      position: relative; 
+      width: 130px; 
+      align-self: stretch; 
+      flex-shrink: 0; 
+    }
+    .ap-scope .sidebar-line { 
+      position: absolute; 
+      right: 4.02mm; 
+      top: 1mm; 
+      bottom: 40mm; /* stop before footer lines; increase to end higher, decrease to extend lower */
+      border-right: 2px solid var(--brand-pink); 
+    }
+
+    /* --- Header rule helpers --- */
+    .ap-scope .header-vertical-rule {
+      position: absolute; left: 135.3px; top: 0; bottom: -2mm; width: 0; 
+      border-left-width: 2px; border-left-style: solid; /* color via utility class */
+    }
+    .ap-scope .header-bottom-rule {
+      position: absolute; left: 130px; right: 0; bottom: 3mm; /* adjust bottom to move the line up/down */
+    }
+    .ap-scope .header-left-bottom-rule {
+      position: absolute; left: 0; bottom: 3mm; width: 130px; /* adjust bottom to move the line up/down */
+    }
+
+    /* Slight left nudge for header logo */
+  .ap-scope .header-logo { margin-left: -9px; }
+
+    /* --- Header typography --- */
+  .ap-scope .header-title { font-family: Cambria, "Times New Roman", Times, serif; font-size: 18pt; font-style: italic; }
+  .ap-scope .header-contacts { font-family: "Times New Roman", Times, serif; font-size: 8pt; line-height: 1.1; }
+  .ap-scope .header-society { font-family: "Times New Roman", Times, serif; font-size: 9.5pt; }
+
+    /* --- Footer rules (first page) --- */
+    .ap-scope .footer-rules {
+      position: absolute; top: -4mm; left: -6mm; right: 240px; /* screen: extend to left edge, shorten more on right to clear ISO */
+    }
+    /* --- Footer rules (middle/subsequent pages) - bleed to both edges --- */
+    .ap-scope .footer-rules-middle {
+      position: absolute; top: -4mm; left: -6mm; right: -13mm; /* screen: full bleed on both sides */
+    }
+
+    /* --- Footer accreditation text size --- */
+    .ap-scope .footer-acc {
+      font-size: 8.67px; /* ~6.5pt at 96dpi */
+      line-height: 1.25;
+      font-family: Tahoma, Geneva, Verdana, sans-serif;
+      font-weight: 700; /* Tahoma Bold */
+    }
+    .ap-scope .footer-acc-block { max-width: 148mm; margin-left: auto; margin-right: auto; }
+
+    /* --- Formatting Toolbar (centered above first page, non-sticky) --- */
+    .ap-scope .formatting-toolbar {
+      position: static; /* not sticky, stays above first page */
+      background: #fff; border: 1px solid #e5e7eb; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+      border-radius: 0.75rem; padding: 0.5rem 0.6rem; display: flex; align-items: center;
+      gap: 0.5rem; z-index: 10; width: fit-content; margin: 0 auto 1rem auto;
+    }
+    .ap-scope .formatting-toolbar .group { display: inline-flex; align-items: center; gap: 0.25rem; padding: 0 0.25rem; }
+    .ap-scope .formatting-toolbar .divider { width: 1px; background: #e5e7eb; margin: 0 0.5rem; align-self: stretch; }
+    .ap-scope .formatting-toolbar .btn { padding: 0.35rem; border-radius: 0.5rem; border: none; background: transparent; cursor: pointer; transition: background 0.15s ease, color 0.15s ease; }
+    .ap-scope .formatting-toolbar .btn:hover:not(:disabled) { background: #f3f4f6; color: #ec4B99; }
+    .ap-scope .formatting-toolbar .btn:disabled { cursor: not-allowed; opacity: 0.5; }
+    .ap-scope .formatting-toolbar .select { height: 32px; border: 1px solid #e5e7eb; border-radius: 0.5rem; padding: 0 0.5rem; background: #fff; font-size: 12px; }
+
+    /* --- Signatories Section --- */
+    .ap-scope .signatories-container {
+      margin-top: auto; /* Pushes signatories to the bottom */
+      padding-top: 2rem;
+      padding-bottom: 8mm; /* lift signatories above footer lines to avoid clipping (affects screen + print) */
+    }
+    .ap-scope .signatory-item {
+        break-inside: avoid;
+    }
+    .ap-scope .add-signatory-form {
+      border: 1px dashed #d1d5db;
+      border-radius: 0.5rem;
+      background-color: #f9fafb;
+    }
+    .ap-scope .add-signatory-form input {
+        width: 100%;
+        font-size: 10pt;
+        padding: 4px 8px;
+        border-radius: 4px;
+        border: 1px solid #d1d5db;
+        margin-bottom: 0.5rem;
+    }
+
+    /* --- Body content and signatories: uniform Times New Roman 11pt --- */
+    .ap-scope .main-text,
+    .ap-scope .main-text .editable-content,
+    .ap-scope .main-text .static-content,
+    .ap-scope .signatories-container {
+      font-family: "Times New Roman", Times, serif;
+      font-size: 11pt;
+      line-height: 1.5;
+    }
+    /* Ensure headings inside body use 11pt but keep their boldness where applied */
+    .ap-scope .main-text h1,
+    .ap-scope .main-text h2,
+    .ap-scope .main-text h3,
+    .ap-scope .main-text h4,
+    .ap-scope .main-text h5,
+    .ap-scope .main-text h6 {
+      font-size: 11pt !important;
+    }
+    /* Neutralize Tailwind font-size utilities within body content/signatories to keep sizes equal */
+    .ap-scope .main-text .text-xs,
+    .ap-scope .main-text .text-sm,
+    .ap-scope .main-text .text-base,
+    .ap-scope .main-text .text-lg,
+    .ap-scope .main-text .text-xl,
+    .ap-scope .main-text .text-2xl,
+    .ap-scope .signatories-container .text-xs,
+    .ap-scope .signatories-container .text-sm,
+    .ap-scope .signatories-container .text-base,
+    .ap-scope .signatories-container .text-lg,
+    .ap-scope .signatories-container .text-xl,
+    .ap-scope .signatories-container .text-2xl {
+      font-size: inherit !important;
+    }
+
+  /* --- Sidebar inner container to keep content centered and away from the vertical line --- */
+  .ap-scope .sidebar-inner { width: 100%; max-width: 105px; margin-left: -8px; margin-right: auto; }
+
+    /* --- Executive Board heading style (bold, uppercase, double underline) --- */
+    .ap-scope .sidebar-heading {
+      position: relative;
+      display: inline-block;
+      font-family: "Times New Roman", Times, serif;
+      font-weight: 800;
+      text-transform: uppercase;
+      color: #111827; /* near-black for strong contrast */
+      letter-spacing: 0.3px;
+      
+      white-space: nowrap;
+    }
+    .ap-scope .sidebar-heading::after {
+      content: "";
+      position: absolute; left: 0; right: 0; bottom: 0;
+      height: 2px; background: #000;
+    }
+    /* Sidebar typography scale to avoid overlaps */
+  .ap-scope .member-name { font-family: "Times New Roman", Times, serif; font-size: 10px; line-height: 1.1; letter-spacing: 0.2px; }
+  .ap-scope .member-role { font-family: "Times New Roman", Times, serif; font-size: 9px; line-height: 1.1; }
+  .ap-scope .sidebar-subheading { font-family: "Times New Roman", Times, serif; font-weight: 800; font-size: 10px; letter-spacing: 0.2px; }
+  .ap-scope .sidebar-input { font-family: "Times New Roman", Times, serif; font-size: 10px; }
+  .ap-scope .sidebar-btn { font-family: "Times New Roman", Times, serif; font-size: 11px; padding-top: 6px; padding-bottom: 6px; }
+
+    /* --- Print Styles --- */
+    @media print {
+      @page { size: A4; margin: 0; }
+      body, html, .App { 
+        background: white !important; 
+        margin: 0 !important; 
+        padding: 0 !important; 
+      }
+      /* Hide off-screen measurement nodes to avoid blank printed pages */
+      .no-print { display: none !important; }
+      .formatting-toolbar, .sidebar-form, .add-signatory-form, .remove-btn { 
+        display: none !important; 
+      }
+      /* Hide the application shell sidebar during print */
+      aside[aria-label="Sidebar"] { display: none !important; }
+      /* Show the Activity Plan document sidebar (EXECUTIVE BOARD) on first page in print */
+      .ap-scope .sidebar { 
+        visibility: visible !important; 
+        display: block !important; 
+      }
+      .ap-scope .sidebar-heading::after {
+        visibility: visible !important;
+        display: block !important;
+      }
+      /* Ensure the underline prints even when background graphics are disabled */
+      .ap-scope .sidebar-heading {
+        border-bottom: 1.5px solid #000 !important;
+        padding-bottom: 1px !important; /* create space for the printed border */
+      }
+      .ap-scope .sidebar-heading::after {
+        content: none !important; /* rely on border-bottom for reliable printing */
+      }
+      /* Remove left margin/padding from MainLayout's main area when printing */
+      main.ml-64 { margin-left: 0 !important; padding: 0 !important; background: white !important; }
+      .ap-scope .page {
+        margin: 0 !important;
+        box-shadow: none !important;
+        border: none !important; /* hide on print */
+        height: 100vh !important;
+        max-height: none !important;
+        overflow: hidden !important;
+        padding: 0mm !important;
+      }
+      /* Do not apply zoom transform when printing */
+      .ap-scope .pages-scale-wrapper { transform: none !important; }
+  /* Screen-only header hidden via .no-print (already applied globally above) */
+      #page-header {
+        padding-left: 6mm !important;
+        padding-right: 13mm !important;
+        padding-top: 6mm !important;
+      }
+      .page-content {
+        padding-left: 6mm !important;
+        padding-right: 13mm !important;
+      }
+      /* Header bottom rule: start at vertical rule and end at header's right padding in print */
+  .header-bottom-rule { left: 130px !important; right: 0 !important; bottom: 3mm !important; }
+  .header-left-bottom-rule { left: 0 !important; width: 130px !important; bottom: 3mm !important; }
+    /* Header fonts in print */
+    .header-title { font-family: Cambria, "Times New Roman", Times, serif !important; font-size: 18pt !important; font-style: italic !important; }
+  .header-contacts { font-family: "Times New Roman", Times, serif !important; font-size: 8pt !important; line-height: 1.1 !important; margin-bottom: 2mm !important; }
+    .header-society { font-family: "Times New Roman", Times, serif !important; font-size: 9.5pt !important; }
+  /* Footer rules: meet left page edge, reduce on right to clear ISO, and lift upward */
+  .footer-rules { left: -6mm !important; right: 62mm !important; top: -4.5mm !important; }
+  /* Middle pages: push to both edges when printing */
+  .footer-rules-middle { left: -6mm !important; right: -13mm !important; top: -4.5mm !important; }
+  /* Keep footer accreditation text small in print */
+      .footer-acc { 
+        font-size: 8.67px !important; 
+        line-height: 1.25 !important; 
+        font-family: Tahoma, Geneva, Verdana, sans-serif !important;
+        font-weight: 700 !important;
+      }
+      .page-footer {
+        padding: 0 13mm 5mm 6mm !important;
+      }
+      .page:last-child { page-break-after: avoid; }
+      .page-content, .main-text, .editable-content, .static-content {
+        overflow: visible !important;
+        height: auto !important;
+      }
+  .header-logo { margin-left: -9px !important; }
+    }
+  `}</style>
 );
 
-export default function ActivityPlan() {
-  const { data, setData, post, processing, errors } = useForm({
-    activity_name: "",
-    activity_purpose: "",
-    category: "normal" as Category,
-    start_datetime: "",
-    end_datetime: "",
-    objectives: "",
-    participants: "",
-    methodology: "",
-    expected_outcome: "",
-    activity_location: "",
-  });
+/* ---------- Toolbar Component ---------- */
+type ToolbarProps = { onZoomChange?: (scale: number) => void };
+const Toolbar: React.FC<ToolbarProps> = ({ onZoomChange }) => {
+  const exec = (command: string, value?: string) => document.execCommand(command, false, value ?? "");
+  const [zoom, setZoom] = useState<number>(1);
+  const [font, setFont] = useState<string>("Times New Roman");
+  const [fontSize, setFontSize] = useState<number>(11);
+  // removed text color control per request
 
-  // Local state for date pickers
-  const [startDate, setStartDate] = useState<Date | null>(null);
-  const [endDate, setEndDate] = useState<Date | null>(null);
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    post("/activity-plans", { preserveScroll: true });
+  const applyFont = (f: string) => { setFont(f); exec("fontName", f); };
+  // execCommand fontSize expects 1..7; map a few common sizes
+  const sizeMap: Record<number, number> = { 10: 2, 11: 3, 12: 3, 14: 4, 16: 5 };
+  const applyFontSize = (pt: number) => { setFontSize(pt); exec("fontSize", String(sizeMap[pt] ?? 3)); };
+  const promptLink = () => {
+    const url = window.prompt("Enter URL");
+    if (!url) return;
+    const safeUrl = url.match(/^https?:\/\//i) ? url : `https://${url}`;
+    exec("createLink", safeUrl);
   };
+  const handleZoom = (v: string) => {
+    const scale = Number(v) / 100;
+    setZoom(scale);
+    onZoomChange?.(scale);
+  };
+
+  return (
+    <div className="formatting-toolbar" role="toolbar" aria-label="Document formatting toolbar">
+      {/* Undo/Redo */}
+      <div className="group">
+        <button className="btn" title="Undo" onClick={() => exec("undo")}> <Undo2 size={18} /> </button>
+        <button className="btn" title="Redo" onClick={() => exec("redo")}> <Redo2 size={18} /> </button>
+        <button className="btn" title="Print" onClick={() => window.print()}> <PrinterIcon size={18} /> </button>
+      </div>
+      <div className="divider" />
+
+      {/* Zoom */}
+      <div className="group">
+        <select className="select" aria-label="Zoom" value={Math.round(zoom * 100)} onChange={(e) => handleZoom(e.target.value)}>
+          <option value="50">50%</option>
+          <option value="75">75%</option>
+          <option value="90">90%</option>
+          <option value="100">100%</option>
+          <option value="125">125%</option>
+          <option value="150">150%</option>
+        </select>
+      </div>
+      <div className="divider" />
+
+      {/* Font family and size (no heading styles) */}
+      <div className="group">
+        <select className="select" aria-label="Font" value={font} onChange={(e) => applyFont(e.target.value)}>
+          <option>Times New Roman</option>
+          <option>Arial</option>
+          <option>Cambria</option>
+          <option>Georgia</option>
+          <option>Montserrat</option>
+        </select>
+        <select className="select" aria-label="Font size" value={fontSize} onChange={(e) => applyFontSize(Number(e.target.value))}>
+          <option value={10}>10</option>
+          <option value={11}>11</option>
+          <option value={12}>12</option>
+          <option value={14}>14</option>
+          <option value={16}>16</option>
+        </select>
+      </div>
+      <div className="divider" />
+
+      {/* Basic styles */}
+      <div className="group">
+        <button className="btn" title="Bold" onClick={() => exec("bold")}> <BoldIcon size={18} /> </button>
+        <button className="btn" title="Italic" onClick={() => exec("italic")}> <ItalicIcon size={18} /> </button>
+        <button className="btn" title="Underline" onClick={() => exec("underline")}> <UnderlineIcon size={18} /> </button>
+      </div>
+      <div className="divider" />
+
+      {/* Link */}
+      <div className="group">
+        <button className="btn" title="Insert link" onClick={promptLink}> <LinkIcon size={18} /> </button>
+      </div>
+      <div className="divider" />
+
+      {/* Alignment */}
+      <div className="group">
+        <button className="btn" title="Align left" onClick={() => exec("justifyLeft")}> <AlignLeft size={18} /> </button>
+        <button className="btn" title="Align center" onClick={() => exec("justifyCenter")}> <AlignCenter size={18} /> </button>
+        <button className="btn" title="Align right" onClick={() => exec("justifyRight")}> <AlignRight size={18} /> </button>
+        <button className="btn" title="Justify" onClick={() => exec("justifyFull")}> <AlignJustify size={18} /> </button>
+      </div>
+      <div className="divider" />
+
+      {/* Lists (no image insertion, no clear formatting) */}
+      <div className="group">
+        <button className="btn" title="Bulleted list" onClick={() => exec("insertUnorderedList")}> <BulletListIcon size={18} /> </button>
+        <button className="btn" title="Numbered list" onClick={() => exec("insertOrderedList")}> <NumberListIcon size={18} /> </button>
+      </div>
+    </div>
+  );
+};
+
+/*---------- Layout Components ----------*/
+const Header: React.FC = () => (
+  <header id="page-header" className="flex-shrink-0 relative">
+    {/* Vertical line extending from top to horizontal line */}
+    <div className="header-vertical-rule border-pink-500"></div>
+    
+    <div className="flex relative">
+      <div className="flex flex-col items-start justify-center pr-3.5 w-[130px] -mt-6 header-logo">
+        <div className="relative z-10 w-28 h-28 rounded overflow-hidden bg-white">
+          <img src={uicLogo} alt="UIC logo" className="block w-full h-full object-contain" />
+        </div>
+      </div>
+    <div className="flex-1 pl-12 relative pb-4 -mt-3">
+  <h1 className="text-pink-600 header-title font-serif">University of the Immaculate Conception</h1>
+  <div className="text-pink-500 header-contacts mt-0.5 space-y-0.5 max-w-md">
+          <div className="flex items-center gap-2">
+            <IconPin className="w-4 h-4 text-pink-500 flex-shrink-0" />
+            <span>Father Selga Street, Davao City 8000, Philippines</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <IconPhone className="w-4 h-4 text-pink-500 flex-shrink-0" />
+            <span>221-8090; 221-8181 local 107</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <IconPrinter className="w-4 h-4 text-pink-500 flex-shrink-0" />
+            <span>(63-082) 226-2676</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <IconGlobe className="w-4 h-4 text-pink-500 flex-shrink-0" />
+            <a href="https://www.uic.edu.ph" target="_blank" rel="noopener noreferrer" className="hover:underline text-pink-500">www.uic.edu.ph</a>
+          </div>
+          <div className="flex items-center gap-2">
+            <IconMail className="w-4 h-4 text-pink-500 flex-shrink-0" />
+            <a href="mailto:sites@uic.edu.ph" className="hover:underline text-pink-500">sites@uic.edu.ph</a>
+            <span className="text-pink-600 font-bold header-society whitespace-nowrap ml-6">Society of Information Technology Education Students</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    {/* Horizontal line extending full width */}
+    <div className="header-bottom-rule">
+      <div className="w-full border-b-2 border-pink-500"></div>
+    </div>
+    <div className="header-left-bottom-rule">
+      <div className="w-full border-b-2 border-pink-500"></div>
+    </div>
+  </header>
+);
+
+const SubsequentPageHeader: React.FC = () => (
+    <div id="subsequent-page-header" className="flex-shrink-0" style={{ height: '2.7mm' }}></div>
+);
+
+interface SidebarProps {
+  isVisible?: boolean;
+  members: Member[];
+  onAddMember: (name: string, role: string) => void;
+  onDeleteMember: (index: number) => void;
+}
+
+const Sidebar: React.FC<SidebarProps> = ({ isVisible = true, members, onAddMember, onDeleteMember }) => {
+    const [newName, setNewName] = useState("");
+    const [newRole, setNewRole] = useState("");
+
+    const handleAddClick = () => {
+        if (newName.trim() && newRole.trim()) {
+            onAddMember(newName, newRole);
+            setNewName("");
+            setNewRole("");
+        }
+    };
+
+    return (
+        <aside className="sidebar" style={{ visibility: isVisible ? 'visible' : 'hidden' }}>
+            <div className="sidebar-line"></div>
+            <div className="text-xs space-y-3 pt-1 px-0 text-center">
+              <div className="sidebar-inner">
+                <p className="sidebar-heading text-[11px]">EXECUTIVE BOARD</p>
+                <div className="mt-8 space-y-2">
+                  {members.map((m: Member, i: number) => (
+                    <div key={i} className="relative group p-1 text-center">
+                      <p>
+                        <span className="font-bold uppercase member-name">{m.name}</span>
+                        <br />
+                        <span className="text-pink-600 member-role">{m.role}</span>
+                      </p>
+                      <button 
+                        onClick={() => onDeleteMember(i)}
+                        className="absolute top-0 right-0 text-red-500 hover:text-red-700 opacity-0 group-hover:opacity-100 transition-opacity text-base leading-none p-1 remove-btn"
+                        title="Remove member"
+                      >
+                        &times;
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                
+      <div className="pt-3 border-t mt-3 sidebar-form text-center">
+      <p className="sidebar-subheading mb-2">ADD NEW MEMBER</p>
+                    <input 
+            type="text" placeholder="Name" value={newName} onChange={(e) => setNewName(e.target.value)} 
+      className="w-full sidebar-input p-1 border rounded mb-2 text-gray-700 text-left"
+                    />
+                    <input 
+            type="text" placeholder="Role" value={newRole} onChange={(e) => setNewRole(e.target.value)} 
+      className="w-full sidebar-input p-1 border rounded mb-2 text-gray-700 text-left"
+                    />
+                    <button 
+                        onClick={handleAddClick} 
+            className="w-full bg-pink-500 text-white sidebar-btn rounded hover:bg-pink-600 transition-colors"
+                    >
+                        Add Member
+                    </button>
+              </div>
+              </div>
+            </div>
+        </aside>
+    );
+};
+
+/*---------- Signatories Component ----------*/
+interface AddSignatoryFormProps {
+  category: string;
+  onAdd: (category: string, name: string, position: string) => void;
+  onCancel: () => void;
+}
+
+const AddSignatoryForm: React.FC<AddSignatoryFormProps> = ({ category, onAdd, onCancel }) => {
+    const [name, setName] = useState("");
+    const [position, setPosition] = useState("");
+
+    const handleAddClick = () => {
+        if (name.trim() && position.trim()) {
+            onAdd(category, name, position);
+            onCancel(); // Close form after adding
+        }
+    };
+
+    return (
+        <div className="w-full md:w-2/3">
+          <div className="add-signatory-form p-3">
+            <p className="font-bold text-xs mb-2 text-gray-700">Add to "{category}"</p>
+            <input type="text" placeholder="Full Name" value={name} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setName(e.target.value)} />
+            <input type="text" placeholder="Position" value={position} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPosition(e.target.value)} />
+            <div className="flex gap-2">
+                <button onClick={handleAddClick} className="w-full bg-pink-500 text-white text-xs py-1 rounded hover:bg-pink-600 transition-colors">Add</button>
+                <button onClick={onCancel} className="w-full bg-gray-200 text-gray-700 text-xs py-1 rounded hover:bg-gray-300 transition-colors">Cancel</button>
+            </div>
+          </div>
+        </div>
+    );
+};
+
+interface SignatoriesProps {
+  signatories: SignatoriesMap;
+  onAdd: (category: string, name: string, position: string) => void;
+  onDelete: (category: string, index: number) => void;
+  innerRef?: React.RefObject<HTMLDivElement | null>;
+}
+
+const Signatories: React.FC<SignatoriesProps> = ({ signatories, onAdd, onDelete, innerRef }) => {
+  const [addingTo, setAddingTo] = useState<string | null>(null);
+
+    return (
+        <div ref={innerRef} className="signatories-container space-y-1">
+      {(Object.entries(signatories) as Array<[string, Signatory[]]>).map(([category, people]) => (
+                <div key={category}>
+                    <p className="font-bold text-sm mb-1">
+                        {category}
+                    </p>
+                    <div className="space-y-1">
+            {people.map((person: Signatory, index: number) => (
+              <div key={index} className="w-full md:w-2/3 text-left text-sm signatory-item relative group">
+                <div className="h-4"></div>
+                                <p className="font-bold uppercase pt-0">{person.name}</p>
+                                <p className="italic">{person.position}</p>
+                                <button 
+                                    onClick={() => onDelete(category, index)}
+                                    className="absolute top-0 right-2 text-red-500 hover:text-red-700 opacity-0 group-hover:opacity-100 transition-opacity text-base leading-none p-1 remove-btn"
+                                    title={`Remove ${person.name}`}
+                                >
+                                    &times;
+                                </button>
+                            </div>
+                        ))}
+                        
+                        {addingTo === category ? (
+                            <AddSignatoryForm 
+                                category={category}
+                                onAdd={onAdd}
+                                onCancel={() => setAddingTo(null)}
+                            />
+                        ) : (
+                            <div className="pt-2">
+                                <button 
+                  onClick={() => setAddingTo(category)}
+                                    className="text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 py-1 px-3 rounded-full remove-btn transition-colors"
+                                >
+                                    + Add Signatory
+                                </button>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            ))}
+        </div>
+    );
+};
+
+
+interface PageNumberInfoProps { pageIndex: number; totalPages: number; showLogo?: boolean; }
+const PageNumberInfo: React.FC<PageNumberInfoProps> = ({ pageIndex, totalPages, showLogo = true }) => (
+    <div className="flex justify-between items-center mt-2">
+        <div className="w-28">{/* Left Spacer */}</div>
+        <div className="flex-1 text-center text-sm">
+            Page {pageIndex + 1} of {totalPages}
+        </div>
+        {showLogo ? (
+      <div className="w-28 flex justify-end">
+        <img src={uicFooter} alt="UIC" className="w-20 h-12 object-contain" />
+            </div>
+        ) : (
+            <div className="w-28">{/* Right Spacer to keep page number centered */}</div>
+        )}
+    </div>
+);
+
+interface FooterProps { pageIndex: number; totalPages: number; }
+const Footer: React.FC<FooterProps> = ({ pageIndex, totalPages }) => (
+  <footer id="page-footer" className="page-footer">
+    <div>
+      {/* Footer lines: left-bleed, shortened on the right to clear the ISO block */}
+      <div className="footer-rules">
+        <div className="border-t-2 border-pink-500"></div>
+        <div className="border-t-2 border-pink-500 mt-0.5"></div>
+      </div>
+      <div className="flex justify-between items-start mt-1">
+  <div className="footer-acc footer-acc-block text-center flex-1 px-4 leading-snug tracking-tight">
+          <p className="font-bold">CHED Full Autonomous Status • PAASCU Accredited, Institutional Accreditation Status •</p>
+          <p className="font-bold mt-0.5">Bureau of Immigration Accredited • Deputized to offer ETEEAP • Science Resource Center, DENR Recognized •</p>
+                  <p className="mt-1 mb-2 font-bold">
+                    <span className="font-bold">MEMBER:</span> Catholic Educational Association of the Philippines (CEAP) • Association of Catholic Universities of the <br />
+                    Philippines{"\u00A0"}(ACUP) ● ASEAN University Network (AUN-QA, Associate Member) • University Mobility in Asia and the Pacific <br />
+                    (UMAP) Association of Southeast and East Asian Catholic Colleges and Universities (ASEACCU) • <br />
+                    Southeast Asian Ministers of Education Organization (SEAMEO) Schools’ Network
+                  </p>
+        </div>
+        <div className="ml-4 flex flex-col items-end self-start -mt-14">
+          <div className="w-40 ml-auto">
+            <img src={tuvCertified} alt="TÜV Rheinland ISO Certified" className="w-40 h-20 object-contain rounded bg-white" />
+            <div className="text-xs mt-0.5 text-gray-900 text-center">Page {pageIndex + 1} of {totalPages}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </footer>
+);
+
+const MiddlePageFooter: React.FC<FooterProps> = ({ pageIndex, totalPages }) => (
+    <footer id="middle-page-footer" className="page-footer">
+        <div>
+      <div className="footer-rules-middle">
+        <div className="border-t-2 border-pink-500"></div>
+        <div className="border-t-2 border-pink-500 mt-0.5"></div>
+      </div>
+            <PageNumberInfo pageIndex={pageIndex} totalPages={totalPages} showLogo={true} />
+        </div>
+    </footer>
+);
+
+/* ---------- Smart Editable Component ---------- */
+interface EditableContentProps {
+  id: string;
+  html: string;
+  onContentChange: (newHtml: string) => void;
+}
+
+class EditableContent extends React.Component<EditableContentProps> {
+  private elRef = React.createRef<HTMLDivElement>();
+  constructor(props: EditableContentProps) { super(props); }
+  shouldComponentUpdate(nextProps: EditableContentProps) { if (!this.elRef.current) return true; return nextProps.html !== this.elRef.current.innerHTML; }
+  componentDidUpdate() { if (this.elRef.current && this.props.html !== this.elRef.current.innerHTML) { this.elRef.current.innerHTML = this.props.html; } }
+  handleInput = () => { if (this.elRef.current) { const newContent = this.elRef.current.innerHTML; this.props.onContentChange(newContent); } };
+  render() {
+    return <div id={this.props.id} className="editable-content" ref={this.elRef} onInput={this.handleInput} contentEditable suppressContentEditableWarning dangerouslySetInnerHTML={{ __html: this.props.html }} />;
+  }
+}
+
+/*---------- Page Component ----------*/
+interface PageProps {
+  children: React.ReactNode;
+  pageIndex: number;
+  totalPages: number;
+  members: Member[];
+  onAddMember: (name: string, role: string) => void;
+  onDeleteMember: (index: number) => void;
+  showSignatories: boolean;
+  signatoriesComponent: React.ReactNode;
+}
+
+const Page: React.FC<PageProps> = ({ children, pageIndex, totalPages, members, onAddMember, onDeleteMember, showSignatories, signatoriesComponent }) => {
+    const isFirstPage = pageIndex === 0;
+    const useStandardFooter = isFirstPage;
+
+    return (
+        <div className="page">
+            {isFirstPage ? <Header /> : <SubsequentPageHeader />}
+            <main className="page-content">
+                <Sidebar 
+                    isVisible={isFirstPage} 
+                    members={members} 
+                    onAddMember={onAddMember}
+                    onDeleteMember={onDeleteMember}
+                />
+                <div className="main-text">
+                    <div>{children}</div>
+                    {showSignatories && signatoriesComponent}
+                </div>
+            </main>
+            {useStandardFooter ? 
+                <Footer pageIndex={pageIndex} totalPages={totalPages} /> :
+                <MiddlePageFooter pageIndex={pageIndex} totalPages={totalPages} />
+            }
+        </div>
+    );
+};
+
+
+/*---------- Debounce Hook----------*/
+function useDebounce<T>(value: T, delay: number): T {
+  const [debouncedValue, setDebouncedValue] = useState<T>(value);
+    useEffect(() => {
+        const handler = setTimeout(() => { setDebouncedValue(value); }, delay);
+        return () => { clearTimeout(handler); };
+    }, [value, delay]);
+    return debouncedValue;
+}
+
+/* ---------- Main App Component ---------- */
+const App: React.FC = () => {
+  const getInitialContent = () => `
+    <div style="text-align: right;" class="text-sm font-semibold">SEPTEMBER 22, 2025</div><br>
+    <h2 style="text-align: center;" class="text-2xl font-bold mb-4">ACTIVITY PLAN</h2>
+    <h3 class="font-bold text-lg mb-2">I. NAME OF THE ACTIVITY:</h3><p class="ml-4">&lt;content&gt;</p><br>
+    <h3 class="font-bold text-lg mb-2">II. RATIONALE:</h3><p class="ml-4 text-justify">&lt;content&gt;</p><br>
+    <h3 class="font-bold text-lg mb-2">III. DATE:</h3><p class="ml-4">&lt;content&gt;</p><br>
+    <h3 class="font-bold text-lg mb-2">IV. SCHEDULE/VENUE:</h3><p class="ml-4">&lt;content&gt;</p><br>
+    <h3 class="font-bold text-lg mb-2">V. PROVISIONS:</h3><p class="ml-4">&lt;content&gt;</p><br>
+    <h3 class="font-bold text-lg mb-2">VI. EVALUATION FORM:</h3><p class="ml-4">&lt;content&gt;</p>
+  `;
+
+  const [pages, setPages] = useState<string[]>([getInitialContent()]);
+  const [activePageIndex, setActivePageIndex] = useState<number>(0);
+  const [layoutHeights, setLayoutHeights] = useState({
+    firstPageContentH: 0,
+    subsequentPageContentH: 0,
+  });
+  const [members, setMembers] = useState<Member[]>([]);
+  const [signatories, setSignatories] = useState<SignatoriesMap>({
+      "Prepared by:": [],
+      "Noted by:": [
+        { name: "MRS. ANAFLOR E. SACOPAYO, MBA", position: "Director of Student Affairs and Discipline" },
+      ],
+      "Approved by:": [
+        { name: "DR. AVEENIR B. DAYAGANON", position: "Vice President for Academics" },
+      ]
+  });
+  const [signatoriesHeight, setSignatoriesHeight] = useState<number>(0);
+
+  const debouncedPages = useDebounce(pages, 250);
+  const [zoomScale, setZoomScale] = useState<number>(1);
+  const pageContainerRef = useRef<HTMLDivElement | null>(null);
+  const cursorPositionRef = useRef<{ pageIndex: number; offset: number } | null>(null);
+  const signatoriesRef = useRef<HTMLDivElement | null>(null);
+
+  const handleAddMember = (name: string, role: string) => setMembers([...members, { name, role }]);
+  const handleDeleteMember = (index: number) => setMembers(members.filter((_, i) => i !== index));
+  
+  const handleAddSignatory = (category: string, name: string, position: string) => {
+    setSignatories(prev => ({
+        ...prev,
+        [category]: [...prev[category], { name, position }]
+    }));
+  };
+
+  const handleDeleteSignatory = (category: string, index: number) => {
+      setSignatories(prev => ({
+          ...prev,
+          [category]: prev[category].filter((_, i) => i !== index)
+      }));
+  };
+
+  useEffect(() => {
+    const measureContentHeight = (pageSelector: string) => {
+      const page = document.querySelector(pageSelector) as HTMLElement | null;
+      const content = page?.querySelector(".main-text") as HTMLElement | null;
+      return content?.clientHeight || 0;
+    };
+
+    const firstH = measureContentHeight("#measure-page-1");
+    const subH = measureContentHeight("#measure-page-2");
+    
+    if (firstH > 0 && subH > 0 && (layoutHeights.firstPageContentH !== firstH || layoutHeights.subsequentPageContentH !== subH)) {
+        setLayoutHeights({
+            firstPageContentH: firstH,
+            subsequentPageContentH: subH,
+        });
+    }
+  }, []);
+
+  useLayoutEffect(() => {
+      if (signatoriesRef.current) {
+          setSignatoriesHeight(signatoriesRef.current.offsetHeight);
+      }
+  }, [signatories]);
+
+  const calculateAndSetPages = useCallback((currentPages: string[]) => {
+    const { firstPageContentH, subsequentPageContentH } = layoutHeights;
+    if (firstPageContentH === 0 || subsequentPageContentH === 0 || signatoriesHeight === 0) return;
+
+    const fullHtml = currentPages.join('');
+    
+    const tempContainer = document.createElement('div');
+    tempContainer.innerHTML = fullHtml;
+    const allNodes = Array.from(tempContainer.childNodes);
+
+    const measureElement = document.createElement('div');
+    document.body.appendChild(measureElement);
+    Object.assign(measureElement.style, {
+      position: 'absolute', left: '-9999px', visibility: 'hidden',
+      fontFamily: '"Times New Roman", Times, serif', fontSize: '12pt', lineHeight: '1.5',
+      width: 'calc(210mm - 19mm - 130px - 1.5rem)', 
+    });
+    
+    const newPages: string[] = [];
+    let currentPageNodes: ChildNode[] = [];
+    const HEIGHT_BUFFER = 5; 
+
+    for (const node of allNodes) {
+      currentPageNodes.push(node);
+      const currentContentHtml = currentPageNodes.map((n: any) => (n as any).outerHTML || n.textContent).join('');
+      measureElement.innerHTML = currentContentHtml;
+      
+      const isFirstPage = newPages.length === 0;
+      const maxContentHeight = isFirstPage ? firstPageContentH : subsequentPageContentH;
+
+      if (measureElement.scrollHeight > (maxContentHeight - HEIGHT_BUFFER)) {
+        const overflowingNode = currentPageNodes.pop() as HTMLElement | ChildNode | undefined;
+        const baseContentHtml = currentPageNodes.map((n: any) => (n as any).outerHTML || n.textContent).join('');
+        const isSplittable = !!(overflowingNode && (overflowingNode as any).nodeType === Node.ELEMENT_NODE && (overflowingNode as any).textContent && (overflowingNode as any).textContent.includes(' '));
+
+        if (isSplittable) {
+          const elementNode = overflowingNode as HTMLElement;
+          const contentParts = elementNode.innerHTML.split(/(<[^>]*>|\s+|[^\s<]+)/g).filter(Boolean);
+          let low = 0, high = contentParts.length, bestFitIndex = 0;
+          
+          while (low <= high) {
+            const mid = Math.floor((low + high) / 2);
+            const testHtml = contentParts.slice(0, mid).join('');
+            const tempNode = elementNode.cloneNode(false) as HTMLElement;
+            tempNode.innerHTML = testHtml;
+            measureElement.innerHTML = baseContentHtml + tempNode.outerHTML;
+
+            if (measureElement.scrollHeight <= (maxContentHeight - HEIGHT_BUFFER)) {
+              bestFitIndex = mid;
+              low = mid + 1;
+            } else {
+              high = mid - 1;
+            }
+          }
+
+          const fittingHtml = contentParts.slice(0, bestFitIndex).join('');
+          const remainingHtml = contentParts.slice(bestFitIndex).join('');
+
+          if (fittingHtml.trim()) {
+            const fittingNode = elementNode.cloneNode(false) as HTMLElement;
+            fittingNode.innerHTML = fittingHtml;
+            newPages.push(baseContentHtml + fittingNode.outerHTML);
+          } else if (baseContentHtml.trim()) {
+            newPages.push(baseContentHtml);
+          }
+
+          if (remainingHtml.trim()) {
+            const remainingNode = elementNode.cloneNode(false) as HTMLElement;
+            remainingNode.innerHTML = remainingHtml;
+            currentPageNodes = [remainingNode];
+          } else {
+            currentPageNodes = [];
+          }
+        } else {
+          if (baseContentHtml.trim()) newPages.push(baseContentHtml);
+          if (overflowingNode) currentPageNodes = [overflowingNode]; else currentPageNodes = [];
+        }
+      }
+    }
+
+    const lastPageTextHtml = currentPageNodes.map((n: any) => (n as any).outerHTML || n.textContent).join('');
+    const hasSignatories = Object.values(signatories).some((arr: Signatory[]) => arr.length > 0);
+
+    if (newPages.length === 0) {
+        newPages.push(lastPageTextHtml);
+        if (hasSignatories) newPages.push(''); 
+    } else {
+        measureElement.innerHTML = lastPageTextHtml;
+        const lastPageTextHeight = measureElement.scrollHeight;
+        
+        if (hasSignatories && (lastPageTextHeight + signatoriesHeight > subsequentPageContentH - HEIGHT_BUFFER)) {
+            newPages.push(lastPageTextHtml);
+            newPages.push('');
+        } else {
+            newPages.push(lastPageTextHtml);
+        }
+    }
+    
+    document.body.removeChild(measureElement);
+    if (JSON.stringify(newPages) !== JSON.stringify(currentPages)) {
+      setPages(newPages);
+    }
+  }, [layoutHeights, signatoriesHeight, signatories]); 
+
+  useEffect(() => {
+    calculateAndSetPages(debouncedPages);
+  }, [debouncedPages, calculateAndSetPages]);
+  
+  const handleContentChange = (index: number, newHtml: string) => {
+    const selection = window.getSelection();
+    if (selection && selection.rangeCount > 0) {
+      const range = selection.getRangeAt(0);
+      const parentEl = (range.startContainer as Node).parentElement as HTMLElement | null;
+      const editableDiv = parentEl?.closest('[contenteditable="true"]') as HTMLElement | null;
+      if (editableDiv) {
+        const preCaretRange = document.createRange();
+        preCaretRange.selectNodeContents(editableDiv);
+        preCaretRange.setEnd(range.startContainer, range.startOffset);
+        const textContent = preCaretRange.toString();
+        cursorPositionRef.current = { pageIndex: index, offset: textContent.length };
+      }
+    }
+    const tempPages = [...pages];
+    tempPages[index] = newHtml;
+    setPages(tempPages);
+    setActivePageIndex(index);
+  };
+
+  useLayoutEffect(() => {
+    if (cursorPositionRef.current && pageContainerRef.current) {
+        const { pageIndex, offset } = cursorPositionRef.current;
+    const editableDiv = pageContainerRef.current.querySelector(`#editable-content-page-${pageIndex}`) as HTMLElement | null;
+        if (editableDiv) {
+            editableDiv.focus();
+            let charCount = 0;
+      let targetNode: Node | null = null;
+            let offsetInNode = 0;
+
+      function findNode(parentNode: Node): boolean {
+        for (const node of Array.from(parentNode.childNodes)) {
+                    if (node.nodeType === Node.TEXT_NODE) {
+            const textLen = (node as Text).length;
+            const nextCharCount = charCount + textLen;
+                        if (offset <= nextCharCount) {
+                            targetNode = node;
+                            offsetInNode = offset - charCount;
+                            return true;
+                        }
+                        charCount = nextCharCount;
+                    } else if (node.nodeType === Node.ELEMENT_NODE) {
+                        if (findNode(node)) return true;
+                    }
+                }
+                return false;
+            }
+            findNode(editableDiv);
+            
+            const sel = window.getSelection();
+            const range = document.createRange();
+            if (targetNode) {
+                const textLen = (targetNode as Text).length ?? 0;
+                range.setStart(targetNode, Math.min(offsetInNode, textLen));
+                range.collapse(true);
+                if (sel) {
+                  sel.removeAllRanges();
+                  sel.addRange(range);
+                }
+            } else {
+                range.selectNodeContents(editableDiv);
+                range.collapse(false);
+                if (sel) {
+                  sel.removeAllRanges();
+                  sel.addRange(range);
+                }
+            }
+        }
+        cursorPositionRef.current = null;
+    }
+  }, [pages]);
+
+  useEffect(() => {
+    if (cursorPositionRef.current) return;
+    const editableDiv = pageContainerRef.current?.querySelector(`#editable-content-page-${activePageIndex}`) as HTMLElement | null;
+
+    if (editableDiv && document.activeElement !== editableDiv) {
+      editableDiv.focus();
+      const selection = window.getSelection();
+      const range = document.createRange();
+      range.selectNodeContents(editableDiv);
+      range.collapse(false);
+      if (selection) {
+        selection.removeAllRanges();
+        selection.addRange(range);
+      }
+    }
+  }, [activePageIndex]);
 
 
   return (
     <MainLayout>
-      <div className="p-6 font-poppins min-h-screen text-black bg-white">
-        {/* Header */}
-        <div className="mb-8 flex flex-col gap-1">
-          <h1 className="text-3xl font-bold text-red-600 tracking-tight">
-            Activity Plan
-          </h1>
-          <p className="text-gray-600 text-base">Students can submit requests for activity plans.</p>
+      <div className="ap-scope">
+      {/* Screen-only header (BorrowEquipment-like placement & typography) */}
+      <div className="no-print px-6 pt-6">
+        <div className="ap-screen-header mb-8 flex flex-col gap-1">
+          <h1 className="text-3xl font-bold text-red-600 tracking-tight" style={{ fontFamily: 'Poppins, sans-serif', fontWeight: 700 }}>Activity Plan</h1>
+          <p className="text-gray-600 text-base" style={{ fontFamily: 'Poppins, sans-serif', fontWeight: 400 }}>Prepare, format, and print your activity plan.</p>
         </div>
-
-        <form
-          onSubmit={handleSubmit}
-          className="bg-white rounded-2xl shadow-xl border border-gray-100 p-8 space-y-6"
-        >
-          <InputNoIcon
-            type="text"
-            placeholder="Activity Name *"
-            value={data.activity_name}
-            onChange={(e) => setData("activity_name", e.target.value)}
-            required
-          />
-
-          <TextareaNoIcon
-            placeholder="Activity Purpose *"
-            value={data.activity_purpose}
-            onChange={(e) => setData("activity_purpose", e.target.value)}
-            rows={3}
-            required
-          />
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <DatePickerNoIcon
-                selected={startDate}
-                onChange={(date) => {
-                  setStartDate(date);
-                  setData("start_datetime", date ? date.toISOString() : "");
-                }}
-                placeholder="Select start date & time"
-                required
-              />
-            </div>
-
-            <div>
-              <DatePickerNoIcon
-                selected={endDate}
-                onChange={(date) => {
-                  setEndDate(date);
-                  setData("end_datetime", date ? date.toISOString() : "");
-                }}
-                placeholder="Select end date & time"
-                required
-              />
-            </div>
+      </div>
+      <div className="no-print" style={{ position: 'absolute', left: '-9999px', visibility: 'hidden', pointerEvents: 'none' }}>
+        <div id="measure-page-1">
+          <Page 
+            pageIndex={0} 
+            totalPages={2} 
+            members={members}
+            onAddMember={() => {}}
+            onDeleteMember={() => {}}
+            showSignatories={false}
+            signatoriesComponent={<div />}
+          >
+            <div />
+          </Page>
+        </div>
+        <div id="measure-page-2">
+          <Page 
+            pageIndex={1} 
+            totalPages={2} 
+            members={members}
+            onAddMember={() => {}}
+            onDeleteMember={() => {}}
+            showSignatories={false}
+            signatoriesComponent={<div />}
+          >
+            <div />
+          </Page>
+        </div>
+        <Signatories 
+            signatories={signatories} 
+            onAdd={()=>{}} 
+            onDelete={()=>{}} 
+            innerRef={signatoriesRef} 
+        />
+      </div>
+      
+      <div ref={pageContainerRef} className="App">
+        <GlobalStyles />
+        <Toolbar onZoomChange={setZoomScale} />
+        <div className="pages-viewport">
+          <div className="pages-scale-wrapper" style={{ transform: `scale(${zoomScale})` }}>
+            {pages.map((pageHtml, index) => (
+                <Page 
+                  key={index}
+                  pageIndex={index} 
+                  totalPages={pages.length}
+                  members={members}
+                  onAddMember={handleAddMember}
+                  onDeleteMember={handleDeleteMember}
+                  showSignatories={Object.values(signatories).some(arr => arr.length > 0) && index === pages.length - 1 && index > 0}
+                  signatoriesComponent={
+                    <Signatories
+                        signatories={signatories}
+                        onAdd={handleAddSignatory}
+                        onDelete={handleDeleteSignatory}
+                    />
+                  }
+                >
+                  {activePageIndex === index ? (
+                    <EditableContent id={`editable-content-page-${index}`} html={pageHtml} onContentChange={(newHtml) => handleContentChange(index, newHtml)} />
+                  ) : (
+                    <div className="static-content" onClick={() => setActivePageIndex(index)} dangerouslySetInnerHTML={{ __html: pageHtml }} />
+                  )}
+                </Page>
+            ))}
           </div>
-
-          {/* Optional Details */}
-          <TextareaNoIcon
-            placeholder="Objectives"
-            value={data.objectives}
-            onChange={(e) => setData("objectives", e.target.value)}
-            rows={2}
-          />
-
-          <InputNoIcon
-            type="text"
-            placeholder="Expected Participants"
-            value={data.participants}
-            onChange={(e) => setData("participants", e.target.value)}
-          />
-
-          <InputNoIcon
-            type="text"
-            placeholder="Activity Location"
-            value={data.activity_location}
-            onChange={(e) => setData("activity_location", e.target.value)}
-          />
-
-          <TextareaNoIcon
-            placeholder="Methodology"
-            value={data.methodology}
-            onChange={(e) => setData("methodology", e.target.value)}
-            rows={3}
-          />
-
-          <TextareaNoIcon
-            placeholder="Expected Outcome"
-            value={data.expected_outcome}
-            onChange={(e) => setData("expected_outcome", e.target.value)}
-            rows={2}
-          />
-
-          {/* Error messages */}
-          {Object.keys(errors).length > 0 && (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex gap-3 items-start">
-              <AlertCircle className="w-6 h-6 text-red-700 mt-1" />
-              <div>
-                <h4 className="text-red-800 font-semibold mb-2">Errors:</h4>
-                <ul className="text-red-600 text-sm space-y-1">
-                  {Object.entries(errors).map(([field, message]) => (
-                    <li key={field}>• {message}</li>
-                  ))}
-                </ul>
-              </div>
-            </div>
-          )}
-
-          {/* Submit & Preview Buttons */}
-          <div className="flex justify-end gap-3">
-            <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              type="button"
-              className="px-6 py-3 rounded-xl font-semibold text-white bg-blue-600 hover:bg-blue-700 flex items-center gap-2"
-              onClick={() => {
-                // Add your preview logic here
-                alert("Preview document feature coming soon!");
-              }}
-            >
-              Preview Document
-            </motion.button>
-            <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              type="submit"
-              disabled={processing}
-              className={`px-6 py-3 rounded-xl font-semibold text-white flex items-center gap-2 ${
-                processing ? "bg-gray-400 cursor-not-allowed" : "bg-red-600 hover:bg-red-700"
-              }`}
-            >
-              <CheckCircle2 className="w-5 h-5" />
-              {processing ? "Submitting..." : "Submit Activity Plan"}
-            </motion.button>
-          </div>
-        </form>
+        </div>
+      </div>
       </div>
     </MainLayout>
   );
-}
+};
+
+export default App;
