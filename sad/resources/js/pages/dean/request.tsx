@@ -219,8 +219,8 @@ export default function Request() {
         {/* Header */}
         <div className="mb-6">
           <div>
-            <h1 className="text-2xl font-bold text-black">Activity Plan Approval</h1>
-            <p className="text-gray-600">Review and approve student activity plans.</p>
+            <h1 className="text-2xl font-bold text-black">Request Management</h1>
+            <p className="text-gray-600">Review and approve student requests.</p>
           </div>
         </div>
         
