@@ -51,6 +51,7 @@ class AuthenticatedSessionController extends Controller
             case 'admin_assistant':
                 return redirect()->route('admin.dashboard');
             case 'student':
+            case 'student_officer':
                 return redirect()->route('student.dashboard');
             case 'dean':
                 return redirect()->route('dean.dashboard');

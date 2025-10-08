@@ -1,7 +1,7 @@
 import MainLayout from '@/layouts/mainlayout';
 import { useForm, usePage, router } from '@inertiajs/react';
 import { motion } from 'framer-motion';
-import { CheckCircle, ShieldCheck, Info } from 'lucide-react';
+import { CheckCircle, ShieldCheck, Info, ArrowLeft } from 'lucide-react';
 import type { PageProps } from '@/types';
 import { useState } from 'react';
 import ConfirmationModal from '@/components/ConfirmationModal';
@@ -41,8 +41,19 @@ export default function RoleRequest() {
 
   return (
     <MainLayout>
-      <div className="min-h-screen flex items-center justify-center p-8 font-poppins text-black">
-        <div className="w-full max-w-3xl">
+      <div className="min-h-screen p-8 font-poppins text-black">
+        {/* Back Button */}
+        <motion.button
+          onClick={() => router.visit('/profile')}
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.98 }}
+          className="mb-6 inline-flex items-center gap-2 text-gray-600 hover:text-red-600 font-medium transition-colors"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          Back to Profile
+        </motion.button>
+
+        <div className="max-w-3xl mx-auto">
           {/* Success Message */}
           {submitted && (
             <motion.div
@@ -82,12 +93,12 @@ export default function RoleRequest() {
               {/* Organization/Department */}
               <div>
                 <label className="block text-sm font-semibold text-gray-800 mb-2">
-                  Organization/Department {!data.officer_organization && <span className="text-red-600">*</span>}
+                  CCS Organization/Club {!data.officer_organization && <span className="text-red-600">*</span>}
                 </label>
                 <input
                   type="text"
                   className="w-full border border-gray-300 rounded-lg px-4 py-3 bg-gray-50 text-gray-900 focus:bg-white focus:border-red-500 focus:ring-2 focus:ring-red-500/50 transition-colors outline-none"
-                  placeholder="e.g., Student Council, Computer Science Club"
+                  placeholder="e.g., Programming Club, Game Development Society"
                   value={data.officer_organization}
                   onChange={(e) => setData('officer_organization', e.target.value)}
                   required

@@ -7,7 +7,7 @@ import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import "./datepicker-theme.css";
 import axios from "axios";
-import { getCsrfToken } from "@/lib/csrf";
+import { getCsrfToken, refreshCsrfToken } from "@/lib/csrf";
 
 // Themed minimal Select component (keyboard + mouse)
 type SelectOption<V extends string | number | null = string | number | null> = {
@@ -269,21 +269,61 @@ export default function BorrowEquipment() {
     setShowConfirmModal(true);
   }
 
-  function confirmAndSubmit() {
+  async function confirmAndSubmit() {
     if (!confirmChecked) return;
     setShowConfirmModal(false);
-    // Send CSRF token to eliminate intermittent 419s
-    router.post("/equipment-requests", { ...data, _token: getCsrfToken() }, {
-      onSuccess: () => {
-        reset();
-        setConfirmChecked(false);
-        setAvailability({});
-      },
-      onError: (errors) => {
-        console.error("Equipment request submission failed:", errors);
-        setConfirmChecked(false);
-      },
-    });
+    
+    try {
+      // Refresh CSRF token before submission to prevent 419 errors
+      await refreshCsrfToken();
+      const freshToken = getCsrfToken();
+      
+      // Send request with fresh CSRF token
+      router.post("/equipment-requests", { ...data, _token: freshToken }, {
+        headers: {
+          'X-CSRF-TOKEN': freshToken,
+          'X-Requested-With': 'XMLHttpRequest',
+        },
+        onSuccess: () => {
+          reset();
+          setConfirmChecked(false);
+          setAvailability({});
+        },
+        onError: async (errors) => {
+          console.error("Equipment request submission failed:", errors);
+          
+          // If we still get a 419, try one more time with a fresh token
+          if (errors && typeof errors === 'object' && Object.keys(errors).length === 0) {
+            try {
+              await refreshCsrfToken();
+              const retryToken = getCsrfToken();
+              router.post("/equipment-requests", { ...data, _token: retryToken }, {
+                headers: {
+                  'X-CSRF-TOKEN': retryToken,
+                  'X-Requested-With': 'XMLHttpRequest',
+                },
+                onSuccess: () => {
+                  reset();
+                  setConfirmChecked(false);
+                  setAvailability({});
+                },
+                onError: () => {
+                  setConfirmChecked(false);
+                }
+              });
+            } catch (retryError) {
+              console.error("Retry failed:", retryError);
+              setConfirmChecked(false);
+            }
+          } else {
+            setConfirmChecked(false);
+          }
+        },
+      });
+    } catch (error) {
+      console.error("Error refreshing CSRF token:", error);
+      setConfirmChecked(false);
+    }
   }
 
   // DatePickers
