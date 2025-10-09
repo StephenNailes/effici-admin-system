@@ -135,4 +135,14 @@ class User extends Authenticatable implements MustVerifyEmail
     {
         return $this->role === 'dean';
     }
+
+    /**
+     * Override default link-based verification notification.
+     * We now utilize a 6-digit code flow triggered explicitly via controller.
+     */
+    public function sendEmailVerificationNotification(): void
+    {
+        // Intentionally left blank to disable default notification.
+        // The EmailVerificationController@send issues the code + email.
+    }
 }

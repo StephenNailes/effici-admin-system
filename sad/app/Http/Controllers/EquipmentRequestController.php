@@ -11,6 +11,7 @@ use App\Models\RequestApproval;
 use App\Services\NotificationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Carbon\Carbon;
 
 class EquipmentRequestController extends Controller
 {
@@ -40,7 +41,7 @@ class EquipmentRequestController extends Controller
         return EquipmentRequest::with(['items.equipment', 'user'])
             ->whereIn('status', [
                 'approved', 'checked_out', 'returned', 'overdue'
-            ]) // Exclude completed requests
+            ]) // Exclude pending, under_revision, and completed requests
             ->orderByDesc('created_at')
             ->get()
             ->map(function ($req) {
@@ -200,6 +201,26 @@ class EquipmentRequestController extends Controller
         // Combine and format both types of requests
         $allRequests = collect();
 
+        // Include Role Update Requests (student officer verification)
+        $roleUpdates = DB::table('role_update_requests as rur')
+            ->leftJoin('users as approver', 'rur.reviewed_by', '=', 'approver.id')
+            ->where('rur.user_id', Auth::id())
+            ->select(
+                'rur.id',
+                'rur.status',
+                'rur.created_at',
+                'rur.reviewed_at as approval_date',
+                DB::raw("CONCAT(approver.first_name, ' ', approver.last_name) as approver_name"),
+                'rur.officer_organization',
+                'rur.officer_position',
+                'rur.election_date',
+                'rur.term_duration',
+                'rur.remarks',
+                'rur.requested_role'
+            )
+            ->orderByDesc('rur.created_at')
+            ->get();
+
         foreach ($equipmentRequests as $req) {
             // Get equipment items for this request
             $items = DB::table('equipment_request_items as eri')
@@ -211,13 +232,13 @@ class EquipmentRequestController extends Controller
             $allRequests->push([
                 'id' => $req->id,
                 'type' => 'Equipment Request',
-                'date' => $req->created_at,
+                'date' => $req->created_at ? Carbon::parse($req->created_at)->toIso8601String() : null,
                 'status' => ucfirst($req->status),
                 'purpose' => $req->purpose,
                 'approver_role' => $req->approver_role ? ucwords(str_replace('_', ' ', $req->approver_role)) : null,
                 'approver_name' => $req->approver_name,
                 'approval_status' => $req->approval_status,
-                'approval_date' => $req->approval_date,
+                'approval_date' => $req->approval_date ? Carbon::parse($req->approval_date)->toIso8601String() : null,
                 'items' => $items->map(function ($item) {
                     return [
                         'name' => $item->name,
@@ -231,14 +252,44 @@ class EquipmentRequestController extends Controller
             $allRequests->push([
                 'id' => $req->id,
                 'type' => 'Activity Plan',
-                'date' => $req->created_at,
+                'date' => $req->created_at ? Carbon::parse($req->created_at)->toIso8601String() : null,
                 'status' => ucfirst($req->status),
                 'purpose' => $req->purpose,
                 'approver_role' => $req->approver_role ? ucwords(str_replace('_', ' ', $req->approver_role)) : null,
                 'approver_name' => $req->approver_name,
                 'approval_status' => $req->approval_status,
-                'approval_date' => $req->approval_date,
+                'approval_date' => $req->approval_date ? Carbon::parse($req->approval_date)->toIso8601String() : null,
                 'items' => [], // Activity plans don't have equipment items
+            ]);
+        }
+
+        foreach ($roleUpdates as $req) {
+            $purposeParts = [];
+            if (!empty($req->officer_position)) { $purposeParts[] = $req->officer_position; }
+            if (!empty($req->officer_organization)) { $purposeParts[] = 'of ' . $req->officer_organization; }
+            $purpose = 'Officer Verification' . (count($purposeParts) ? ' – ' . implode(' ', $purposeParts) : '');
+
+            $allRequests->push([
+                'id' => $req->id,
+                'type' => 'Role Update Request',
+                'date' => $req->created_at ? Carbon::parse($req->created_at)->toIso8601String() : null,
+                'status' => ucfirst($req->status),
+                'purpose' => $purpose,
+                'approver_role' => 'Admin Assistant',
+                'approver_name' => $req->approver_name,
+                'approval_status' => $req->status,
+                'approval_date' => $req->approval_date ? Carbon::parse($req->approval_date)->toIso8601String() : null,
+                'items' => [],
+                'details' => [
+                    'requested_role' => $req->requested_role,
+                    'officer_position' => $req->officer_position,
+                    'officer_organization' => $req->officer_organization,
+                    'election_date' => $req->election_date ? Carbon::parse($req->election_date)->toIso8601String() : null,
+                    'term_duration' => $req->term_duration,
+                    'remarks' => $req->remarks,
+                    'approver_name' => $req->approver_name,
+                    'approval_date' => $req->approval_date ? Carbon::parse($req->approval_date)->toIso8601String() : null,
+                ],
             ]);
         }
 
@@ -255,6 +306,10 @@ class EquipmentRequestController extends Controller
      */
     public function store(Request $request)
     {
+        // Only students and student officers may submit equipment requests
+        if (!in_array(optional(Auth::user())->role, ['student', 'student_officer'], true)) {
+            return back()->withErrors(['auth' => 'Only students and student officers can submit equipment requests.']);
+        }
         // Handle both regular Inertia requests and API requests properly
         try {
             $validated = $request->validate([

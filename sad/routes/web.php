@@ -8,8 +8,7 @@ use Inertia\Inertia;
 // use Illuminate\Support\Facades\URL; // No longer needed after removing email preview routes
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\Auth\RegisteredUserController;
-use App\Http\Controllers\Auth\VerifyEmailController;
-use App\Http\Controllers\Auth\EmailVerificationNotificationController;
+use App\Http\Controllers\Auth\EmailVerificationController;
 
 use App\Http\Controllers\StudentDashboardController;
 use App\Http\Controllers\ActivityPlanController;
@@ -72,20 +71,12 @@ Route::post('/admin/invitations/resend', [InvitationController::class, 'resend']
     ->middleware(['auth', 'verified'])
     ->name('invitations.resend');
 
-// ✅ Email Verification Routes
-Route::get('/email/verify', function () {
-    return Inertia::render('auth/verifyemail', [
-        'status' => Session::get('status'),
-    ]);
-})->middleware('auth')->name('verification.notice');
-
-Route::get('/email/verify/{id}/{hash}', VerifyEmailController::class)
-    ->middleware(['auth', 'signed', 'throttle:6,1'])
-    ->name('verification.verify');
-
-Route::post('/email/verification-notification', [EmailVerificationNotificationController::class, 'store'])
-    ->middleware(['auth', 'throttle:6,1'])
-    ->name('verification.send');
+// ✅ Email Verification (6-digit code) Routes
+Route::middleware('auth')->group(function () {
+    Route::get('/email/verify', [EmailVerificationController::class, 'notice'])->name('verification.notice');
+    Route::post('/email/verification-notification', [EmailVerificationController::class, 'send'])->middleware('throttle:10,1')->name('verification.send');
+    Route::post('/email/verify', [EmailVerificationController::class, 'verify'])->middleware('throttle:20,1')->name('verification.verify');
+});
 
 // 🟩 Role-based Dashboards
 Route::middleware(['auth', 'verified'])->group(function () {

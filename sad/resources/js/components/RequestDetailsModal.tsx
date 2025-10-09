@@ -11,6 +11,15 @@ type Request = {
   details?: {
     purpose?: string;
     items?: { name: string; quantity: number }[]; // optional, if still needed elsewhere
+    // Role Update fields
+    requested_role?: string;
+    officer_position?: string;
+    officer_organization?: string;
+    election_date?: string;
+    term_duration?: string;
+    remarks?: string | null;
+    approver_name?: string | null;
+    approval_date?: string | null;
   };
 };
 
@@ -86,6 +95,49 @@ export default function RequestDetailsModal({ request, onClose }: Props) {
                     </ul>
                   </div>
                 )}
+
+              {/* Role Update Request Details */}
+              {request.type === "Role Update Request" && (
+                <div className="space-y-2">
+                  {request.details?.requested_role && (
+                    <p>
+                      <span className="font-semibold">Requested Role:</span> {request.details.requested_role.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
+                    </p>
+                  )}
+                  {request.details?.officer_position && (
+                    <p>
+                      <span className="font-semibold">Position:</span> {request.details.officer_position}
+                    </p>
+                  )}
+                  {request.details?.officer_organization && (
+                    <p>
+                      <span className="font-semibold">Organization:</span> {request.details.officer_organization}
+                    </p>
+                  )}
+                  {request.details?.election_date && (
+                    <p>
+                      <span className="font-semibold">Election Date:</span> {formatDateTime(request.details.election_date)}
+                    </p>
+                  )}
+                  {request.details?.term_duration && (
+                    <p>
+                      <span className="font-semibold">Term Duration:</span> {request.details.term_duration.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
+                    </p>
+                  )}
+                  {typeof request.details?.remarks === 'string' && request.details?.remarks.trim() !== '' && (
+                    <div>
+                      <span className="font-semibold">Admin Remarks:</span>
+                      <p className="mt-1 text-gray-700 whitespace-pre-wrap">{request.details?.remarks}</p>
+                    </div>
+                  )}
+                  {(request.details?.approver_name || request.details?.approval_date) && (
+                    <p className="text-sm text-gray-500">
+                      {request.details.approver_name ? `Reviewed by ${request.details.approver_name}` : ''}
+                      {request.details.approval_date ? ` on ${formatDateTime(request.details.approval_date)}` : ''}
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
           </motion.div>
         </motion.div>

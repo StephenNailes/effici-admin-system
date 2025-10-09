@@ -2,6 +2,36 @@ import { type ClassValue, clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { format } from 'date-fns';
 
+const APP_TZ = 'Asia/Manila';
+
+function formatWithTZ(date: Date, pattern: string): string {
+    // Use Intl for stable timezone formatting, then optionally massage pieces
+    const parts = new Intl.DateTimeFormat('en-US', {
+        timeZone: APP_TZ,
+        year: 'numeric', month: 'short', day: '2-digit',
+        hour: pattern.includes('h') ? 'numeric' : undefined,
+        minute: pattern.includes('mm') ? '2-digit' : undefined,
+        hour12: true,
+    }).formatToParts(date);
+
+    const get = (type: string) => parts.find(p => p.type === type)?.value || '';
+    const MMM = get('month');
+    const d = String(Number(get('day'))); // remove leading zero
+    const yyyy = get('year');
+    const h = get('hour');
+    const mm = get('minute');
+    const dayStr = `${MMM} ${d}, ${yyyy}`;
+    if (pattern.includes('•')) {
+        const ampm = parts.find(p => p.type === 'dayPeriod')?.value?.toUpperCase() || '';
+        return `${dayStr} • ${h}:${mm} ${ampm}`.trim();
+    }
+    if (pattern.includes('h:mm a')) {
+        const ampm = parts.find(p => p.type === 'dayPeriod')?.value?.toUpperCase() || '';
+        return `${h}:${mm} ${ampm}`.trim();
+    }
+    return dayStr;
+}
+
 export function cn(...inputs: ClassValue[]) {
     return twMerge(clsx(inputs));
 }
@@ -18,8 +48,7 @@ export function formatDateTime(value?: string | Date | null): string {
     try {
         const date = value instanceof Date ? value : new Date(value);
         if (isNaN(date.getTime())) return '—';
-        // Example: Jan 5, 2025 • 3:07 PM
-        return format(date, 'MMM d, yyyy • h:mm a');
+    return formatWithTZ(date, 'MMM d, yyyy • h:mm a');
     } catch {
         return '—';
     }
@@ -34,7 +63,7 @@ export function formatTime12h(value?: string | Date | null): string {
     try {
         const date = value instanceof Date ? value : new Date(value);
         if (isNaN(date.getTime())) return '—';
-        return format(date, 'h:mm a');
+    return formatWithTZ(date, 'h:mm a');
     } catch {
         return '—';
     }
@@ -49,7 +78,7 @@ export function formatDateShort(value?: string | Date | null): string {
     try {
         const date = value instanceof Date ? value : new Date(value);
         if (isNaN(date.getTime())) return '—';
-        return format(date, 'MMM d, yyyy');
+    return formatWithTZ(date, 'MMM d, yyyy');
     } catch {
         return '—';
     }

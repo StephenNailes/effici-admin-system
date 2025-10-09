@@ -66,10 +66,9 @@ export default function EquipmentManagement({ requests: initialRequests }: Props
 
     setProcessing(true);
     
-    const csrfToken = (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)?.content || '';
-    
+    // Inertia router automatically handles CSRF tokens via X-XSRF-TOKEN header
     router.patch(`/equipment-requests/${id}/status`, 
-      { status: newStatus, _token: csrfToken },
+      { status: newStatus },
       {
         onStart: () => setProcessing(true),
         onFinish: () => setProcessing(false),
@@ -87,6 +86,14 @@ export default function EquipmentManagement({ requests: initialRequests }: Props
         },
         onError: (errors: any) => {
           console.error("Error updating status:", errors);
+          
+          // Handle 419 CSRF token mismatch - reload page to refresh session
+          if (errors?.response?.status === 419 || errors?.status === 419) {
+            setError("Session expired. Refreshing page...");
+            setTimeout(() => window.location.reload(), 1500);
+            return;
+          }
+          
           const errorMessage = errors.message || errors.error || "Failed to update status.";
           setError(errorMessage);
         }

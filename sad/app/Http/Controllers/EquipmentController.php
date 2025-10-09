@@ -78,8 +78,8 @@ class EquipmentController extends Controller
     public function availableForStudent()
     {
         $user = Auth::user();
-        if ($user->role !== 'student') {
-            return response()->json(['error' => 'Only students can view available equipment.'], 403);
+        if (!in_array($user->role, ['student', 'student_officer'], true)) {
+            return response()->json(['error' => 'Only students and student officers can view available equipment.'], 403);
         }
 
         // Get all equipment and calculate current available quantity
@@ -116,11 +116,11 @@ class EquipmentController extends Controller
     public function index()
     {
         $user = Auth::user();
-        if ($user->role !== 'student') {
+        if (!in_array($user->role, ['student', 'student_officer'], true)) {
             return Inertia::render('student/BorrowEquipment', [
                 'equipment'     => [],
                 'activityPlans' => [],
-                'error'         => 'Only students are allowed to request equipment.',
+                'error'         => 'Only students and student officers are allowed to request equipment.',
             ]);
         }
 

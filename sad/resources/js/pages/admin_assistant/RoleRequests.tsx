@@ -2,6 +2,7 @@ import MainLayout from '@/layouts/mainlayout';
 import { usePage, router } from '@inertiajs/react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Calendar, Briefcase, Building2, Clock, ChevronDown, ChevronUp, Hourglass, BadgeCheck, CircleX, UserCheck2, UserX2 } from 'lucide-react';
+import { formatDateShort } from '@/lib/utils';
 import { useState } from 'react';
 
 type RequestUser = {
@@ -52,14 +53,12 @@ export default function RoleRequests() {
   };
 
   const formatDate = (dateStr?: string | null) => {
-    if (!dateStr) return '-';
-    return new Date(dateStr).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+    // Use shared utils for consistency
+    const s = formatDateShort(dateStr);
+    return s === '—' ? '-' : s.replace(/\b([A-Za-z]{3})\b/, (m) => ({Jan:'January',Feb:'February',Mar:'March',Apr:'April',May:'May',Jun:'June',Jul:'July',Aug:'August',Sep:'September',Oct:'October',Nov:'November',Dec:'December'} as any)[m] || m);
   };
 
-  const formatShortDate = (dateStr?: string | null) => {
-    if (!dateStr) return '-';
-    return new Date(dateStr).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
-  };
+  const formatShortDate = (dateStr?: string | null) => formatDateShort(dateStr);
 
   const getInitials = (u: RequestUser) => {
     const a = (u.first_name?.[0] || '').toUpperCase();
