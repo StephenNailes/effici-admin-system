@@ -139,8 +139,8 @@ class EquipmentController extends Controller
         $activityPlans = DB::table('activity_plans')
             ->where('user_id', $user->id)
             ->whereIn('status', ['pending','approved'])
-            ->select('id', 'activity_name', 'start_datetime', 'end_datetime', 'status')
-            ->orderBy('start_datetime')
+            ->select('id', 'category', 'status', 'created_at')
+            ->orderBy('created_at', 'desc')
             ->get();
 
         return Inertia::render('student/BorrowEquipment', [

@@ -24,6 +24,7 @@ import {
 
 import type { PageProps, User as AppUser } from '@/types';
 import { getCsrfToken, getXsrfCookieToken, refreshCsrfToken } from '@/lib/csrf';
+import PendingRequestModal from '@/components/PendingRequestModal';
 
 export default function Profile() {
   const pageProps = usePage<PageProps>().props;
@@ -51,6 +52,10 @@ export default function Profile() {
   const [profilePictureError, setProfilePictureError] = useState('');
   const [nameError, setNameError] = useState('');
   
+  // Pending request modal state
+  const [showPendingRequestModal, setShowPendingRequestModal] = useState(false);
+  const [pendingRequestSubmittedAt, setPendingRequestSubmittedAt] = useState<string | null>(null);
+  
   // Non-clickable placeholder for missing values
   const renderNotSet = (_label: string) => (
     <span className="text-gray-400 italic">Not set</span>
@@ -62,6 +67,27 @@ export default function Profile() {
   // Helper functions
   const isHandoverEligible = () => {
     return user.role === 'admin_assistant' || user.role === 'dean';
+  };
+
+  // Check for pending role request and navigate accordingly
+  const handleVerifyOfficerStatusClick = async () => {
+    try {
+      const response = await fetch('/api/student/role-request/check-pending');
+      const data = await response.json();
+      
+      if (data.has_pending) {
+        // Show modal if there's a pending request
+        setPendingRequestSubmittedAt(data.request?.created_at || null);
+        setShowPendingRequestModal(true);
+      } else {
+        // Navigate to verification page if no pending request
+        router.visit('/student/role-request');
+      }
+    } catch (error) {
+      console.error('Error checking pending request:', error);
+      // Fallback: navigate to verification page on error
+      router.visit('/student/role-request');
+    }
   };
 
   // Close dropdown when clicking outside
@@ -523,7 +549,7 @@ export default function Profile() {
                           <motion.button
                             whileHover={{ scale: 1.02 }}
                             whileTap={{ scale: 0.98 }}
-                            onClick={() => router.visit('/student/role-request')}
+                            onClick={handleVerifyOfficerStatusClick}
                             className="mt-3 inline-flex items-center gap-2 text-sm bg-[#e6232a] hover:bg-[#d01e24] text-white px-3 py-2 rounded-lg w-fit"
                           >
                             <UserCheck className="w-4 h-4" /> Verify Officer Status
@@ -764,6 +790,13 @@ export default function Profile() {
         </div>
 
         {/* Handover modal removed in favor of dedicated page */}
+        
+        {/* Pending Request Modal */}
+        <PendingRequestModal 
+          isOpen={showPendingRequestModal} 
+          submittedAtIso={pendingRequestSubmittedAt || undefined}
+          onClose={() => setShowPendingRequestModal(false)} 
+        />
     </MainLayout>
   );
 }

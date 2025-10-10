@@ -164,10 +164,9 @@ type Equipment = {
 
 type ActivityPlan = {
   id: number;
-  activity_name: string;
-  start_datetime: string;
-  end_datetime: string;         
+  category: string;
   status: string;
+  created_at: string;
 };
 
 type PageProps = {
@@ -459,7 +458,7 @@ export default function BorrowEquipment() {
                     { value: null, label: "— None —" },
                     ...activityPlans.map((plan) => ({
                       value: plan.id,
-                      label: `${plan.activity_name} (${plan.start_datetime} → ${plan.end_datetime})`,
+                      label: `Activity Plan #${plan.id} - ${plan.category} (${new Date(plan.created_at).toLocaleDateString()})`,
                     })),
                   ]}
                   className="w-full"

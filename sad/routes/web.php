@@ -14,7 +14,7 @@ use App\Http\Controllers\StudentDashboardController;
 use App\Http\Controllers\ActivityPlanController;
 use App\Http\Controllers\EquipmentController;
 use App\Http\Controllers\EquipmentRequestController;
-use App\Http\Controllers\DocumentController;
+// DocumentController removed with document generation reset
 use App\Http\Controllers\CommentController;
 use App\Http\Controllers\LikeController;
 use App\Http\Controllers\ApprovalController;
@@ -101,6 +101,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Role request routes (student self-service)
     Route::get('/student/role-request', [App\Http\Controllers\RoleUpdateRequestController::class, 'create'])->name('student.role-request.create');
     Route::post('/student/role-request', [App\Http\Controllers\RoleUpdateRequestController::class, 'store'])->name('student.role-request.store');
+    Route::get('/api/student/role-request/check-pending', [App\Http\Controllers\RoleUpdateRequestController::class, 'checkPending'])->name('student.role-request.check-pending');
     
     // Profile update routes
     Route::post('/profile/update-picture', [App\Http\Controllers\ProfileController::class, 'updateProfilePicture'])->name('profile.update-picture');
@@ -117,6 +118,10 @@ Route::middleware(['auth', 'verified'])->prefix('student')->group(function () {
     Route::middleware(['role:student_officer'])->group(function () {
         Route::get('/requests/activity-plan', [ActivityPlanController::class, 'index'])
             ->name('student.requests.activity-plan');
+        Route::post('/requests/activity-plan/create-draft', [ActivityPlanController::class, 'createDraft'])
+            ->name('student.requests.activity-plan.create-draft');
+        Route::post('/requests/activity-plan/{id}/submit', [ActivityPlanController::class, 'submit'])
+            ->name('student.requests.activity-plan.submit');
         Route::post('/requests/activity-plan', [ActivityPlanController::class, 'store'])
             ->name('student.requests.activity-plan.store');
         Route::get('/requests/activity-plan/{id}', [ActivityPlanController::class, 'show'])
@@ -127,9 +132,16 @@ Route::middleware(['auth', 'verified'])->prefix('student')->group(function () {
             ->name('student.requests.activity-plan.destroy');
     });
 
-    // Generated documents for activity plan
-    Route::post('/requests/activity-plan/{id}/generate', [DocumentController::class, 'generate'])
-        ->name('student.requests.activity-plan.generate');
+    // Generated documents for activity plan (PDF generation removed)
+    // Draft and download routes removed
+
+    // Activity Plan Signatures
+    Route::post('/requests/activity-plan/{id}/signatures', [App\Http\Controllers\ActivityPlanSignatureController::class, 'store'])
+        ->name('student.requests.activity-plan.signatures.store');
+    Route::delete('/requests/activity-plan/{id}/signatures/{signatureId}', [App\Http\Controllers\ActivityPlanSignatureController::class, 'destroy'])
+        ->name('student.requests.activity-plan.signatures.destroy');
+    Route::get('/requests/activity-plan/{id}/signatures', [App\Http\Controllers\ActivityPlanSignatureController::class, 'index'])
+        ->name('student.requests.activity-plan.signatures.index');
 
     // Equipment Borrowing (page only)
     Route::get('/borrow-equipment', [EquipmentController::class, 'index'])
@@ -174,6 +186,10 @@ Route::middleware(['auth', 'verified', 'role:admin_assistant,dean'])->group(func
     Route::get('/dean/activity-plan-approval/{id}', [App\Http\Controllers\NotificationController::class, 'showActivityPlanApproval'])->name('dean.activity-plan-approval');
     Route::get('/admin/activity-history', fn () => Inertia::render('admin_assistant/ActivityHistory'))->name('admin.activity-history');
     Route::get('/dean/activity-history', fn () => Inertia::render('dean/ActivityHistory'))->name('dean.activity-history');
+
+    // Reviewer access to generated documents with gating (admin assistant first, then dean)
+    // Reviewer download route removed
+    // Route for PDF download removed
 });
 
 // 🟩 Role Handover Management
@@ -304,9 +320,7 @@ Route::middleware('auth')->group(function () {
     Route::delete('/comments/{id}', [CommentController::class, 'destroy'])->middleware('throttle:30,1')->name('comments.destroy');
 });
 
-// Local-only email preview routes removed
-
-// 🟩 Likes
+// � Likes
 Route::middleware('auth')->group(function () {
     Route::post('/likes/toggle', [LikeController::class, 'toggle'])->middleware('throttle:60,1')->name('likes.toggle');
     Route::get('/likes/{type}/{id}', [LikeController::class, 'show'])->name('likes.show');

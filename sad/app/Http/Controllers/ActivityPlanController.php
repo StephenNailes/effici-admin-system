@@ -18,22 +18,98 @@ class ActivityPlanController extends Controller
         $this->notificationService = $notificationService;
     }
 
+    /**
+     * Create a draft plan (no approvals, no notifications - just a shell for saving files)
+     */
+    public function createDraft(Request $request)
+    {
+        if (Auth::user()?->role !== 'student_officer') {
+            abort(403, 'Only Student Officers can create activity plans.');
+        }
+        
+        $validated = $request->validate([
+            'category' => 'sometimes|in:minor,normal,urgent',
+        ]);
+
+        // Create plan without approvals or notifications (just a draft container)
+        $plan = ActivityPlan::create([
+            'user_id' => Auth::id(),
+            'category' => $validated['category'] ?? 'normal',
+            'status' => 'draft', // Draft status - no approvals yet
+        ]);
+
+        // Redirect to the GET show route to avoid GET requests hitting the POST path
+        return redirect()->route('student.requests.activity-plan.show', ['id' => $plan->id])
+            ->with('success', 'Draft created.');
+    }
+
+    /**
+     * Submit an existing draft plan for approval (creates approvals and sends notifications)
+     */
+    public function submit(Request $request, $id)
+    {
+        if (Auth::user()?->role !== 'student_officer') {
+            abort(403, 'Only Student Officers can submit activity plans.');
+        }
+
+        $plan = ActivityPlan::where('id', $id)
+            ->where('user_id', Auth::id())
+            ->firstOrFail();
+
+        $user = Auth::user();
+
+        DB::transaction(function () use ($plan, $user) {
+            // Create approval record if it doesn't exist
+            $existingApproval = RequestApproval::where('request_type', 'activity_plan')
+                ->where('request_id', $plan->id)
+                ->where('approver_role', 'admin_assistant')
+                ->first();
+
+            if (!$existingApproval) {
+                RequestApproval::insert([
+                    [
+                        'request_type' => 'activity_plan',
+                        'request_id' => $plan->id,
+                        'approver_role' => 'admin_assistant',
+                        'status' => 'pending',
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ]
+                ]);
+            }
+
+            // Update plan status to pending
+            $plan->update(['status' => 'pending']);
+        });
+
+        // Send notification to admin assistants
+        $priorityMap = [
+            'minor' => 'low',
+            'normal' => 'normal',
+            'urgent' => 'urgent'
+        ];
+        $priority = $priorityMap[$plan->category] ?? 'normal';
+        $studentName = $user->first_name . ' ' . $user->last_name;
+
+        $this->notificationService->notifyNewRequest(
+            'admin_assistant',
+            $studentName,
+            'activity_plan',
+            $plan->id,
+            $priority
+        );
+
+        return back()->with('success', 'Activity plan submitted for approval!');
+    }
+
     public function store(Request $request)
     {
         if (Auth::user()?->role !== 'student_officer') {
             abort(403, 'Only Student Officers can create activity plans.');
         }
         $validated = $request->validate([
-            'activity_name' => 'required|string|max:255',
-            'activity_purpose' => 'required|string',
+            // Document-centric: only metadata we still track
             'category' => 'required|in:minor,normal,urgent',
-            'start_datetime' => 'required|date',
-            'end_datetime' => 'required|date|after_or_equal:start_datetime',
-            'objectives' => 'nullable|string',
-            'participants' => 'nullable|string',
-            'methodology' => 'nullable|string',
-            'expected_outcome' => 'nullable|string',
-            'activity_location' => 'nullable|string',
         ]);
 
         $plan = null;
@@ -41,17 +117,8 @@ class ActivityPlanController extends Controller
         
         DB::transaction(function () use ($validated, &$plan, $user) {
             $plan = ActivityPlan::create([
-                'user_id'          => $user->id,
-                'activity_name' => $validated['activity_name'],
-                'activity_purpose' => $validated['activity_purpose'],
+                'user_id' => $user->id,
                 'category' => $validated['category'],
-                'start_datetime' => $validated['start_datetime'],
-                'end_datetime' => $validated['end_datetime'],
-                'objectives' => $validated['objectives'] ?? null,
-                'participants' => $validated['participants'] ?? null,
-                'methodology' => $validated['methodology'] ?? null,
-                'expected_outcome' => $validated['expected_outcome'] ?? null,
-                'activity_location' => $validated['activity_location'] ?? null,
                 'status' => 'pending',
             ]);
 
@@ -86,9 +153,14 @@ class ActivityPlanController extends Controller
                 $plan->id,
                 $priority
             );
+            
+            // Reload the plan with relationships
+            $plan = $plan->fresh(['files', 'currentFile']);
         }
 
-        return redirect()->back()->with('success', 'Activity plan submitted successfully!');
+        // Redirect to show route to ensure consistent page state and eager-loaded relationships
+        return redirect()->route('student.requests.activity-plan.show', ['id' => $plan->id])
+            ->with('success', 'Activity plan created successfully!');
     }
 
     public function index()
@@ -107,7 +179,8 @@ class ActivityPlanController extends Controller
         if (Auth::user()?->role !== 'student_officer') {
             abort(403);
         }
-        $plan = ActivityPlan::where('id', $id)
+        $plan = ActivityPlan::with(['files', 'currentFile'])
+            ->where('id', $id)
             ->where('user_id', Auth::id())
             ->firstOrFail();
 
@@ -122,16 +195,7 @@ class ActivityPlanController extends Controller
             abort(403);
         }
         $validated = $request->validate([
-            'activity_name' => 'required|string|max:255',
-            'activity_purpose' => 'required|string',
             'category' => 'required|in:minor,normal,urgent',
-            'start_datetime' => 'required|date',
-            'end_datetime' => 'required|date|after_or_equal:start_datetime',
-            'objectives' => 'nullable|string',
-            'participants' => 'nullable|string',
-            'methodology' => 'nullable|string',
-            'expected_outcome' => 'nullable|string',
-            'activity_location' => 'nullable|string',
         ]);
 
         $plan = ActivityPlan::where('id', $id)
@@ -140,16 +204,7 @@ class ActivityPlanController extends Controller
 
         DB::transaction(function () use ($plan, $validated) {
             $plan->update([
-                'activity_name' => $validated['activity_name'],
-                'activity_purpose' => $validated['activity_purpose'],
                 'category' => $validated['category'],
-                'start_datetime' => $validated['start_datetime'],
-                'end_datetime' => $validated['end_datetime'],
-                'objectives' => $validated['objectives'] ?? null,
-                'participants' => $validated['participants'] ?? null,
-                'methodology' => $validated['methodology'] ?? null,
-                'expected_outcome' => $validated['expected_outcome'] ?? null,
-                'activity_location' => $validated['activity_location'] ?? null,
                 'status' => 'pending',
             ]);
 

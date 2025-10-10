@@ -88,7 +88,7 @@ export default function BatchApprovalModal({
                       <li key={request.id || index} className="text-sm text-gray-600 flex items-center gap-2">
                         <CheckCircle className="w-3 h-3 text-green-500 flex-shrink-0" />
                         <span className="truncate">
-                          {request.activity_name || request.title || `Request #${request.id}`}
+                          {request.activity_category || request.title || `Request #${request.id}`}
                           <span className="text-gray-400 ml-1">
                             ({request.request_type || request.type})
                           </span>

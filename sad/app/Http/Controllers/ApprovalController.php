@@ -46,8 +46,7 @@ class ApprovalController extends Controller
                 DB::raw("CAST(COALESCE(er.category, ap.category) AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci as priority"),
                 DB::raw("CONCAT(u.first_name, ' ', u.last_name) as student_name"),
                 DB::raw("CONCAT(approver.first_name, ' ', approver.last_name) as approver_name"),
-                DB::raw("CAST(ap.activity_name AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci as activity_name"),
-                DB::raw("CAST(ap.activity_purpose AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci as activity_purpose"),
+                DB::raw("CAST(ap.category AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci as activity_category"),
                 DB::raw("CAST(er.purpose AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci as equipment_purpose"),
                 DB::raw("CAST(er.status AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci as equipment_status"),
                 DB::raw("CAST(ap.status AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci as activity_status")
@@ -70,8 +69,7 @@ class ApprovalController extends Controller
                     DB::raw('CAST(NULL AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci as priority'),
                     DB::raw("CONCAT(u.first_name, ' ', u.last_name) as student_name"),
                     DB::raw("CONCAT(approver.first_name, ' ', approver.last_name) as approver_name"),
-                    DB::raw('CAST(NULL AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci as activity_name'),
-                    DB::raw('CAST(NULL AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci as activity_purpose'),
+                    DB::raw('CAST(NULL AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci as activity_category'),
                     DB::raw('CAST(NULL AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci as equipment_purpose'),
                     DB::raw('CAST(NULL AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci as equipment_status'),
                     DB::raw('CAST(NULL AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci as activity_status')
@@ -145,8 +143,7 @@ class ApprovalController extends Controller
                 DB::raw("COALESCE(er.category, ap.category) as priority"),
                 DB::raw("CONCAT(u.first_name, ' ', u.last_name) as student_name"),
                 DB::raw("CONCAT(approver.first_name, ' ', approver.last_name) as approver_name"),
-                'ap.activity_name',
-                'ap.activity_purpose',
+                'ap.category as activity_category',
                 'er.purpose as equipment_purpose',
                 'er.status as equipment_status',
                 'ap.status as activity_status'

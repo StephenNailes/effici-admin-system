@@ -265,7 +265,7 @@ class HandoverController extends Controller
                     'created_at' => $approval->created_at,
                     'request_details' => $approval->request_type === 'equipment' 
                         ? $approval->equipment_request?->purpose 
-                        : $approval->activity_plan?->activity_name,
+                        : $approval->activity_plan?->category,
                 ];
             }),
         ]);

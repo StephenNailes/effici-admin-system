@@ -238,9 +238,9 @@ export default function ActivityHistory() {
             student: item.student_name || "-",
             type: item.request_type === "activity_plan" ? "Activity Plan" : "Equipment",
             dateSubmitted: item.submitted_at ? item.submitted_at.slice(0, 10) : "-",
-            purpose:
+            category:
               item.request_type === "activity_plan"
-                ? item.activity_purpose || "-"
+                ? item.activity_category || "-"
                 : item.equipment_purpose || "-",
             status,
             approverRole: item.approver_role ? item.approver_role.replace('_', ' ').split(' ').map((word: string) => word.charAt(0).toUpperCase() + word.slice(1)).join(' ') : null,
@@ -310,7 +310,7 @@ export default function ActivityHistory() {
     const matchesSearch = searchTerm.trim() === "" || [
       activity.student || "",
       String(activity.id || ""),
-      activity.purpose || "",
+      activity.category || "",
       activity.type || ""
     ].some(field => 
       field.toLowerCase().includes(searchTerm.toLowerCase())
@@ -401,7 +401,7 @@ export default function ActivityHistory() {
                     type="text"
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    placeholder="Search by student, ID, purpose, or type..."
+                    placeholder="Search by student, ID, category, or type..."
                     className="w-full pl-11 pr-4 h-[44px] rounded-lg border border-gray-300 text-black 
                                hover:border-gray-400 hover:bg-gray-100
                                focus:ring-2 focus:ring-red-200 focus:border-red-300 focus:outline-none 
@@ -448,7 +448,7 @@ export default function ActivityHistory() {
                   <th className="py-3 px-6">Student</th>
                   <th className="py-3 px-6">Type</th>
                   <th className="py-3 px-6">Date Submitted</th>
-                  <th className="py-3 px-6">Purpose</th>
+                  <th className="py-3 px-6">Category/Purpose</th>
                   <th className="py-3 px-6">Status</th>
                   <th className="py-3 px-6">Approved By</th>
                 </tr>
@@ -503,7 +503,7 @@ export default function ActivityHistory() {
                       <td className="py-3 px-6">{activity.student}</td>
                       <td className="py-3 px-6">{activity.type}</td>
                       <td className="py-3 px-6">{activity.dateSubmitted}</td>
-                      <td className="py-3 px-6">{activity.purpose}</td>
+                      <td className="py-3 px-6">{activity.category}</td>
                       <td className="py-3 px-6">
                         {(() => {
                           const status = activity.status?.toLowerCase();

@@ -8,6 +8,7 @@ use App\Models\EmailVerificationCode;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
 
@@ -19,7 +20,33 @@ class EmailVerificationController extends Controller
         if ($user->hasVerifiedEmail()) {
             return redirect()->to($this->redirectFor($user->role));
         }
-        return Inertia::render('Auth/VerifyEmail', [
+
+        // Auto-send verification code on first visit if no active code exists
+        $existingCode = EmailVerificationCode::where('user_id', $user->id)
+            ->where('expires_at', '>', now())
+            ->first();
+
+        if (!$existingCode) {
+            // Generate and send new code
+            $code = str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
+            
+            EmailVerificationCode::updateOrCreate(
+                ['user_id' => $user->id],
+                [
+                    'code' => $code,
+                    'expires_at' => now()->addMinutes(15),
+                ]
+            );
+
+            try {
+                Mail::to($user->email)->send(new VerificationCode($user, $code));
+                // Don't flash status on auto-send, only on manual resend
+            } catch (\Exception $e) {
+                Log::error('Failed to send verification code: ' . $e->getMessage());
+            }
+        }
+
+        return Inertia::render('Auth/verifyemail', [
             'status' => session('status')
         ]);
     }

@@ -90,7 +90,7 @@ export default function RoleRequests() {
               className="bg-white rounded-lg shadow border border-gray-200 overflow-hidden transition-shadow hover:shadow-md"
             >
               {/* Header */}
-              <div className="bg-gradient-to-r from-red-50 to-white p-5 border-b border-gray-200">
+              <div className="bg-white p-5 border-b border-gray-200">
                 <div className="flex items-center justify-between gap-4">
                   <div className="flex items-center gap-3 min-h-[44px]">
                     {r.user?.profile_photo_url ? (

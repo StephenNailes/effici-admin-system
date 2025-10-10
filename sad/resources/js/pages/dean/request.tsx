@@ -11,7 +11,7 @@ import { csrfFetch } from '@/lib/csrf';
 interface RequestData {
   approval_id: number;
   student_name: string;
-  activity_name?: string;
+  activity_category?: string;
   request_type: 'activity_plan';
   submitted_at: string;
   priority: 'minor' | 'normal' | 'urgent';
@@ -140,7 +140,7 @@ export default function Request() {
     }
     
     const matchesSearch = request.student_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      request.activity_name?.toLowerCase().includes(searchTerm.toLowerCase());
+      request.activity_category?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesPriority = !priorityFilter || request.priority === priorityFilter;
     return matchesSearch && matchesPriority;
   });
@@ -353,7 +353,7 @@ export default function Request() {
                       />
                     </td>
                     <td className="px-6 py-4 text-sm font-medium text-gray-900 whitespace-nowrap">{request.student_name || 'Unknown Student'}</td>
-                    <td className="px-6 py-4 text-sm text-gray-700 whitespace-nowrap">{request.activity_name || 'Activity Plan'}</td>
+                    <td className="px-6 py-4 text-sm text-gray-700 whitespace-nowrap">{request.activity_category || 'Activity Plan'}</td>
                     <td className="px-6 py-4 text-sm text-gray-900 whitespace-nowrap">
                       {request.submitted_at ? (
                         <div className="flex flex-col">

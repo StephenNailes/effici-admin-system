@@ -22,7 +22,7 @@ class ActivityLogController extends Controller
 
         // ✅ Fetch only this student's logs
         $query = "
-            SELECT 'Activity Plan' AS type, id, activity_name AS title, status, created_at AS date
+            SELECT 'Activity Plan' AS type, id, category AS title, status, created_at AS date
             FROM activity_plans
             WHERE user_id = ?
 

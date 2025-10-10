@@ -3,11 +3,14 @@
 namespace App\Http\Controllers;
 
 use App\Models\RoleUpdateRequest;
+use App\Mail\RoleUpdateApproved;
 use App\Models\User;
 use App\Services\NotificationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
 
 class RoleUpdateRequestController extends Controller
@@ -78,6 +81,24 @@ class RoleUpdateRequestController extends Controller
         ]);
     }
 
+    // Check if user has pending role update request (API)
+    public function checkPending()
+    {
+        $user = Auth::user();
+        
+        $pendingRequest = RoleUpdateRequest::where('user_id', $user->id)
+            ->where('status', 'pending')
+            ->first();
+
+        return response()->json([
+            'has_pending' => $pendingRequest !== null,
+            'request' => $pendingRequest ? [
+                'id' => $pendingRequest->id,
+                'created_at' => $pendingRequest->created_at->toIso8601String(),
+            ] : null
+        ]);
+    }
+
     // Admin Assistant: approve or reject
     public function update(Request $request, int $id)
     {
@@ -94,7 +115,8 @@ class RoleUpdateRequestController extends Controller
             return back()->withErrors(['status' => 'This request has already been processed.']);
         }
 
-        DB::transaction(function () use ($validated, $roleRequest, $admin) {
+        $approved = false;
+        DB::transaction(function () use ($validated, $roleRequest, $admin, &$approved) {
             $roleRequest->status = $validated['action'] === 'approve' ? 'approved' : 'rejected';
             $roleRequest->remarks = $validated['remarks'] ?? null;
             $roleRequest->reviewed_by = $admin->id;
@@ -106,6 +128,7 @@ class RoleUpdateRequestController extends Controller
                 $user = $roleRequest->user;
                 $user->role = 'student_officer';
                 $user->save();
+                $approved = true;
             }
         });
 
@@ -115,6 +138,15 @@ class RoleUpdateRequestController extends Controller
             $roleRequest->status,
             $roleRequest->id
         );
+
+        // Send email if approved
+        if ($approved) {
+            try {
+                Mail::to($roleRequest->user->email)->send(new RoleUpdateApproved($roleRequest));
+            } catch (\Throwable $e) {
+                Log::warning('Failed to send RoleUpdateApproved mail: '.$e->getMessage());
+            }
+        }
 
         return back()->with('success', 'Request processed successfully.');
     }

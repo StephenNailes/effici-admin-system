@@ -94,7 +94,7 @@ export default function VerifyEmail() {
                         prev?.focus();
                       }
                     }}
-                    className="w-12 h-14 rounded-xl border border-gray-200 text-center text-xl font-semibold tracking-widest focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent bg-white shadow-sm"
+                    className="w-12 h-14 rounded-xl border border-gray-200 text-center text-xl font-semibold tracking-widest focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent bg-white shadow-sm text-black"
                   />
                 ))}
               </div>

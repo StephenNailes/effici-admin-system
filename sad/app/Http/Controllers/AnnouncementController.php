@@ -62,9 +62,9 @@ class AnnouncementController extends Controller
 
     public function create()
     {
-        // Only allow admin_assistant and dean to create announcements
+        // Only allow admin_assistant, dean, and student_officer to create announcements
         $user = Auth::user();
-        if (!in_array($user->role, ['admin_assistant', 'dean'])) {
+        if (!in_array($user->role, ['admin_assistant', 'dean', 'student_officer'])) {
             return redirect()->route('announcements.index')->with('error', 'Unauthorized access');
         }
 
@@ -73,9 +73,9 @@ class AnnouncementController extends Controller
 
     public function store(Request $request)
     {
-        // Only allow admin_assistant and dean to create announcements
+        // Only allow admin_assistant, dean, and student_officer to create announcements
         $user = Auth::user();
-        if (!in_array($user->role, ['admin_assistant', 'dean'])) {
+        if (!in_array($user->role, ['admin_assistant', 'dean', 'student_officer'])) {
             return redirect()->route('announcements.index')->with('error', 'Unauthorized access');
         }
 
@@ -109,7 +109,7 @@ class AnnouncementController extends Controller
     public function edit($id)
     {
         $user = Auth::user();
-        if (!in_array($user->role, ['admin_assistant', 'dean'])) {
+        if (!in_array($user->role, ['admin_assistant', 'dean', 'student_officer'])) {
             return redirect()->route('announcements.index')->with('error', 'Unauthorized access');
         }
 
@@ -140,7 +140,7 @@ class AnnouncementController extends Controller
     public function update(Request $request, $id)
     {
         $user = Auth::user();
-        if (!in_array($user->role, ['admin_assistant', 'dean'])) {
+        if (!in_array($user->role, ['admin_assistant', 'dean', 'student_officer'])) {
             return redirect()->route('announcements.index')->with('error', 'Unauthorized access');
         }
 
@@ -192,7 +192,7 @@ class AnnouncementController extends Controller
     public function destroy($id)
     {
         $user = Auth::user();
-        if (!in_array($user->role, ['admin_assistant', 'dean'])) {
+        if (!in_array($user->role, ['admin_assistant', 'dean', 'student_officer'])) {
             return redirect()->route('announcements.index')->with('error', 'Unauthorized access');
         }
 

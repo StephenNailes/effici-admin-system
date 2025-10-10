@@ -27,7 +27,7 @@ class RevisionController extends Controller
             ->where('activity_plans.status', 'under_revision')
             ->select([
                 'activity_plans.id',
-                'activity_plans.activity_name as title',
+                'activity_plans.category as title',
                 'request_approvals.remarks as comment',
                 'activity_plans.status',
                 DB::raw("'activity_plan' as request_type")
@@ -141,17 +141,8 @@ class RevisionController extends Controller
         $requestType = request()->query('type');
         
         $validated = request()->validate([
-            // Activity fields
-            'activity_name' => 'nullable|string|max:255',
-            'activity_purpose' => 'nullable|string',
+            // Activity plan now only has category
             'category' => 'nullable|in:minor,normal,urgent',
-            'start_datetime' => 'nullable|date',
-            'end_datetime' => 'nullable|date|after_or_equal:start_datetime',
-            'objectives' => 'nullable|string',
-            'participants' => 'nullable|string',
-            'methodology' => 'nullable|string',
-            'expected_outcome' => 'nullable|string',
-            'activity_location' => 'nullable|string',
             // Equipment fields
             'purpose' => 'nullable|string',
             'equipment_category' => 'nullable|string',
@@ -162,21 +153,13 @@ class RevisionController extends Controller
 
         DB::transaction(function () use ($id, $validated, $userId, $requestType, $notificationService) {
             if ($requestType === 'activity_plan') {
-                // Update activity plan
+                // For activity plans, just update category and reset status to pending
+                // The student should regenerate the document in ActivityPlan.tsx
                 $affectedRows = DB::table('activity_plans')
                     ->where('id', $id)
                     ->where('user_id', $userId)
                     ->update([
-                        'activity_name' => $validated['activity_name'],
-                        'activity_purpose' => $validated['activity_purpose'],
-                        'category' => $validated['category'],
-                        'start_datetime' => $validated['start_datetime'],
-                        'end_datetime' => $validated['end_datetime'],
-                        'objectives' => $validated['objectives'] ?? null,
-                        'participants' => $validated['participants'] ?? null,
-                        'methodology' => $validated['methodology'] ?? null,
-                        'expected_outcome' => $validated['expected_outcome'] ?? null,
-                        'activity_location' => $validated['activity_location'] ?? null,
+                        'category' => $validated['category'] ?? 'normal',
                         'status' => 'pending',
                         'updated_at' => now(),
                     ]);

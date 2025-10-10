@@ -1,8 +1,21 @@
 import React, { useState, useEffect, useCallback, useRef, useLayoutEffect } from "react";
+import { createPortal } from "react-dom";
+import { router, usePage } from '@inertiajs/react';
+import { getCsrfMetaToken, refreshCsrfToken } from '@/lib/csrf';
+import ReactSignatureCanvas from 'react-signature-canvas';
 import MainLayout from "@/layouts/mainlayout";
+import SubmissionModal from "@/components/SubmissionModal";
+import SignatureWarningModal from "@/components/SignatureWarningModal";
+// FileSelectionModal removed with PDF feature reset
+// Local type definitions (no external template export/generation)
+export type Member = { name: string; role: string };
+export type Signatory = { name: string; position: string };
+export type SignatoriesMap = Record<string, Signatory[]>;
+import { useActivityPlanIO } from "@/hooks/useActivityPlanIO";
 import uicLogo from "/public/images/uic-logo.png";
 import tuvCertified from "/public/images/tuv-certified.jpg";
 import uicFooter from "/public/images/uic-footer.jpg";
+// Removed buildTemplateExportHtml; no document generation or preview
 import {
   Undo2,
   Redo2,
@@ -20,9 +33,7 @@ import {
 } from "lucide-react";
 
 /*---------- Types ----------*/
-type Member = { name: string; role: string };
-type Signatory = { name: string; position: string };
-type SignatoriesMap = Record<string, Signatory[]>;
+// Member, Signatory, SignatoriesMap now imported from templateExport
 
 /*---------- Small inline SVG Icons ----------*/
 type IconProps = React.SVGProps<SVGSVGElement>;
@@ -65,7 +76,7 @@ const IconMail = (props: IconProps) => (
 
 /*---------- Styling (CSS) ----------*/
 const GlobalStyles = () => (
-  <style>{`
+  <style id="ap-global-css">{`
     /* Removed page-level Tailwind import to avoid conflicting resets with app Tailwind */
     /* Fonts loaded globally by app; no @import needed here to avoid side effects */
     
@@ -114,7 +125,7 @@ const GlobalStyles = () => (
       max-height: 297mm;
       margin: 20px auto; 
       box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08); /* subtle shadow on screen */
-      border: 1px solid #d1d5db; /* gray outline for screen */
+  border: 1px solid #374151; /* Tailwind gray-700 for even stronger visibility */
       box-sizing: border-box; 
       display: flex; 
       flex-direction: column;
@@ -174,7 +185,7 @@ const GlobalStyles = () => (
     }
     .ap-scope .sidebar-line { 
       position: absolute; 
-      right: 4.02mm; 
+      right: 4.09mm; 
       top: 1mm; 
       bottom: 40mm; /* stop before footer lines; increase to end higher, decrease to extend lower */
       border-right: 2px solid var(--brand-pink); 
@@ -220,23 +231,28 @@ const GlobalStyles = () => (
 
     /* --- Formatting Toolbar (centered above first page, non-sticky) --- */
     .ap-scope .formatting-toolbar {
-      position: static; /* not sticky, stays above first page */
+      position: sticky; /* follow page scroll */
+      top: 12px; /* distance from top while scrolling */
       background: #fff; border: 1px solid #e5e7eb; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-      border-radius: 0.75rem; padding: 0.5rem 0.6rem; display: flex; align-items: center;
-      gap: 0.5rem; z-index: 10; width: fit-content; margin: 0 auto 1rem auto;
+      border-radius: 0.75rem; padding: 0.35rem 0.5rem; display: flex; align-items: center;
+      gap: 0.5rem; z-index: 30; width: fit-content; margin: 0 auto 1rem auto;
+      backdrop-filter: saturate(1.1) blur(2px);
+      font-size: 12px;
     }
     .ap-scope .formatting-toolbar .group { display: inline-flex; align-items: center; gap: 0.25rem; padding: 0 0.25rem; }
     .ap-scope .formatting-toolbar .divider { width: 1px; background: #e5e7eb; margin: 0 0.5rem; align-self: stretch; }
-    .ap-scope .formatting-toolbar .btn { padding: 0.35rem; border-radius: 0.5rem; border: none; background: transparent; cursor: pointer; transition: background 0.15s ease, color 0.15s ease; }
+  .ap-scope .formatting-toolbar .btn { padding: 0.25rem; border-radius: 0.5rem; border: none; background: transparent; cursor: pointer; transition: background 0.15s ease, color 0.15s ease; font-size: 12px; }
     .ap-scope .formatting-toolbar .btn:hover:not(:disabled) { background: #f3f4f6; color: #ec4B99; }
     .ap-scope .formatting-toolbar .btn:disabled { cursor: not-allowed; opacity: 0.5; }
-    .ap-scope .formatting-toolbar .select { height: 32px; border: 1px solid #e5e7eb; border-radius: 0.5rem; padding: 0 0.5rem; background: #fff; font-size: 12px; }
+  .ap-scope .formatting-toolbar .select { height: 28px; border: 1px solid #e5e7eb; border-radius: 0.5rem; padding: 0 0.4rem; background: #fff; font-size: 12px; }
 
     /* --- Signatories Section --- */
     .ap-scope .signatories-container {
       margin-top: auto; /* Pushes signatories to the bottom */
       padding-top: 2rem;
       padding-bottom: 8mm; /* lift signatories above footer lines to avoid clipping (affects screen + print) */
+      position: relative; /* Enable absolute positioning for signatures */
+      min-height: 200px; /* Ensure enough space for signatures */
     }
     .ap-scope .signatory-item {
         break-inside: avoid;
@@ -264,6 +280,77 @@ const GlobalStyles = () => (
       font-size: 11pt;
       line-height: 1.5;
     }
+    /* Tables inside the document */
+    .ap-scope .main-text table {
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+    }
+    .ap-scope .main-text table, 
+    .ap-scope .main-text th, 
+    .ap-scope .main-text td {
+      border: 1px solid #000;
+    }
+    .ap-scope .main-text th, 
+    .ap-scope .main-text td {
+      padding: 4px 6px;
+      vertical-align: top;
+      word-wrap: break-word;
+    }
+    /* Lists inside content */
+    .ap-scope .main-text ul, .ap-scope .main-text ol {
+      margin-left: 1.25em !important;
+      padding-left: 1.25em !important;
+      list-style-position: outside;
+    }
+    .ap-scope .main-text li { margin: 0.2em 0; }
+
+    /* Table insertion menu (popover) */
+    .table-menu {
+      position: absolute;
+      z-index: 50;
+      background: #ffffff;
+      border: 1px solid #e5e7eb;
+      border-radius: 0.5rem;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+      padding: 0.75rem;
+      width: max-content;
+    }
+    .table-menu .grid {
+      display: grid;
+      grid-template-columns: repeat(10, 18px);
+      grid-auto-rows: 18px;
+      gap: 4px;
+      padding: 4px;
+      background: #f9fafb;
+      border-radius: 0.375rem;
+      border: 1px solid #e5e7eb;
+    }
+    .table-menu .cell {
+      width: 18px; height: 18px;
+      border: 1px solid #e5e7eb;
+      background: #fff;
+      border-radius: 2px;
+    }
+    .table-menu .cell.active {
+      background: #fde7f4; /* light pink highlight */
+      border-color: #ec4899;
+    }
+    .table-menu .label { font-size: 12px; color: #374151; margin-top: 6px; text-align: center; }
+    .table-menu .row { display: flex; gap: 0.5rem; align-items: center; margin-top: 0.5rem; }
+    .table-menu select, .table-menu input[type="checkbox"] { font-size: 12px; }
+    .table-menu .actions { display: flex; gap: 0.5rem; margin-top: 0.5rem; justify-content: space-between; }
+    .table-menu .btn-sm { font-size: 12px; padding: 4px 8px; border-radius: 6px; border: 1px solid #e5e7eb; background: #fff; }
+    .table-menu .btn-sm:hover { background: #f3f4f6; }
+
+    /* Table design variants */
+    .ap-scope .main-text table.table--borders-none,
+    .ap-scope .main-text table.table--borders-none th,
+    .ap-scope .main-text table.table--borders-none td { border: 0 !important; }
+    .ap-scope .main-text table.table--borders-gray,
+    .ap-scope .main-text table.table--borders-gray th,
+    .ap-scope .main-text table.table--borders-gray td { border-color: #9ca3af !important; }
+    .ap-scope .main-text table.table--auto { width: auto !important; }
     /* Ensure headings inside body use 11pt but keep their boldness where applied */
     .ap-scope .main-text h1,
     .ap-scope .main-text h2,
@@ -331,12 +418,16 @@ const GlobalStyles = () => (
       }
       /* Hide the application shell sidebar during print */
       aside[aria-label="Sidebar"] { display: none !important; }
-      /* Show the Activity Plan document sidebar (EXECUTIVE BOARD) on first page in print */
-      .ap-scope .sidebar { 
+      /* Show the Activity Plan document sidebar (EXECUTIVE BOARD) ONLY on the first page in print */
+      .ap-scope .page:first-of-type .sidebar { 
         visibility: visible !important; 
         display: block !important; 
       }
-      .ap-scope .sidebar-heading::after {
+      /* Hide sidebar content on subsequent pages but keep its width (preserve layout/format) */
+      .ap-scope .page:not(:first-of-type) .sidebar { 
+        visibility: hidden !important; /* preserves space */
+      }
+      .ap-scope .page:first-of-type .sidebar-heading::after {
         visibility: visible !important;
         display: block !important;
       }
@@ -399,16 +490,67 @@ const GlobalStyles = () => (
       }
   .header-logo { margin-left: -9px !important; }
     }
+    /* --- E-Signature styles --- */
+    .signature-draggable { 
+      display: inline-block; 
+      cursor: move; 
+      border: none; 
+      padding: 0; 
+      margin: 2px; 
+      background: transparent; 
+      user-select: none; 
+      transition: all 0.2s;
+      box-shadow: none;
+      pointer-events: auto;
+    }
+    .signature-draggable:hover { 
+      box-shadow: 0 2px 6px rgba(236,72,153,0.15);
+    }
+    .signature-draggable:active {
+      cursor: grabbing;
+    }
+    .signature-draggable img { display: block; max-width: 240px; height: auto; pointer-events: none; }
+    
+    /* Ensure signatory items don't interfere with signature dragging */
+    .ap-scope .signatory-item {
+      position: relative;
+      z-index: 1;
+    }
+    .ap-scope .signatories-container.dragging .signatory-item,
+    .ap-scope .signatories-container.dragging .add-signatory-form,
+    .ap-scope .signatories-container.dragging button {
+      pointer-events: none !important;
+    }
+    .ap-scope .signatories-container.dragging {
+      user-select: none !important;
+    }
+    
+    /* Hide signature borders when printing */
+    @media print {
+      .signature-draggable {
+        border: none !important;
+        box-shadow: none !important;
+        padding: 0 !important;
+      }
+    }
   `}</style>
 );
 
 /* ---------- Toolbar Component ---------- */
-type ToolbarProps = { onZoomChange?: (scale: number) => void };
-const Toolbar: React.FC<ToolbarProps> = ({ onZoomChange }) => {
+type ToolbarProps = { 
+  onZoomChange?: (scale: number) => void;
+  onStartSignature?: (range: Range | null) => void;
+  // Submission only; draft/export/preview removed
+  onSubmit?: () => void;
+};
+const Toolbar: React.FC<ToolbarProps> = ({ onZoomChange, onStartSignature, onSubmit }) => {
   const exec = (command: string, value?: string) => document.execCommand(command, false, value ?? "");
   const [zoom, setZoom] = useState<number>(1);
   const [font, setFont] = useState<string>("Times New Roman");
   const [fontSize, setFontSize] = useState<number>(11);
+  const [showTableMenu, setShowTableMenu] = useState<boolean>(false);
+  const [tableMenuPos, setTableMenuPos] = useState<{x:number;y:number}>({x:0,y:0});
+  const savedSelectionRef = useRef<Range | null>(null);
   // removed text color control per request
 
   const applyFont = (f: string) => { setFont(f); exec("fontName", f); };
@@ -420,6 +562,159 @@ const Toolbar: React.FC<ToolbarProps> = ({ onZoomChange }) => {
     if (!url) return;
     const safeUrl = url.match(/^https?:\/\//i) ? url : `https://${url}`;
     exec("createLink", safeUrl);
+  };
+  const captureSelection = (): Range | null => {
+    const selection = window.getSelection();
+    if (selection && selection.rangeCount > 0) {
+      return selection.getRangeAt(0).cloneRange();
+    }
+    return null;
+  };
+  const insertSimpleTable = (rows: number, cols: number) => {
+    // Build table HTML
+    let html = '<table style="width: 100%; border-collapse: collapse;">';
+    for (let r = 0; r < rows; r++) {
+      html += '<tr>';
+      for (let c = 0; c < cols; c++) {
+        html += '<td style="border: 1px solid #000; padding: 4px 6px;">&nbsp;</td>';
+      }
+      html += '</tr>';
+    }
+    html += '</table><p><br></p>';
+    
+    // Try to use saved selection first (from toolbar interaction)
+    let range = savedSelectionRef.current;
+    
+    // If no saved selection, try to get current selection
+    if (!range) {
+      const selection = window.getSelection();
+      if (selection && selection.rangeCount > 0) {
+        range = selection.getRangeAt(0);
+      }
+    }
+    
+    // Insert at cursor position if we have a range
+    if (range) {
+      const editableParent = (range.commonAncestorContainer as Node).parentElement?.closest('.editable-content');
+      
+      if (editableParent) {
+        // Delete any selected content first
+        range.deleteContents();
+        
+        // Create a temporary div to parse the HTML
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = html;
+        
+        // Insert each node from the parsed HTML
+        const fragment = document.createDocumentFragment();
+        while (tempDiv.firstChild) {
+          fragment.appendChild(tempDiv.firstChild);
+        }
+        
+        range.insertNode(fragment);
+        
+        // Move cursor after the inserted content
+        range.collapse(false);
+        const selection = window.getSelection();
+        if (selection) {
+          selection.removeAllRanges();
+          selection.addRange(range);
+        }
+        
+        // Clear saved selection
+        savedSelectionRef.current = null;
+        return;
+      }
+    }
+    
+    // Fallback: if no selection, find active editable and append
+    const editableDiv = document.querySelector('.editable-content[contenteditable="true"]') as HTMLElement;
+    if (editableDiv) {
+      editableDiv.focus();
+      document.execCommand('insertHTML', false, html);
+    }
+    
+    // Clear saved selection
+    savedSelectionRef.current = null;
+  };
+  const openTableMenu = (btnEl: HTMLButtonElement | null) => {
+    // Save current selection before opening menu
+    const selection = window.getSelection();
+    if (selection && selection.rangeCount > 0) {
+      savedSelectionRef.current = selection.getRangeAt(0).cloneRange();
+    }
+    
+    if (!btnEl) { setShowTableMenu((s)=>!s); return; }
+    const rect = btnEl.getBoundingClientRect();
+    // Use viewport coordinates for fixed-position portal (do NOT add scrollY)
+    setTableMenuPos({ x: rect.left, y: rect.bottom + 6 });
+    setShowTableMenu(true);
+  };
+  const insertTable = () => {
+    const colsStr = window.prompt("How many columns?", "3");
+    const rowsStr = window.prompt("How many rows?", "3");
+    if (!colsStr || !rowsStr) return;
+    const cols = Math.max(1, Math.min(10, Number(colsStr)));
+    const rows = Math.max(1, Math.min(20, Number(rowsStr)));
+    const header = window.confirm("Use first row as header?");
+    let html = '<table contenteditable="false">';
+    for (let r = 0; r < rows; r++) {
+      html += "<tr>";
+      for (let c = 0; c < cols; c++) {
+        if (header && r === 0) {
+          html += '<th><div contenteditable="true">&nbsp;</div></th>';
+        } else {
+          html += '<td><div contenteditable="true">&nbsp;</div></td>';
+        }
+      }
+      html += "</tr>";
+    }
+    html += "</table>";
+    exec("insertHTML", html);
+  };
+  const withTableCell = (fn: (cell: HTMLTableCellElement, table: HTMLTableElement) => void) => {
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0) return;
+    const anchor = sel.anchorNode as Node | null;
+    const cell = anchor ? (anchor instanceof HTMLElement ? anchor : (anchor.parentElement as HTMLElement | null))?.closest("td,th") as HTMLTableCellElement | null : null;
+    if (!cell) return;
+    const table = cell.closest("table") as HTMLTableElement | null;
+    if (!table) return;
+    fn(cell, table);
+  };
+  const addRowBelow = () => withTableCell((cell, table) => {
+    const row = cell.parentElement as HTMLTableRowElement;
+    const newRow = row.cloneNode(true) as HTMLTableRowElement;
+    newRow.querySelectorAll("th,td").forEach((el) => { el.innerHTML = '<div contenteditable="true">&nbsp;</div>'; if (el.tagName === 'TH') (el as HTMLElement).outerHTML = (el as HTMLElement).outerHTML.replace('<th', '<td').replace('</th>', '</td>'); });
+    row.after(newRow);
+  });
+  const addColRight = () => withTableCell((cell, table) => {
+    const colIndex = (cell as HTMLTableCellElement).cellIndex;
+    Array.from(table.rows).forEach((tr, idx) => {
+      const isHeaderRow = tr.cells[0]?.tagName === 'TH' && idx === 0;
+      const el = document.createElement(isHeaderRow ? 'th' : 'td');
+      el.innerHTML = '<div contenteditable="true">&nbsp;</div>';
+      tr.insertBefore(el, tr.cells[colIndex + 1] || null);
+    });
+  });
+  const deleteRow = () => withTableCell((cell) => { (cell.parentElement as HTMLTableRowElement).remove(); });
+  const deleteCol = () => withTableCell((cell, table) => {
+    const colIndex = cell.cellIndex;
+    Array.from(table.rows).forEach((tr) => { if (tr.cells[colIndex]) tr.deleteCell(colIndex); });
+  });
+  const normalizeList = (ordered: boolean) => {
+    const cmd = ordered ? "insertOrderedList" : "insertUnorderedList";
+    exec(cmd);
+    // Ensure proper <ul>/<ol><li> structure and avoid nested <div> artifacts
+    const sel = window.getSelection();
+    const root = sel?.anchorNode ? (sel.anchorNode as HTMLElement | Text).parentElement?.closest(".editable-content") : null;
+    if (!root) return;
+    root.querySelectorAll('li > div').forEach((div) => {
+      const li = div.parentElement as HTMLLIElement;
+      // unwrap div but keep its children
+      while (div.firstChild) li.insertBefore(div.firstChild, div);
+      div.remove();
+    });
   };
   const handleZoom = (v: string) => {
     const scale = Number(v) / 100;
@@ -434,6 +729,12 @@ const Toolbar: React.FC<ToolbarProps> = ({ onZoomChange }) => {
         <button className="btn" title="Undo" onClick={() => exec("undo")}> <Undo2 size={18} /> </button>
         <button className="btn" title="Redo" onClick={() => exec("redo")}> <Redo2 size={18} /> </button>
         <button className="btn" title="Print" onClick={() => window.print()}> <PrinterIcon size={18} /> </button>
+      </div>
+      <div className="divider" />
+      
+      {/* Document Actions */}
+      <div className="group">
+        <button className="btn" title="Submit for Approval" onClick={() => onSubmit?.()}>✅ Submit</button>
       </div>
       <div className="divider" />
 
@@ -494,14 +795,92 @@ const Toolbar: React.FC<ToolbarProps> = ({ onZoomChange }) => {
 
       {/* Lists (no image insertion, no clear formatting) */}
       <div className="group">
-        <button className="btn" title="Bulleted list" onClick={() => exec("insertUnorderedList")}> <BulletListIcon size={18} /> </button>
-        <button className="btn" title="Numbered list" onClick={() => exec("insertOrderedList")}> <NumberListIcon size={18} /> </button>
+        <button className="btn" title="Bulleted list" onClick={() => normalizeList(false)}> <BulletListIcon size={18} /> </button>
+        <button className="btn" title="Numbered list" onClick={() => normalizeList(true)}> <NumberListIcon size={18} /> </button>
+      </div>
+      <div className="divider" />
+
+      {/* E-Signature */}
+      <div className="group">
+        <button
+          className="btn"
+          title="Add E-Signature"
+          onMouseDown={() => {
+            // Save selection before focus shifts to the button
+            const r = captureSelection();
+            if (r && savedSelectionRef) savedSelectionRef.current = r;
+          }}
+          onClick={() => {
+            const r = savedSelectionRef?.current ?? captureSelection();
+            onStartSignature?.(r ?? null);
+          }}
+        >
+          Add E-Signature
+        </button>
+      </div>
+      <div className="divider" />
+
+      {/* Tables (Google Docs-like) */}
+      <div className="group" style={{ position: 'relative' }}>
+        <button className="btn" title="Table" ref={(el)=>{/* attach for position */}} onClick={(e)=>openTableMenu(e.currentTarget)}>Table</button>
+        {showTableMenu && (
+          <TableMenu x={tableMenuPos.x} y={tableMenuPos.y} onClose={()=>setShowTableMenu(false)} onInsert={insertSimpleTable} />
+        )}
       </div>
     </div>
   );
 };
 
-/*---------- Layout Components ----------*/
+/* ---------- Table Menu (popover) ---------- */
+interface TableMenuProps {
+  x: number; y: number;
+  onInsert: (rows:number, cols:number) => void;
+  onClose: () => void;
+}
+const TableMenu: React.FC<TableMenuProps> = ({ x, y, onInsert, onClose }) => {
+  const [hoverRows, setHoverRows] = useState(1);
+  const [hoverCols, setHoverCols] = useState(1);
+  const ref = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    // Use 'click' instead of 'mousedown' to avoid immediate close from the opener click
+    const onDocClick = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) onClose();
+    };
+    // Defer binding to the end of the event loop so the opening click doesn't immediately close it
+    const id = setTimeout(() => {
+      document.addEventListener('click', onDocClick);
+    }, 0);
+    return () => { clearTimeout(id); document.removeEventListener('click', onDocClick); };
+  }, [onClose]);
+
+  const maxRows = 10;
+  const maxCols = 10;
+  const cells: React.ReactElement[] = [];
+  for (let r = 1; r <= maxRows; r++) {
+    for (let c = 1; c <= maxCols; c++) {
+      const active = r <= hoverRows && c <= hoverCols;
+      cells.push(
+        <div
+          key={`g-${r}-${c}`}
+          className={`cell${active ? ' active' : ''}`}
+          onMouseEnter={() => { setHoverRows(r); setHoverCols(c); }}
+          onClick={() => { onInsert(r, c); onClose(); }}
+        />
+      );
+    }
+  }
+
+  return createPortal(
+    <div className="table-menu" ref={ref} style={{ position: 'fixed', left: x, top: y, zIndex: 2000 }}>
+      <div className="grid" style={{ gridTemplateColumns: 'repeat(10, 18px)' }}>
+        {cells}
+      </div>
+      <div className="label">{hoverRows} × {hoverCols}</div>
+    </div>,
+    document.body
+  );
+};/*---------- Layout Components ----------*/
 const Header: React.FC = () => (
   <header id="page-header" className="flex-shrink-0 relative">
     {/* Vertical line extending from top to horizontal line */}
@@ -621,6 +1000,50 @@ const Sidebar: React.FC<SidebarProps> = ({ isVisible = true, members, onAddMembe
     );
 };
 
+/* Submission confirmation modal moved to @/components/SubmissionModal */
+
+/*---------- Signature Canvas Component ----------*/
+interface SignatureCanvasProps {
+  onSave: (signatureData: string) => void;
+  onCancel: () => void;
+  signerRole: 'prepared_by' | 'dean';
+}
+
+const SignatureCanvas: React.FC<SignatureCanvasProps> = ({ onSave, onCancel, signerRole }) => {
+  const sigRef = useRef<ReactSignatureCanvas | null>(null);
+  const [hasDrawn, setHasDrawn] = useState(false);
+
+  const handleClear = () => { sigRef.current?.clear(); setHasDrawn(false); };
+  const handleSave = () => {
+    if (!sigRef.current || sigRef.current.isEmpty()) return;
+    const dataUrl = sigRef.current.toDataURL('image/png');
+    onSave(dataUrl);
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm">
+      <div className="bg-white rounded-lg p-6 max-w-lg w-full mx-4 shadow-xl border border-gray-200">
+        <h3 className="text-lg font-bold mb-4">
+          {signerRole === 'prepared_by' ? 'Add Your Signature (Prepared By)' : 'Add Dean Signature'}
+        </h3>
+        <div className="border-2 border-gray-300 rounded mb-4 bg-gray-50">
+          <ReactSignatureCanvas
+            ref={sigRef}
+            penColor="#000"
+            onBegin={() => setHasDrawn(true)}
+            canvasProps={{ width: 500, height: 200, className: 'w-full cursor-crosshair' }}
+          />
+        </div>
+        <div className="flex gap-2">
+          <button onClick={handleClear} className="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 transition-colors">Clear</button>
+          <button onClick={onCancel} className="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 transition-colors">Cancel</button>
+          <button onClick={handleSave} disabled={!hasDrawn} className="flex-1 px-4 py-2 bg-pink-500 text-white rounded hover:bg-pink-600 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed">Save Signature</button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 /*---------- Signatories Component ----------*/
 interface AddSignatoryFormProps {
   category: string;
@@ -659,15 +1082,100 @@ interface SignatoriesProps {
   onAdd: (category: string, name: string, position: string) => void;
   onDelete: (category: string, index: number) => void;
   innerRef?: React.RefObject<HTMLDivElement | null>;
+  signatures?: Array<{id: string; data: string; x: number; y: number}>;
+  onSignatureMove?: (id: string, x: number, y: number) => void;
 }
 
-const Signatories: React.FC<SignatoriesProps> = ({ signatories, onAdd, onDelete, innerRef }) => {
+const Signatories: React.FC<SignatoriesProps> = ({ signatories, onAdd, onDelete, innerRef, signatures = [], onSignatureMove }) => {
   const [addingTo, setAddingTo] = useState<string | null>(null);
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+  const dragOffsetRef = useRef<{dx: number; dy: number}>({ dx: 0, dy: 0 });
+  const preparedByRef = useRef<HTMLDivElement | null>(null);
 
-    return (
+  // Attach global mousemove/mouseup while dragging
+  useEffect(() => {
+    const handleMove = (e: MouseEvent) => {
+      if (!draggingId || !onSignatureMove || !innerRef?.current || !preparedByRef?.current) return;
+      const containerEl = innerRef.current;
+      const preparedByEl = preparedByRef.current;
+      
+      // Get bounding rects
+      const containerRect = containerEl.getBoundingClientRect();
+      const preparedByRect = preparedByEl.getBoundingClientRect();
+      
+      // Adjust for CSS transform scale applied to pages wrapper (zoom)
+      const scaleX = containerRect.width / (containerEl.offsetWidth || containerRect.width);
+      const scaleY = containerRect.height / (containerEl.offsetHeight || containerRect.height);
+      
+      // Compute position relative to container (for absolute positioning)
+      let newX = (e.clientX - containerRect.left) / (scaleX || 1) - dragOffsetRef.current.dx;
+      let newY = (e.clientY - containerRect.top) / (scaleY || 1) - dragOffsetRef.current.dy;
+      
+      // Calculate "Prepared by:" section bounds relative to container
+      const preparedByTop = (preparedByRect.top - containerRect.top) / (scaleY || 1);
+      const preparedByLeft = (preparedByRect.left - containerRect.left) / (scaleX || 1);
+      const preparedByWidth = preparedByRect.width / (scaleX || 1);
+      const preparedByHeight = preparedByRect.height / (scaleY || 1);
+      
+      // Clamp within "Prepared by:" section only
+      const margin = 5;
+      newX = Math.max(preparedByLeft - margin, Math.min(preparedByLeft + preparedByWidth - 1 + margin, newX));
+      newY = Math.max(preparedByTop - margin, Math.min(preparedByTop + preparedByHeight - 1 + margin, newY));
+      
+      onSignatureMove(draggingId, newX, newY);
+    };
+    const handleUp = () => {
+      if (draggingId && innerRef?.current) {
+        innerRef.current.classList.remove('dragging');
+      }
+      setDraggingId(null);
+    };
+    if (draggingId) {
+      document.addEventListener('mousemove', handleMove);
+      document.addEventListener('mouseup', handleUp);
+    }
+    return () => {
+      document.removeEventListener('mousemove', handleMove);
+      document.removeEventListener('mouseup', handleUp);
+    };
+  }, [draggingId, onSignatureMove, innerRef]);
+
+  return (
         <div ref={innerRef} className="signatories-container space-y-1">
+      {/* Render signatures */}
+      {signatures.map((sig) => (
+        <div
+          key={sig.id}
+          className="signature-draggable"
+          style={{
+            position: 'absolute',
+            left: `${sig.x}px`,
+            top: `${sig.y}px`,
+            zIndex: 1000,
+          }}
+          onMouseDown={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            setDraggingId(sig.id);
+            if (innerRef?.current) {
+              innerRef.current.classList.add('dragging');
+              const el = innerRef.current;
+              const rect = el.getBoundingClientRect();
+              const scaleX = rect.width / (el.offsetWidth || rect.width);
+              const scaleY = rect.height / (el.offsetHeight || rect.height);
+              // store offset between mouse and signature top-left in unscaled coords
+              const mouseX = (e.clientX - rect.left) / (scaleX || 1);
+              const mouseY = (e.clientY - rect.top) / (scaleY || 1);
+              dragOffsetRef.current = { dx: mouseX - sig.x, dy: mouseY - sig.y };
+            }
+          }}
+        >
+          <img src={sig.data} alt="E-Signature" style={{ maxWidth: '240px', display: 'block', pointerEvents: 'none' }} />
+        </div>
+      ))}
+      
       {(Object.entries(signatories) as Array<[string, Signatory[]]>).map(([category, people]) => (
-                <div key={category}>
+                <div key={category} ref={category === "Prepared by:" ? preparedByRef : null}>
                     <p className="font-bold text-sm mb-1">
                         {category}
                     </p>
@@ -694,14 +1202,19 @@ const Signatories: React.FC<SignatoriesProps> = ({ signatories, onAdd, onDelete,
                                 onCancel={() => setAddingTo(null)}
                             />
                         ) : (
-                            <div className="pt-2">
-                                <button 
-                  onClick={() => setAddingTo(category)}
-                                    className="text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 py-1 px-3 rounded-full remove-btn transition-colors"
-                                >
-                                    + Add Signatory
-                                </button>
-                            </div>
+                            // Only show "+ Add Signatory" button if:
+                            // - Category is NOT "Prepared by:" OR
+                            // - Category is "Prepared by:" AND no people added yet
+                            (category !== "Prepared by:" || people.length === 0) && (
+                                <div className="pt-2">
+                                    <button 
+                      onClick={() => setAddingTo(category)}
+                                        className="text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 py-1 px-3 rounded-full remove-btn transition-colors"
+                                    >
+                                        + Add Signatory
+                                    </button>
+                                </div>
+                            )
                         )}
                     </div>
                 </div>
@@ -784,8 +1297,72 @@ class EditableContent extends React.Component<EditableContentProps> {
   shouldComponentUpdate(nextProps: EditableContentProps) { if (!this.elRef.current) return true; return nextProps.html !== this.elRef.current.innerHTML; }
   componentDidUpdate() { if (this.elRef.current && this.props.html !== this.elRef.current.innerHTML) { this.elRef.current.innerHTML = this.props.html; } }
   handleInput = () => { if (this.elRef.current) { const newContent = this.elRef.current.innerHTML; this.props.onContentChange(newContent); } };
+  handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0) return;
+    const anchor = sel.anchorNode as Node | null;
+    const cell = anchor ? (anchor instanceof HTMLElement ? anchor : (anchor.parentElement as HTMLElement | null))?.closest('td,th') as HTMLTableCellElement | null : null;
+    
+    // Handle Tab key - insert indentation (outside or inside tables)
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      
+      // If inside a table cell, navigate between cells
+      if (cell) {
+        const table = cell.closest('table') as HTMLTableElement | null;
+        if (table) {
+          const row = cell.parentElement as HTMLTableRowElement;
+          const next = e.shiftKey ? (cell.previousElementSibling as HTMLTableCellElement | null) : (cell.nextElementSibling as HTMLTableCellElement | null);
+          let targetCell: HTMLTableCellElement | null = next;
+          if (!targetCell) {
+            const siblingRow = e.shiftKey ? (row.previousElementSibling as HTMLTableRowElement | null) : (row.nextElementSibling as HTMLTableRowElement | null);
+            if (siblingRow) {
+              targetCell = (e.shiftKey ? siblingRow.lastElementChild : siblingRow.firstElementChild) as HTMLTableCellElement | null;
+            }
+          }
+          if (targetCell) {
+            const editable = targetCell.querySelector('[contenteditable="true"]') as HTMLElement | null;
+            (editable ?? targetCell).focus();
+            const r = document.createRange();
+            r.selectNodeContents(editable ?? targetCell);
+            r.collapse(true);
+            const s = window.getSelection();
+            s?.removeAllRanges(); s?.addRange(r);
+          }
+          return;
+        }
+      }
+      
+      // Otherwise, insert tab spacing (4 non-breaking spaces for consistent indentation)
+      document.execCommand('insertHTML', false, '&nbsp;&nbsp;&nbsp;&nbsp;');
+      return;
+    }
+    
+    // Handle Enter key - ensure proper line break
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      
+      // If inside a table cell, just insert a line break
+      if (cell) {
+        document.execCommand('insertHTML', false, '<br>');
+        return;
+      }
+      
+      // For normal text, insert a proper paragraph or line break
+      const range = sel.getRangeAt(0);
+      const currentBlock = (range.commonAncestorContainer as Node).parentElement?.closest('p, div, li, h1, h2, h3, h4, h5, h6');
+      
+      if (currentBlock && currentBlock.tagName === 'LI') {
+        // Let the browser handle list items naturally
+        document.execCommand('insertHTML', false, '<br>');
+      } else {
+        // Insert a new paragraph for regular content
+        document.execCommand('insertParagraph', false);
+      }
+    }
+  };
   render() {
-    return <div id={this.props.id} className="editable-content" ref={this.elRef} onInput={this.handleInput} contentEditable suppressContentEditableWarning dangerouslySetInnerHTML={{ __html: this.props.html }} />;
+    return <div id={this.props.id} className="editable-content" ref={this.elRef} onInput={this.handleInput} onKeyDown={this.handleKeyDown} contentEditable suppressContentEditableWarning dangerouslySetInnerHTML={{ __html: this.props.html }} />;
   }
 }
 
@@ -841,8 +1418,29 @@ function useDebounce<T>(value: T, delay: number): T {
 
 /* ---------- Main App Component ---------- */
 const App: React.FC = () => {
+  const page = usePage();
+  // Expecting optional plan prop when editing/viewing a specific plan
+  const plan: any = (page.props as any).plan ?? null;
+  // PDF generation removed; drafts remain HTML-only
+  // CSRF priming to avoid 419 on POST
+  const [csrfReady, setCsrfReady] = useState(false);
+  const ensureCsrf = useCallback(async () => {
+    try {
+      // Refresh cookie and update <meta name="csrf-token"> simultaneously
+      const token = await refreshCsrfToken();
+      if (!token) {
+        // Fallback: best-effort cookie refresh
+        await fetch('/api/csrf-token', { credentials: 'include' });
+      }
+    } catch (e) {
+      // ignore
+    }
+  }, []);
+  useEffect(() => {
+    ensureCsrf().finally(() => setCsrfReady(true));
+  }, [ensureCsrf]);
   const getInitialContent = () => `
-    <div style="text-align: right;" class="text-sm font-semibold">SEPTEMBER 22, 2025</div><br>
+    <div style="text-align: left;" class="text-sm font-semibold">SEPTEMBER 22, 2025</div><br>
     <h2 style="text-align: center;" class="text-2xl font-bold mb-4">ACTIVITY PLAN</h2>
     <h3 class="font-bold text-lg mb-2">I. NAME OF THE ACTIVITY:</h3><p class="ml-4">&lt;content&gt;</p><br>
     <h3 class="font-bold text-lg mb-2">II. RATIONALE:</h3><p class="ml-4 text-justify">&lt;content&gt;</p><br>
@@ -869,12 +1467,29 @@ const App: React.FC = () => {
       ]
   });
   const [signatoriesHeight, setSignatoriesHeight] = useState<number>(0);
+  const [showSignatureCanvas, setShowSignatureCanvas] = useState(false);
+  const [signatureRole, setSignatureRole] = useState<'prepared_by' | 'dean' | null>(null);
+  const [preparedBySignature, setPreparedBySignature] = useState<string | null>(null);
+  const [deanSignature, setDeanSignature] = useState<string | null>(null);
+  const [signatures, setSignatures] = useState<Array<{id: string; data: string; x: number; y: number}>>([]);
+  const [showSubmissionModal, setShowSubmissionModal] = useState(false);
+  const [showSignatureWarning, setShowSignatureWarning] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [lastSaved, setLastSaved] = useState<Date | null>(null);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [pendingSaveHtml, setPendingSaveHtml] = useState<string | null>(null);
+  // PDF generation modal removed
+  
+  // TODO: Get these from backend/props based on user role and activity plan status
+  const canSignAsPreparedBy = true; // Only the creator can sign
+  const canSignAsDean = true; // Only dean role can sign after admin approval
 
   const debouncedPages = useDebounce(pages, 250);
   const [zoomScale, setZoomScale] = useState<number>(1);
   const pageContainerRef = useRef<HTMLDivElement | null>(null);
   const cursorPositionRef = useRef<{ pageIndex: number; offset: number } | null>(null);
   const signatoriesRef = useRef<HTMLDivElement | null>(null);
+  const savedSelectionFromToolbarRef = useRef<Range | null>(null);
 
   const handleAddMember = (name: string, role: string) => setMembers([...members, { name, role }]);
   const handleDeleteMember = (index: number) => setMembers(members.filter((_, i) => i !== index));
@@ -892,6 +1507,77 @@ const App: React.FC = () => {
           [category]: prev[category].filter((_, i) => i !== index)
       }));
   };
+
+  const handleAddSignature = (role: 'prepared_by' | 'dean') => {
+    setSignatureRole(role);
+    setShowSignatureCanvas(true);
+  };
+
+  const handleToolbarStartSignature = (range: Range | null) => {
+    // Check if a signature already exists
+    if (signatures.length > 0) {
+      setShowSignatureWarning(true);
+      return;
+    }
+    
+    // Save selection from toolbar and open signature modal.
+    savedSelectionFromToolbarRef.current = range;
+    // For now, assume the user is signing as 'prepared_by' by default; could infer from role later.
+    setSignatureRole('prepared_by');
+    setShowSignatureCanvas(true);
+  };
+
+  const handleSaveSignature = async (signatureData: string) => {
+    if (!signatureRole) return;
+
+    // TODO: Send to backend
+    // await axios.post(`/student/requests/activity-plan/${activityPlanId}/signatures`, {
+    //   signature_data: signatureData,
+    //   signer_role: signatureRole
+    // });
+
+    // For now, just save locally
+    if (signatureRole === 'prepared_by') {
+      setPreparedBySignature(signatureData);
+    } else {
+      setDeanSignature(signatureData);
+    }
+
+    // Add signature to state (will be rendered in signatories section)
+    const newSignature = {
+      id: `sig-${Date.now()}`,
+      data: signatureData,
+      x: 20,
+      y: 20,
+    };
+    
+    setSignatures(prev => [...prev, newSignature]);
+
+    // Clear saved selection and close modal
+    savedSelectionFromToolbarRef.current = null;
+    setShowSignatureCanvas(false);
+    setSignatureRole(null);
+  };
+
+  const handleSignatureMove = (id: string, x: number, y: number) => {
+    setSignatures(prev => prev.map(sig => 
+      sig.id === id ? { ...sig, x, y } : sig
+    ));
+  };  const handleCancelSignature = () => {
+    setShowSignatureCanvas(false);
+    setSignatureRole(null);
+  };
+
+  const handleCancelSubmission = () => {
+    setShowSubmissionModal(false);
+  };
+
+  const handleConfirmSubmission = () => {
+    // Close modal and proceed with submission
+    setShowSubmissionModal(false);
+  };
+
+  // Removed autosave/draft tracking
 
   useEffect(() => {
     const measureContentHeight = (pageSelector: string) => {
@@ -950,7 +1636,10 @@ const App: React.FC = () => {
       if (measureElement.scrollHeight > (maxContentHeight - HEIGHT_BUFFER)) {
         const overflowingNode = currentPageNodes.pop() as HTMLElement | ChildNode | undefined;
         const baseContentHtml = currentPageNodes.map((n: any) => (n as any).outerHTML || n.textContent).join('');
-        const isSplittable = !!(overflowingNode && (overflowingNode as any).nodeType === Node.ELEMENT_NODE && (overflowingNode as any).textContent && (overflowingNode as any).textContent.includes(' '));
+        const isElement = !!(overflowingNode && (overflowingNode as any).nodeType === Node.ELEMENT_NODE);
+        const tagName = isElement ? (overflowingNode as HTMLElement).tagName?.toLowerCase() : '';
+        const isAtomicBlock = tagName === 'table' || tagName === 'ul' || tagName === 'ol';
+        const isSplittable = isElement && !isAtomicBlock && (overflowingNode as any).textContent && (overflowingNode as any).textContent.includes(' ');
 
         if (isSplittable) {
           const elementNode = overflowingNode as HTMLElement;
@@ -1118,11 +1807,15 @@ const App: React.FC = () => {
   return (
     <MainLayout>
       <div className="ap-scope">
+      
+      {/* Draft status UI removed */}
+      
       {/* Screen-only header (BorrowEquipment-like placement & typography) */}
       <div className="no-print px-6 pt-6">
         <div className="ap-screen-header mb-8 flex flex-col gap-1">
           <h1 className="text-3xl font-bold text-red-600 tracking-tight" style={{ fontFamily: 'Poppins, sans-serif', fontWeight: 700 }}>Activity Plan</h1>
           <p className="text-gray-600 text-base" style={{ fontFamily: 'Poppins, sans-serif', fontWeight: 400 }}>Prepare, format, and print your activity plan.</p>
+          {/* Latest document link removed in favor of FileSelectionModal for preview/generate */}
         </div>
       </div>
       <div className="no-print" style={{ position: 'absolute', left: '-9999px', visibility: 'hidden', pointerEvents: 'none' }}>
@@ -1152,17 +1845,26 @@ const App: React.FC = () => {
             <div />
           </Page>
         </div>
-        <Signatories 
-            signatories={signatories} 
-            onAdd={()=>{}} 
-            onDelete={()=>{}} 
-            innerRef={signatoriesRef} 
-        />
+    <Signatories 
+      signatories={signatories} 
+      onAdd={()=>{}} 
+      onDelete={()=>{}} 
+      innerRef={signatoriesRef}
+      signatures={signatures}
+      onSignatureMove={handleSignatureMove}
+    />
       </div>
       
       <div ref={pageContainerRef} className="App">
-        <GlobalStyles />
-        <Toolbar onZoomChange={setZoomScale} />
+    <GlobalStyles />
+  <Toolbar 
+    onZoomChange={setZoomScale} 
+    onStartSignature={(range)=>handleToolbarStartSignature(range)}
+    onSubmit={() => {
+      // Show confirmation modal instead of submitting directly
+      setShowSubmissionModal(true);
+    }}
+  />
         <div className="pages-viewport">
           <div className="pages-scale-wrapper" style={{ transform: `scale(${zoomScale})` }}>
             {pages.map((pageHtml, index) => (
@@ -1179,6 +1881,8 @@ const App: React.FC = () => {
                         signatories={signatories}
                         onAdd={handleAddSignatory}
                         onDelete={handleDeleteSignatory}
+                        signatures={signatures}
+                        onSignatureMove={handleSignatureMove}
                     />
                   }
                 >
@@ -1192,6 +1896,34 @@ const App: React.FC = () => {
           </div>
         </div>
       </div>
+      
+      {/* Signature Canvas Modal */}
+      {showSignatureCanvas && signatureRole && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm">
+          <div className="bg-white rounded-lg p-6 max-w-lg w-full mx-4 shadow-xl border border-gray-200">
+            <SignatureCanvas
+              signerRole={signatureRole}
+              onSave={handleSaveSignature}
+              onCancel={handleCancelSignature}
+            />
+          </div>
+        </div>
+      )}
+      
+      {/* Signature Warning Modal */}
+      <SignatureWarningModal
+        isOpen={showSignatureWarning}
+        onClose={() => setShowSignatureWarning(false)}
+      />
+      
+      {/* Submission Confirmation Modal */}
+      <SubmissionModal
+        isOpen={showSubmissionModal}
+        onConfirm={handleConfirmSubmission}
+        onCancel={handleCancelSubmission}
+      />
+
+      {/* PDF generation UI removed */}
       </div>
     </MainLayout>
   );

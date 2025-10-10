@@ -187,7 +187,7 @@ class EquipmentRequestController extends Controller
             ->where('ap.user_id', Auth::id())
             ->select(
                 'ap.id',
-                'ap.activity_name as purpose',
+                'ap.category as purpose',
                 'ap.status',
                 'ap.created_at',
                 'ra.approver_role',

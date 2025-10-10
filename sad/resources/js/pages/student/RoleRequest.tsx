@@ -13,7 +13,7 @@ export default function RoleRequest() {
   const [showDateTooltip, setShowDateTooltip] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const { data, setData, post, processing, errors, reset } = useForm({
-    requested_role: 'student_officer' as 'student_officer',
+    requested_role: 'student_officer' as const,
     officer_organization: '',
     officer_position: '',
     election_date: '',
