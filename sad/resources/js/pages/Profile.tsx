@@ -36,7 +36,6 @@ export default function Profile() {
   const [editingEmail, setEditingEmail] = useState(false);
   const [editingPassword, setEditingPassword] = useState(false);
   const [editingProfilePicture, setEditingProfilePicture] = useState(false);
-  const [editingName, setEditingName] = useState(false);
   const [showProfileDropdown, setShowProfileDropdown] = useState(false);
   const [email, setEmail] = useState(user.email || '');
   const [password, setPassword] = useState('');
@@ -50,7 +49,6 @@ export default function Profile() {
   const [emailError, setEmailError] = useState('');
   const [passwordError, setPasswordError] = useState('');
   const [profilePictureError, setProfilePictureError] = useState('');
-  const [nameError, setNameError] = useState('');
   
   // Pending request modal state
   const [showPendingRequestModal, setShowPendingRequestModal] = useState(false);
@@ -296,43 +294,6 @@ export default function Profile() {
     });
   };
 
-  const handleNameSave = async () => {
-    setNameError('');
-    
-    if (!firstName.trim() || !lastName.trim()) {
-      const errorMessage = 'First name and last name are required.';
-      setNameError(errorMessage);
-      return;
-    }
-    await refreshCsrfToken();
-    const freshToken = getCsrfToken();
-    const xsrf = getXsrfCookieToken();
-
-    router.put('/profile/update-name', {
-      first_name: firstName.trim(),
-      middle_name: middleName.trim(),
-      last_name: lastName.trim(),
-      _token: freshToken,
-    }, {
-      headers: {
-        'X-CSRF-TOKEN': freshToken,
-        ...(xsrf ? { 'X-XSRF-TOKEN': xsrf } : {}),
-        'X-Requested-With': 'XMLHttpRequest',
-      },
-      preserveScroll: true,
-      preserveState: false, // Allow state refresh to get updated user data
-      onSuccess: (page) => {
-        setEditingName(false);
-        // Flash message will be handled by FlashToaster component
-      },
-      onError: (errors) => {
-        console.error('Name update errors:', errors);
-        const errorMessage = errors.first_name || errors.last_name || errors.message || 'Failed to update name.';
-        setNameError(errorMessage);
-      }
-    });
-  };
-
   return (
     <MainLayout>
       <div className="p-8 font-poppins text-black overflow-y-auto max-h-screen">
@@ -444,73 +405,9 @@ export default function Profile() {
                       <User2 className="text-[#e6232a]/80 w-5 h-5 flex-shrink-0 mt-1" />
                       <div className="flex flex-col flex-grow">
                         <span className="font-semibold text-gray-700 text-sm mb-1">Name</span>
-                        {!editingName ? (
-                          <div className="flex items-center gap-3">
-                            <span className="text-gray-900">
-                              {firstName} {middleName ? middleName + ' ' : ''} {lastName}
-                            </span>
-                            <button
-                              className="text-xs text-[#e6232a] hover:text-[#d01e24] hover:underline transition-colors flex items-center gap-1"
-                              onClick={() => setEditingName(true)}
-                            >
-                              <Pencil className="w-3 h-3" /> Change
-                            </button>
-                          </div>
-                        ) : (
-                          <motion.form
-                            initial={{ opacity: 0, x: 10 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            exit={{ opacity: 0, x: 10 }}
-                            className="flex flex-col gap-3"
-                            onSubmit={e => { e.preventDefault(); handleNameSave(); }}
-                          >
-                            <div className="grid grid-cols-1 gap-2">
-                              <input
-                                type="text"
-                                className="border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900 bg-gray-50 focus:bg-white focus:border-[#e6232a] focus:ring-2 focus:ring-[#e6232a]/20 transition-colors"
-                                placeholder="First Name"
-                                value={firstName}
-                                onChange={e => setFirstName(e.target.value)}
-                              />
-                              <input
-                                type="text"
-                                className="border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900 bg-gray-50 focus:bg-white focus:border-[#e6232a] focus:ring-2 focus:ring-[#e6232a]/20 transition-colors"
-                                placeholder="Middle Name (Optional)"
-                                value={middleName}
-                                onChange={e => setMiddleName(e.target.value)}
-                              />
-                              <input
-                                type="text"
-                                className="border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900 bg-gray-50 focus:bg-white focus:border-[#e6232a] focus:ring-2 focus:ring-[#e6232a]/20 transition-colors"
-                                placeholder="Last Name"
-                                value={lastName}
-                                onChange={e => setLastName(e.target.value)}
-                              />
-                            </div>
-                            <div className="flex gap-2">
-                              <button
-                                type="submit"
-                                className="bg-[#e6232a] hover:bg-[#d01e24] text-white px-3 py-2 rounded-lg flex items-center gap-1 text-sm transition-colors"
-                              >
-                                <Save className="w-3 h-3" /> Save
-                              </button>
-                              <button
-                                type="button"
-                                className="text-gray-500 hover:text-gray-700 transition-colors"
-                                onClick={() => { 
-                                  setEditingName(false); 
-                                  setFirstName(user.first_name || '');
-                                  setMiddleName(user.middle_name || '');
-                                  setLastName(user.last_name || '');
-                                  setNameError(''); 
-                                }}
-                              >
-                                <X className="w-4 h-4" />
-                              </button>
-                            </div>
-                            {nameError && <div className="text-red-500 text-xs">{nameError}</div>}
-                          </motion.form>
-                        )}
+                        <span className="text-gray-900">
+                          {firstName} {middleName ? middleName + ' ' : ''} {lastName}
+                        </span>
                       </div>
                       </div>
 

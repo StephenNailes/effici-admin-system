@@ -142,6 +142,10 @@ Route::middleware(['auth', 'verified'])->prefix('student')->group(function () {
         // Document save route
         Route::post('/requests/activity-plan/{id}/save-document', [ActivityPlanController::class, 'saveDocument'])
             ->name('student.requests.activity-plan.save-document');
+
+        // Thumbnail for recent documents grid
+        Route::get('/requests/activity-plan/{id}/thumbnail', [ActivityPlanController::class, 'thumbnail'])
+            ->name('student.requests.activity-plan.thumbnail');
     });
 
     // Generated documents for activity plan (PDF generation removed)

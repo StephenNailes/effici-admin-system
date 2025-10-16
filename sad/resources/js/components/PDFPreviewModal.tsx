@@ -45,7 +45,7 @@ const PDFPreviewModal: React.FC<PDFPreviewModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-75 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-white/20 backdrop-blur-md">
       {/* Modal Container */}
       <div className="relative w-full h-full max-w-7xl max-h-screen mx-4 my-4 bg-white rounded-lg shadow-2xl flex flex-col">
         
@@ -89,7 +89,7 @@ const PDFPreviewModal: React.FC<PDFPreviewModalProps> = ({
                 </div>
               )}
               <iframe
-                src={`${pdfUrl}#toolbar=1&navpanes=1&scrollbar=1&view=FitH`}
+                src={`${pdfUrl}#toolbar=1&navpanes=1&scrollbar=1&page=1&zoom=100`}
                 className="w-full h-full border-0"
                 title="PDF Preview"
                 onLoad={() => setIframeLoaded(true)}

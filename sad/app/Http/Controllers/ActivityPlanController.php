@@ -165,7 +165,7 @@ class ActivityPlanController extends Controller
             ->with('success', 'Activity plan created successfully!');
     }
 
-    public function index()
+    public function index(Request $request)
     {
         if (Auth::user()?->role !== 'student_officer') {
             abort(403);
@@ -195,9 +195,35 @@ class ActivityPlanController extends Controller
             'needsRevision' => (clone $base)->where('status','under_revision')->count(),
         ];
 
+        // Submitted (non-draft) with pagination (5 per page)
+        $submittedPage = max(1, (int) $request->query('submitted_page', 1));
+        $submittedPaginated = (clone $base)
+            ->where('status', '!=', 'draft')
+            ->latest('updated_at')
+            ->paginate(5, ['id','status','created_at','updated_at'], 'submitted_page', $submittedPage);
+
+        $submitted = collect($submittedPaginated->items())->map(function ($p) {
+            return [
+                'id' => $p->id,
+                'status' => $p->status,
+                'created_at' => $p->created_at,
+                'updated_at' => $p->updated_at,
+            ];
+        });
+
+        $submittedPagination = [
+            'current_page' => $submittedPaginated->currentPage(),
+            'last_page' => $submittedPaginated->lastPage(),
+            'has_more_pages' => $submittedPaginated->hasMorePages(),
+            'per_page' => $submittedPaginated->perPage(),
+            'total' => $submittedPaginated->total(),
+        ];
+
         return inertia('student/ActivityRequests', [
             'counts' => $counts,
             'recent' => $recent,
+            'submitted' => $submitted,
+            'submittedPagination' => $submittedPagination,
         ]);
     }
 
@@ -246,6 +272,101 @@ class ActivityPlanController extends Controller
         });
 
         return redirect()->back()->with('success', 'Activity plan updated successfully!');
+    }
+
+    /**
+     * Render a small thumbnail (first page) of the current HTML document using Browsershot.
+     * Cached by current_file_id in the filename to avoid stale images.
+     */
+    public function thumbnail($id)
+    {
+        if (Auth::user()?->role !== 'student_officer') {
+            abort(403);
+        }
+
+        $plan = ActivityPlan::with('currentFile')
+            ->where('id', $id)
+            ->where('user_id', Auth::id())
+            ->firstOrFail();
+
+        if (!$plan->currentFile) {
+            // No file yet, return 204 so frontend can show a placeholder
+            return response('', 204);
+        }
+
+        $file = $plan->currentFile;
+        $filePath = $file->file_path; // stored on public disk
+        if (!Storage::disk('public')->exists($filePath)) {
+            return response('', 204);
+        }
+
+        // Thumbnail path includes file id to bust cache on new saves
+        $thumbRel = 'thumbnails/activity_plan_' . $plan->id . '_file_' . $file->id . '.png';
+        $thumbAbs = storage_path('app/public/' . $thumbRel);
+
+        if (!file_exists($thumbAbs)) {
+            // Ensure directory
+            @mkdir(dirname($thumbAbs), 0775, true);
+
+            $html = Storage::disk('public')->get($filePath);
+
+            // Inject CSS to hide toolbars and only show first page if multiple
+            $injectCss = '<style>.no-print,.formatting-toolbar,[data-role="toolbar"]{display:none!important;} .page{box-shadow:none!important;border:none!important;} .page{counter-reset: pg} .page ~ .page{display:none!important;}</style>';
+            if (str_contains($html, '</head>')) {
+                $html = str_replace('</head>', $injectCss.'</head>', $html);
+            } else {
+                $html = $injectCss.$html;
+            }
+
+            try {
+                // Approx A4 preview at small size; scale down for speed
+                // 794x1123 is roughly A4 at 96dpi; adjust smaller for thumbnail
+                $width = 560; // thumbnail width
+                $height = (int) round($width * (11 / 8.5));
+
+                $b = Browsershot::html($html)
+                    ->timeout(30)
+                    ->waitUntilNetworkIdle()
+                    ->windowSize($width, $height)
+                    ->deviceScaleFactor(1)
+                    ->setScreenshotType('png');
+
+                // Try to capture only the first page when possible
+                $selectors = [
+                    '.page',
+                    '#editable-content-page-0',
+                    '.ap-scope .page',
+                    '[data-page-index="0"]',
+                ];
+                $captured = false;
+                foreach ($selectors as $sel) {
+                    try {
+                        // clone instance and select the element to capture only first page
+                        $bb = clone $b;
+                        $bb->select($sel)->save($thumbAbs);
+                        if (file_exists($thumbAbs) && filesize($thumbAbs) > 0) {
+                            $captured = true;
+                            break;
+                        }
+                    } catch (\Throwable $e) {
+                        // try next selector
+                        continue;
+                    }
+                }
+
+                if (!$captured) {
+                    // Fallback: full screenshot (with injected CSS hiding toolbars and later pages)
+                    $b->save($thumbAbs);
+                }
+            } catch (\Throwable $e) {
+                Log::error('Thumbnail generation failed: ' . $e->getMessage());
+                return response('', 204);
+            }
+        }
+
+        return response()->file($thumbAbs, [
+            'Cache-Control' => 'public, max-age=86400',
+        ]);
     }
 
     public function destroy($id)

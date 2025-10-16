@@ -1,8 +1,8 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React from 'react';
 import MainLayout from '@/layouts/mainlayout';
 import { router, usePage } from '@inertiajs/react';
 import { motion } from 'framer-motion';
-import { FileText, Clock, CheckCircle2, Pencil } from 'lucide-react';
+import { FileText, Clock, CheckCircle2, Pencil, ChevronLeft, ChevronRight } from 'lucide-react';
 
 interface PlanSummary {
   id: number;
@@ -20,6 +20,14 @@ type DashboardProps = {
     needsRevision: number;
   };
   recent: PlanSummary[];
+  submitted: Pick<PlanSummary, 'id' | 'status' | 'created_at' | 'updated_at'>[];
+  submittedPagination: {
+    current_page: number;
+    last_page: number;
+    has_more_pages: boolean;
+    per_page: number;
+    total: number;
+  };
 }
 
 const StatCard: React.FC<{ icon: React.ReactNode; label: string; value: number; color: string; delay?: number }> = ({ icon, label, value, color, delay = 0 }) => (
@@ -39,7 +47,12 @@ const StatCard: React.FC<{ icon: React.ReactNode; label: string; value: number; 
 
 export default function ActivityRequests() {
   const page = usePage();
-  const { counts, recent } = (page.props as any) as DashboardProps;
+  const { counts, recent, submitted, submittedPagination } = (page.props as any) as DashboardProps;
+
+  const gotoSubmittedPage = (pageNum: number) => {
+    if (pageNum < 1 || pageNum > submittedPagination.last_page) return;
+    router.get('/student/requests/activity-plan', { submitted_page: pageNum }, { preserveScroll: true, preserveState: true });
+  };
 
   const handleCreate = () => {
     router.post('/student/requests/activity-plan/create-draft', { category: 'normal' }, {
@@ -64,22 +77,68 @@ export default function ActivityRequests() {
           <StatCard icon={<Pencil className="text-rose-600" />} label="Needs Revision" value={counts.needsRevision} color="bg-rose-50" delay={0.15} />
         </div>
 
-        {/* Actions */}
+        {/* Submitted card with Create button and list */}
         <motion.div
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, type: 'spring' }}
-          className="bg-white rounded-2xl p-8 shadow-xl border border-gray-100 flex items-center justify-between"
+          className="bg-white rounded-2xl p-6 shadow-xl border border-gray-100"
         >
-          <div className="font-semibold text-gray-900">Your Submitted Requests</div>
-          <motion.button
-            whileHover={{ scale: 1.04 }}
-            whileTap={{ scale: 0.98 }}
-            onClick={handleCreate}
-            className="px-5 py-2.5 rounded-lg bg-gradient-to-r from-red-500 to-red-600 text-white font-semibold shadow-md hover:shadow-xl focus:outline-none"
-          >
-            + Create Document
-          </motion.button>
+          <div className="flex items-center justify-between mb-4">
+            <div className="font-semibold text-gray-900">Submitted Requests</div>
+            <motion.button
+              whileHover={{ scale: 1.04 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={handleCreate}
+              className="px-5 py-2.5 rounded-lg bg-gradient-to-r from-red-500 to-red-600 text-white font-semibold shadow-md hover:shadow-xl focus:outline-none"
+            >
+              + Create Document
+            </motion.button>
+          </div>
+          {submitted.length === 0 ? (
+            <div className="text-sm text-gray-400">No submitted activity plans yet.</div>
+          ) : (
+            <ul className="divide-y divide-gray-100">
+              {submitted.map((s) => (
+                <li key={s.id} className="py-3 flex items-center justify-between">
+                  <button
+                    onClick={() => router.get(`/student/requests/activity-plan/${s.id}`)}
+                    className="text-left"
+                  >
+                    <div className="text-sm font-medium text-black">Activity Plan #{s.id}</div>
+                    <div className="text-xs text-black">{s.status}</div>
+                  </button>
+                  <div className="text-xs text-black">
+                    {s.updated_at ? new Date(s.updated_at).toLocaleString() : ''}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+          {/* Pagination controls */}
+          <div className="mt-3 flex items-center justify-end gap-2">
+            <button
+              onClick={() => gotoSubmittedPage(submittedPagination.current_page - 1)}
+              disabled={submittedPagination.current_page <= 1}
+              className="h-8 w-8 inline-flex items-center justify-center rounded-md border border-gray-300 text-black hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+              aria-label="Previous"
+              title="Previous"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+            <div className="text-xs text-black tabular-nums">
+              {submittedPagination.current_page} / {submittedPagination.last_page}
+            </div>
+            <button
+              onClick={() => gotoSubmittedPage(submittedPagination.current_page + 1)}
+              disabled={submittedPagination.current_page >= submittedPagination.last_page}
+              className="h-8 w-8 inline-flex items-center justify-center rounded-md border border-gray-300 text-black hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+              aria-label="Next"
+              title="Next"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
         </motion.div>
 
         {/* Recent Document Previews (like Google Docs thumbnails) */}
@@ -101,13 +160,20 @@ export default function ActivityRequests() {
                   className="group text-left"
                   onClick={() => router.get(`/student/requests/activity-plan/${doc.id}`)}
                 >
-                  {doc.file_url ? (
-                    <DocumentThumbnail url={doc.file_url} />
-                  ) : (
-                    <div className="aspect-[8.5/11] w-full bg-white border border-gray-200 rounded-lg shadow overflow-hidden flex items-center justify-center text-gray-300">
-                      <FileText className="w-8 h-8" />
-                    </div>
-                  )}
+                  <img
+                    src={`/student/requests/activity-plan/${doc.id}/thumbnail`}
+                    alt={`Document ${doc.id} preview`}
+                    className="aspect-[8.5/11] w-full object-cover bg-white border border-gray-200 rounded-lg shadow overflow-hidden"
+                    onError={(e) => {
+                      const target = e.currentTarget as HTMLImageElement;
+                      target.style.display = 'none';
+                      const ph = target.nextElementSibling as HTMLElement | null;
+                      if (ph) ph.style.display = 'flex';
+                    }}
+                  />
+                  <div className="hidden aspect-[8.5/11] w-full bg-white border border-gray-200 rounded-lg shadow overflow-hidden items-center justify-center text-gray-300">
+                    <FileText className="w-8 h-8" />
+                  </div>
                   <div className="mt-2">
                     <div className="text-sm font-medium text-gray-800 truncate">{`Document #${doc.id}`}</div>
                     <div className="text-xs text-gray-500">{doc.status}</div>
@@ -119,105 +185,5 @@ export default function ActivityRequests() {
         </div>
       </div>
     </MainLayout>
-  );
-}
-
-// Helper: display a scaled first-page preview from an HTML document URL (same-origin)
-const DocumentThumbnail: React.FC<{ url: string }> = ({ url }) => {
-  const iframeRef = useRef<HTMLIFrameElement | null>(null);
-  const [loaded, setLoaded] = useState(false);
-
-  useEffect(() => {
-    const iframe = iframeRef.current;
-    if (!iframe) return;
-
-    const handleLoad = () => {
-      setLoaded(true);
-      try {
-        const doc = iframe.contentDocument || iframe.contentWindow?.document;
-        if (!doc) return;
-
-        // Hide everything except the first ".page" if present
-        let first: HTMLElement | null = null;
-        const pages = Array.from(doc.querySelectorAll<HTMLElement>('.page'));
-        if (pages.length > 0) {
-          pages.forEach((el, i) => {
-            if (i > 0) el.style.display = 'none';
-            el.style.boxShadow = 'none';
-            el.style.border = 'none';
-          });
-          first = pages[0];
-        } else {
-          // Fallback: try a root container typical from our saved HTML
-          first = (doc.querySelector('#app') as HTMLElement) || (doc.body.firstElementChild as HTMLElement) || doc.body as HTMLElement;
-        }
-
-        if (first) {
-          // Measure and scale to fit the card width
-          // parentElement of iframe is the card; its clientWidth is our target width
-          const container = iframe.parentElement as HTMLElement | null;
-          if (!container) return;
-
-          // Ensure body background is white
-          doc.body.style.background = '#fff';
-
-          // Compute scale
-          // If width is 0 (not yet laid out), delay a tick
-          const fit = () => {
-            const rect = first!.getBoundingClientRect();
-            const pageWidth = rect.width || (first as HTMLElement).offsetWidth;
-            const pageHeight = rect.height || (first as HTMLElement).offsetHeight;
-            if (!pageWidth || !pageHeight) return;
-            const containerWidth = container.clientWidth;
-            const scale = Math.max(0.1, Math.min(1.0, containerWidth / pageWidth));
-
-            // Wrap scaling around the first page's parent to avoid affecting fixed headers
-            const wrapper = first!.parentElement as HTMLElement | null;
-            if (wrapper) {
-              wrapper.style.transformOrigin = 'top left';
-              wrapper.style.transform = `scale(${scale})`;
-            } else {
-              (first as HTMLElement).style.transformOrigin = 'top left';
-              (first as HTMLElement).style.transform = `scale(${scale})`;
-            }
-
-            // Set iframe height to scaled page height to avoid scrollbars
-            iframe.style.height = `${pageHeight * scale}px`;
-          };
-
-          // Initial fit and on resize
-          fit();
-          // ResizeObserver for responsive scaling
-          const ro = new ResizeObserver(() => fit());
-          ro.observe(container);
-          // Cleanup
-          const cleanup = () => ro.disconnect();
-          iframe.addEventListener('load', cleanup, { once: true });
-        }
-      } catch (e) {
-        // Swallow cross-origin errors silently
-      }
-    };
-
-    iframe.addEventListener('load', handleLoad);
-    return () => {
-      iframe.removeEventListener('load', handleLoad);
-    };
-  }, [url]);
-
-  return (
-    <div className="relative aspect-[8.5/11] w-full bg-white border border-gray-200 rounded-lg shadow overflow-hidden">
-      <iframe
-        ref={iframeRef}
-        src={url}
-        className="absolute inset-0 w-full h-full pointer-events-none"
-        title="Document preview"
-      />
-      {!loaded && (
-        <div className="absolute inset-0 flex items-center justify-center text-gray-300">
-          <FileText className="w-8 h-8" />
-        </div>
-      )}
-    </div>
   );
 }
