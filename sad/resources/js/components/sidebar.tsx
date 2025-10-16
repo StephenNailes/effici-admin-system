@@ -254,9 +254,9 @@ export default function Sidebar() {
           // 🔜 Add more requests here (e.g. Room Reservation, etc.)
         ],
       },
-      { name: 'Calendar', href: route('calendar'), routeName: 'calendar', icon: <FaCalendarAlt /> },
       { name: 'Revise Requests', href: route('student.revision'), routeName: 'student.revision', icon: <FaBook /> },
       { name: 'Activity Log', href: route('activity-log.index'), routeName: 'activity-log.index', icon: <FaChartLine /> },
+      { name: 'Calendar', href: route('calendar'), routeName: 'calendar', icon: <FaCalendarAlt /> },
     ],
     student_officer: [
       { name: 'Home', href: route('student.dashboard'), routeName: 'student.dashboard', icon: <FaHome /> },
@@ -268,9 +268,9 @@ export default function Sidebar() {
           { name: 'Borrow Equipment', href: route('student.borrow-equipment'), routeName: 'student.borrow-equipment', icon: <FaToolbox /> },
         ],
       },
-      { name: 'Calendar', href: route('calendar'), routeName: 'calendar', icon: <FaCalendarAlt /> },
       { name: 'Revise Requests', href: route('student.revision'), routeName: 'student.revision', icon: <FaBook /> },
       { name: 'Activity Log', href: route('activity-log.index'), routeName: 'activity-log.index', icon: <FaChartLine /> },
+      { name: 'Calendar', href: route('calendar'), routeName: 'calendar', icon: <FaCalendarAlt /> },
     ],
     admin_assistant: [
       { name: 'Home', href: route('admin.dashboard'), routeName: 'admin.dashboard', icon: <FaHome /> },
@@ -320,10 +320,10 @@ export default function Sidebar() {
                 return (
                   <div key={item.name}>
                     {/* Section headings by role */}
-                    {role === 'student' && item.name === 'Request Forms' && !added['Requests'] && (
+                    {(role === 'student' || role === 'student_officer') && item.name === 'Request Forms' && !added['Requests'] && (
                       (added['Requests'] = true) && <SectionHeading label="Requests" />
                     )}
-                    {role === 'student' && item.name === 'Activity Log' && !added['Activity'] && (
+                    {(role === 'student' || role === 'student_officer') && item.name === 'Activity Log' && !added['Activity'] && (
                       (added['Activity'] = true) && <SectionHeading label="Activity" />
                     )}
 

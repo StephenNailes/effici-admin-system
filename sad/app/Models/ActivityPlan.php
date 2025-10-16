@@ -16,6 +16,7 @@ class ActivityPlan extends Model
         'category',
         'status',
         'current_file_id',
+        'pdf_path',
     ];
 
     // Relationship to approvals

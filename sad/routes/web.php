@@ -130,6 +130,18 @@ Route::middleware(['auth', 'verified'])->prefix('student')->group(function () {
             ->name('student.requests.activity-plan.update');
         Route::delete('/requests/activity-plan/{id}', [ActivityPlanController::class, 'destroy'])
             ->name('student.requests.activity-plan.destroy');
+        
+        // PDF generation and preview routes
+        Route::post('/requests/activity-plan/{id}/preview', [ActivityPlanController::class, 'preview'])
+            ->name('student.requests.activity-plan.preview');
+        Route::post('/requests/activity-plan/{id}/generate-pdf', [ActivityPlanController::class, 'generatePdf'])
+            ->name('student.requests.activity-plan.generate-pdf');
+        Route::post('/requests/activity-plan/cleanup-preview', [ActivityPlanController::class, 'cleanupPreview'])
+            ->name('student.requests.activity-plan.cleanup-preview');
+        
+        // Document save route
+        Route::post('/requests/activity-plan/{id}/save-document', [ActivityPlanController::class, 'saveDocument'])
+            ->name('student.requests.activity-plan.save-document');
     });
 
     // Generated documents for activity plan (PDF generation removed)

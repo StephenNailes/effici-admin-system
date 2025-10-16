@@ -6,7 +6,7 @@ import ReactSignatureCanvas from 'react-signature-canvas';
 import MainLayout from "@/layouts/mainlayout";
 import SubmissionModal from "@/components/SubmissionModal";
 import SignatureWarningModal from "@/components/SignatureWarningModal";
-// FileSelectionModal removed with PDF feature reset
+import PDFPreviewModal from "@/components/PDFPreviewModal";
 // Local type definitions (no external template export/generation)
 export type Member = { name: string; role: string };
 export type Signatory = { name: string; position: string };
@@ -15,7 +15,7 @@ import { useActivityPlanIO } from "@/hooks/useActivityPlanIO";
 import uicLogo from "/public/images/uic-logo.png";
 import tuvCertified from "/public/images/tuv-certified.jpg";
 import uicFooter from "/public/images/uic-footer.jpg";
-// Removed buildTemplateExportHtml; no document generation or preview
+import axios from 'axios';
 import {
   Undo2,
   Redo2,
@@ -30,6 +30,9 @@ import {
   List as BulletListIcon,
   ListOrdered as NumberListIcon,
   Printer as PrinterIcon,
+  Eye as EyeIcon,
+  FileText as FileTextIcon,
+  Save as SaveIcon,
 } from "lucide-react";
 
 /*---------- Types ----------*/
@@ -540,10 +543,12 @@ const GlobalStyles = () => (
 type ToolbarProps = { 
   onZoomChange?: (scale: number) => void;
   onStartSignature?: (range: Range | null) => void;
-  // Submission only; draft/export/preview removed
   onSubmit?: () => void;
+  onPreview?: () => void;
+  onGeneratePDF?: () => void;
+  onSave?: () => void;
 };
-const Toolbar: React.FC<ToolbarProps> = ({ onZoomChange, onStartSignature, onSubmit }) => {
+const Toolbar: React.FC<ToolbarProps> = ({ onZoomChange, onStartSignature, onSubmit, onPreview, onGeneratePDF, onSave }) => {
   const exec = (command: string, value?: string) => document.execCommand(command, false, value ?? "");
   const [zoom, setZoom] = useState<number>(1);
   const [font, setFont] = useState<string>("Times New Roman");
@@ -734,6 +739,9 @@ const Toolbar: React.FC<ToolbarProps> = ({ onZoomChange, onStartSignature, onSub
       
       {/* Document Actions */}
       <div className="group">
+        <button className="btn" title="Save Draft" onClick={() => onSave?.()}><SaveIcon size={18} /> Save</button>
+        <button className="btn" title="Preview PDF" onClick={() => onPreview?.()}><EyeIcon size={18} /> Preview</button>
+        <button className="btn" title="Generate PDF" onClick={() => onGeneratePDF?.()}><FileTextIcon size={18} /> Generate PDF</button>
         <button className="btn" title="Submit for Approval" onClick={() => onSubmit?.()}>✅ Submit</button>
       </div>
       <div className="divider" />
@@ -1478,7 +1486,12 @@ const App: React.FC = () => {
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [pendingSaveHtml, setPendingSaveHtml] = useState<string | null>(null);
-  // PDF generation modal removed
+  
+  // PDF Preview & Generation States
+  const [showPdfPreview, setShowPdfPreview] = useState(false);
+  const [pdfPreviewUrl, setPdfPreviewUrl] = useState<string | null>(null);
+  const [pdfGenerating, setPdfGenerating] = useState(false);
+  const [pdfFilename, setPdfFilename] = useState<string | null>(null);
   
   // TODO: Get these from backend/props based on user role and activity plan status
   const canSignAsPreparedBy = true; // Only the creator can sign
@@ -1576,6 +1589,294 @@ const App: React.FC = () => {
     // Close modal and proceed with submission
     setShowSubmissionModal(false);
   };
+
+  // Helper function to capture complete document HTML for PDF generation
+  const captureDocumentHTML = (): string => {
+    const pagesContainer = pageContainerRef.current;
+    if (!pagesContainer) return '';
+
+    // Clone the pages container to avoid affecting the UI
+    const clone = pagesContainer.cloneNode(true) as HTMLElement;
+    
+    // Get all stylesheets and inline them
+    const styles = Array.from(document.styleSheets)
+      .map(sheet => {
+        try {
+          return Array.from(sheet.cssRules)
+            .map(rule => rule.cssText)
+            .join('\n');
+        } catch (e) {
+          return '';
+        }
+      })
+      .join('\n');
+
+    // Construct complete HTML document
+    const html = `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Activity Plan</title>
+  <style>
+    ${styles}
+    
+    /* Print-specific styles */
+    @media print {
+      body { margin: 0; padding: 0; }
+      .no-print { display: none !important; }
+      .page { page-break-after: always; margin: 0; box-shadow: none; border: none; }
+    }
+    
+    /* Ensure fonts load */
+    @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;700&display=swap');
+  </style>
+</head>
+<body>
+  ${clone.innerHTML}
+</body>
+</html>
+    `;
+
+    return html;
+  };
+
+  // Handle PDF Preview
+  const handlePreviewPDF = async () => {
+    if (!plan?.id) {
+      alert('Please save the activity plan first before previewing.');
+      return;
+    }
+
+    setPdfGenerating(true);
+    setShowPdfPreview(true);
+    setPdfPreviewUrl(null);
+
+    try {
+      const html = captureDocumentHTML();
+      const csrfToken = getCsrfMetaToken();
+      
+      const response = await axios.post(
+        `/student/requests/activity-plan/${plan.id}/preview`,
+        {
+          html,
+          members,
+          signatories,
+        },
+        {
+          headers: {
+            'X-CSRF-TOKEN': csrfToken,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      if (response.data.success) {
+        setPdfPreviewUrl(response.data.preview_url);
+        setPdfFilename(response.data.filename);
+      } else {
+        throw new Error(response.data.error || 'Failed to generate preview');
+      }
+    } catch (error: any) {
+      console.error('PDF Preview Error:', error);
+      alert(`Failed to generate PDF preview: ${error.response?.data?.error || error.message}`);
+      setShowPdfPreview(false);
+    } finally {
+      setPdfGenerating(false);
+    }
+  };
+
+  // Handle PDF Generation
+  const handleGeneratePDF = async () => {
+    if (!plan?.id) {
+      alert('Please save the activity plan first before generating PDF.');
+      return;
+    }
+
+    if (!confirm('Generate final PDF for this activity plan?')) {
+      return;
+    }
+
+    setPdfGenerating(true);
+
+    try {
+      const html = captureDocumentHTML();
+      const csrfToken = getCsrfMetaToken();
+      
+      const response = await axios.post(
+        `/student/requests/activity-plan/${plan.id}/generate-pdf`,
+        {
+          html,
+          members,
+          signatories,
+        },
+        {
+          headers: {
+            'X-CSRF-TOKEN': csrfToken,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      if (response.data.success) {
+        alert('PDF generated successfully!');
+        // Optionally download the PDF
+        window.open(response.data.pdf_url, '_blank');
+      } else {
+        throw new Error(response.data.error || 'Failed to generate PDF');
+      }
+    } catch (error: any) {
+      console.error('PDF Generation Error:', error);
+      alert(`Failed to generate PDF: ${error.response?.data?.error || error.message}`);
+    } finally {
+      setPdfGenerating(false);
+    }
+  };
+
+  // Handle PDF Preview Close
+  const handleClosePdfPreview = async () => {
+    setShowPdfPreview(false);
+    
+    // Cleanup temporary preview file
+    if (pdfFilename) {
+      try {
+        const csrfToken = getCsrfMetaToken();
+        await axios.post(
+          '/student/requests/activity-plan/cleanup-preview',
+          { filename: pdfFilename },
+          {
+            headers: {
+              'X-CSRF-TOKEN': csrfToken,
+            },
+          }
+        );
+      } catch (error) {
+        console.error('Failed to cleanup preview file:', error);
+      }
+    }
+    
+    setPdfPreviewUrl(null);
+    setPdfFilename(null);
+  };
+
+  // Handle PDF Download from Preview
+  const handleDownloadPdf = () => {
+    if (pdfPreviewUrl) {
+      const link = document.createElement('a');
+      link.href = pdfPreviewUrl;
+      link.download = `activity_plan_${plan?.id || 'document'}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+  };
+
+  // Handle Save Draft
+  const handleSaveDraft = async () => {
+    if (isSaving) return; // Prevent duplicate saves
+
+    setIsSaving(true);
+    
+    try {
+      const csrfToken = getCsrfMetaToken();
+      
+      // If no plan exists, create a draft first using Inertia
+      if (!plan?.id) {
+        router.post('/student/requests/activity-plan/create-draft', {
+          category: 'normal'
+        }, {
+          preserveState: false,
+          preserveScroll: false,
+          onSuccess: () => {
+            // Will redirect to the new plan page
+          },
+          onError: (errors) => {
+            console.error('Failed to create draft:', errors);
+            alert('Failed to create draft. Please try again.');
+            setIsSaving(false);
+          }
+        });
+        return;
+      }
+
+      // Save the current state to database
+      const html = captureDocumentHTML();
+      
+      // Prepare the data to save
+      const draftData = {
+        html,
+        pages,
+        members,
+        signatories,
+        signatures,
+        timestamp: new Date().toISOString(),
+      };
+      
+      // Save to database via API
+      console.log('Saving document for plan ID:', plan.id);
+      const response = await axios.post(
+        `/student/requests/activity-plan/${plan.id}/save-document`,
+        {
+          document_html: html,
+          document_data: JSON.stringify(draftData),
+        },
+        {
+          headers: {
+            'X-CSRF-TOKEN': csrfToken,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+      console.log('Save response:', response.data);
+
+      if (response.data.success) {
+        // Also store in localStorage as backup
+        localStorage.setItem(`activity_plan_draft_${plan.id}`, JSON.stringify(draftData));
+
+        setLastSaved(new Date());
+        setHasUnsavedChanges(false);
+
+        // Show success message briefly (draft saved)
+        const notification = document.createElement('div');
+        notification.className = 'fixed top-4 right-4 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg z-50 animate-fade-in';
+        notification.textContent = '✓ Draft saved successfully';
+        document.body.appendChild(notification);
+
+        setTimeout(() => {
+          notification.remove();
+        }, 2000);
+      } else {
+        throw new Error(response.data.message || 'Failed to save document');
+      }
+      
+    } catch (error: any) {
+      console.error('Save Error:', error);
+      alert(`Failed to save draft: ${error.message}`);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Mark as having unsaved changes when content changes
+  useEffect(() => {
+    if (pages.length > 0) {
+      setHasUnsavedChanges(true);
+    }
+  }, [pages, members, signatories]);
+
+  // Keyboard shortcut for saving (Ctrl+S / Cmd+S)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+        e.preventDefault();
+        handleSaveDraft();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [pages, members, signatories, signatures, plan?.id, isSaving]);
 
   // Removed autosave/draft tracking
 
@@ -1767,6 +2068,7 @@ const App: React.FC = () => {
             const range = document.createRange();
             if (targetNode) {
                 const textLen = (targetNode as Text).length ?? 0;
+      
                 range.setStart(targetNode, Math.min(offsetInNode, textLen));
                 range.collapse(true);
                 if (sel) {
@@ -1808,15 +2110,18 @@ const App: React.FC = () => {
     <MainLayout>
       <div className="ap-scope">
       
-      {/* Draft status UI removed */}
-      
-      {/* Screen-only header (BorrowEquipment-like placement & typography) */}
+      {/* Back button only; header removed */}
       <div className="no-print px-6 pt-6">
-        <div className="ap-screen-header mb-8 flex flex-col gap-1">
-          <h1 className="text-3xl font-bold text-red-600 tracking-tight" style={{ fontFamily: 'Poppins, sans-serif', fontWeight: 700 }}>Activity Plan</h1>
-          <p className="text-gray-600 text-base" style={{ fontFamily: 'Poppins, sans-serif', fontWeight: 400 }}>Prepare, format, and print your activity plan.</p>
-          {/* Latest document link removed in favor of FileSelectionModal for preview/generate */}
-        </div>
+        <button
+          onClick={() => router.get('/student/requests/activity-plan')}
+          className="inline-flex items-center gap-2 text-sm text-gray-600 hover:text-red-600 transition"
+          aria-label="Back to Activity Requests"
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M15 18l-6-6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+          Back to Activity Requests
+        </button>
       </div>
       <div className="no-print" style={{ position: 'absolute', left: '-9999px', visibility: 'hidden', pointerEvents: 'none' }}>
         <div id="measure-page-1">
@@ -1860,6 +2165,9 @@ const App: React.FC = () => {
   <Toolbar 
     onZoomChange={setZoomScale} 
     onStartSignature={(range)=>handleToolbarStartSignature(range)}
+    onSave={handleSaveDraft}
+    onPreview={handlePreviewPDF}
+    onGeneratePDF={handleGeneratePDF}
     onSubmit={() => {
       // Show confirmation modal instead of submitting directly
       setShowSubmissionModal(true);
@@ -1923,7 +2231,15 @@ const App: React.FC = () => {
         onCancel={handleCancelSubmission}
       />
 
-      {/* PDF generation UI removed */}
+      {/* PDF Preview Modal */}
+      <PDFPreviewModal
+        isOpen={showPdfPreview}
+        pdfUrl={pdfPreviewUrl}
+        onClose={handleClosePdfPreview}
+        onDownload={handleDownloadPdf}
+        isLoading={pdfGenerating}
+        title="Activity Plan Preview"
+      />
       </div>
     </MainLayout>
   );

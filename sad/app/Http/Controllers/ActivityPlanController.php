@@ -8,6 +8,9 @@ use App\Services\NotificationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Log;
+use Spatie\Browsershot\Browsershot;
 
 class ActivityPlanController extends Controller
 {
@@ -38,9 +41,8 @@ class ActivityPlanController extends Controller
             'status' => 'draft', // Draft status - no approvals yet
         ]);
 
-        // Redirect to the GET show route to avoid GET requests hitting the POST path
-        return redirect()->route('student.requests.activity-plan.show', ['id' => $plan->id])
-            ->with('success', 'Draft created.');
+        // Redirect to the GET show route (no flash message to avoid duplicate toasts)
+        return redirect()->route('student.requests.activity-plan.show', ['id' => $plan->id]);
     }
 
     /**
@@ -168,9 +170,34 @@ class ActivityPlanController extends Controller
         if (Auth::user()?->role !== 'student_officer') {
             abort(403);
         }
-        $plans = ActivityPlan::where('user_id', Auth::id())->get();
-        return inertia('student/ActivityPlan', [
-            'plans' => $plans
+        // Render compact dashboard instead of editor here
+        $base = ActivityPlan::query()->where('user_id', Auth::id());
+        $plans = (clone $base)
+            ->with(['currentFile:id,activity_plan_id,file_path'])
+            ->latest('updated_at')
+            ->take(5)
+            ->get(['id','status','created_at','updated_at']);
+        // Shape data for the dashboard (include a public URL to current HTML file if available)
+        $recent = $plans->map(function ($p) {
+            $fileUrl = $p->currentFile ? asset('storage/' . ltrim($p->currentFile->file_path, '/')) : null;
+            return [
+                'id' => $p->id,
+                'status' => $p->status,
+                'created_at' => $p->created_at,
+                'updated_at' => $p->updated_at,
+                'file_url' => $fileUrl,
+            ];
+        });
+        $counts = [
+            'total' => (clone $base)->count(),
+            'pending' => (clone $base)->where('status','pending')->count(),
+            'approved' => (clone $base)->where('status','approved')->count(),
+            'needsRevision' => (clone $base)->where('status','under_revision')->count(),
+        ];
+
+        return inertia('student/ActivityRequests', [
+            'counts' => $counts,
+            'recent' => $recent,
         ]);
     }
 
@@ -241,5 +268,218 @@ class ActivityPlanController extends Controller
 
         return redirect()->route('student.requests.activity-plan')
             ->with('success', 'Activity plan deleted successfully!');
+    }
+
+    /**
+     * Generate PDF preview HTML for the activity plan
+     */
+    public function preview(Request $request, $id)
+    {
+        if (Auth::user()?->role !== 'student_officer') {
+            abort(403, 'Only Student Officers can preview activity plans.');
+        }
+
+        $plan = ActivityPlan::where('id', $id)
+            ->where('user_id', Auth::id())
+            ->firstOrFail();
+
+        // Get HTML content from request
+        $validated = $request->validate([
+            'html' => 'required|string',
+            'members' => 'nullable|array',
+            'signatories' => 'nullable|array',
+        ]);
+
+        $html = $validated['html'];
+        
+        // Generate PDF using Browsershot
+        try {
+            $pdf = Browsershot::html($html)
+                ->setNodeBinary(config('browsershot.node_binary', 'node'))
+                ->setNpmBinary(config('browsershot.npm_binary', 'npm'))
+                ->format('A4')
+                ->margins(0, 0, 0, 0)
+                ->showBackground()
+                ->waitUntilNetworkIdle()
+                ->pdf();
+
+            // Store temporary PDF
+            $filename = 'activity_plan_preview_' . $plan->id . '_' . time() . '.pdf';
+            $path = 'temp/' . $filename;
+            Storage::disk('public')->put($path, $pdf);
+
+            return response()->json([
+                'success' => true,
+                'preview_url' => Storage::url($path),
+                'filename' => $filename,
+            ]);
+        } catch (\Exception $e) {
+            Log::error('PDF Preview Generation Error: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'error' => 'Failed to generate PDF preview: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Generate and save final PDF for the activity plan
+     */
+    public function generatePdf(Request $request, $id)
+    {
+        if (Auth::user()?->role !== 'student_officer') {
+            abort(403, 'Only Student Officers can generate activity plan PDFs.');
+        }
+
+        $plan = ActivityPlan::where('id', $id)
+            ->where('user_id', Auth::id())
+            ->firstOrFail();
+
+        // Get HTML content from request
+        $validated = $request->validate([
+            'html' => 'required|string',
+            'members' => 'nullable|array',
+            'signatories' => 'nullable|array',
+        ]);
+
+        $html = $validated['html'];
+        
+        // Generate PDF using Browsershot
+        try {
+            $pdf = Browsershot::html($html)
+                ->setNodeBinary(config('browsershot.node_binary', 'node'))
+                ->setNpmBinary(config('browsershot.npm_binary', 'npm'))
+                ->format('A4')
+                ->margins(0, 0, 0, 0)
+                ->showBackground()
+                ->waitUntilNetworkIdle()
+                ->pdf();
+
+            // Store final PDF
+            $filename = 'activity_plan_' . $plan->id . '_' . date('Y-m-d_His') . '.pdf';
+            $path = 'activity_plans/' . $filename;
+            Storage::disk('public')->put($path, $pdf);
+
+            // Update plan record with PDF path
+            $plan->update([
+                'pdf_path' => $path,
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'pdf_url' => Storage::url($path),
+                'filename' => $filename,
+            ]);
+        } catch (\Exception $e) {
+            Log::error('PDF Generation Error: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'error' => 'Failed to generate PDF: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Clean up temporary preview files
+     */
+    public function cleanupPreview(Request $request)
+    {
+        $validated = $request->validate([
+            'filename' => 'required|string',
+        ]);
+
+        $path = 'temp/' . $validated['filename'];
+        
+        if (Storage::disk('public')->exists($path)) {
+            Storage::disk('public')->delete($path);
+        }
+
+        return response()->json(['success' => true]);
+    }
+
+    /**
+     * Save document HTML to activity_plan_files table
+     */
+    public function saveDocument(Request $request, $id)
+    {
+        if (Auth::user()?->role !== 'student_officer') {
+            abort(403, 'Only Student Officers can save activity plan documents.');
+        }
+
+        $plan = ActivityPlan::where('id', $id)
+            ->where('user_id', Auth::id())
+            ->firstOrFail();
+
+        $validated = $request->validate([
+            'document_html' => 'required|string',
+            'document_data' => 'nullable|string',
+        ]);
+
+        try {
+            DB::beginTransaction();
+
+            Log::info('Starting document save', ['plan_id' => $plan->id, 'user_id' => Auth::id()]);
+
+            // Create filename
+            $filename = 'activity_plan_' . $plan->id . '_' . date('Y-m-d_His') . '.html';
+            $path = 'activity_plans/' . $filename;
+
+            // Store HTML file
+            Storage::disk('public')->put($path, $validated['document_html']);
+            Log::info('HTML file stored', ['path' => $path]);
+
+            // Get file size
+            $fileSize = Storage::disk('public')->size($path);
+            Log::info('File size calculated', ['size' => $fileSize]);
+
+            // Create file record in activity_plan_files
+            $file = \App\Models\ActivityPlanFile::create([
+                'activity_plan_id' => $plan->id,
+                'file_name' => $filename,
+                'file_path' => $path,
+                'file_type' => 'text/html',
+                'file_size' => $fileSize,
+                'uploaded_at' => now(),
+            ]);
+            Log::info('File record created', ['file_id' => $file->id]);
+
+            // Update plan to reference this file as current
+            $updateResult = $plan->update([
+                'current_file_id' => $file->id,
+            ]);
+            Log::info('Plan update attempted', [
+                'result' => $updateResult,
+                'current_file_id' => $file->id,
+                'plan_id' => $plan->id
+            ]);
+
+            // Refresh the model to verify the update
+            $plan->refresh();
+            Log::info('Plan refreshed', [
+                'current_file_id' => $plan->current_file_id,
+                'pdf_path' => $plan->pdf_path
+            ]);
+
+            DB::commit();
+            Log::info('Transaction committed successfully');
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Document saved successfully',
+                'file_id' => $file->id,
+                'file_path' => $path,
+                'current_file_id' => $plan->current_file_id,
+            ]);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Document Save Error: ' . $e->getMessage(), [
+                'trace' => $e->getTraceAsString()
+            ]);
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to save document: ' . $e->getMessage()
+            ], 500);
+        }
     }
 }
