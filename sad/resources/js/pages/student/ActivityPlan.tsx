@@ -1598,6 +1598,14 @@ const App: React.FC = () => {
     // Clone the pages container to avoid affecting the UI
     const clone = pagesContainer.cloneNode(true) as HTMLElement;
     
+    // Remove interactive elements that shouldn't be in PDF
+    const interactiveElements = clone.querySelectorAll('.no-print, .formatting-toolbar, .sidebar-form, .add-signatory-form, .remove-btn, button[aria-label]');
+    interactiveElements.forEach(el => el.remove());
+    
+    // Get the global styles element
+    const globalStylesEl = document.getElementById('ap-global-css');
+    const globalStyles = globalStylesEl ? globalStylesEl.textContent : '';
+    
     // Get all stylesheets and inline them
     const styles = Array.from(document.styleSheets)
       .map(sheet => {
@@ -1611,7 +1619,7 @@ const App: React.FC = () => {
       })
       .join('\n');
 
-    // Construct complete HTML document
+    // Construct complete HTML document with proper structure
     const html = `
 <!DOCTYPE html>
 <html lang="en">
@@ -1620,21 +1628,60 @@ const App: React.FC = () => {
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Activity Plan</title>
   <style>
-    ${styles}
+    /* Global Activity Plan Styles */
+    ${globalStyles}
     
-    /* Print-specific styles */
-    @media print {
-      body { margin: 0; padding: 0; }
-      .no-print { display: none !important; }
-      .page { page-break-after: always; margin: 0; box-shadow: none; border: none; }
-    }
+    /* Additional captured styles */
+    ${styles}
     
     /* Ensure fonts load */
     @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;700&display=swap');
+    
+    /* PDF-specific overrides to match print layout */
+    @page { size: A4; margin: 0; }
+    body, html { 
+      background: white !important; 
+      margin: 0 !important; 
+      padding: 0 !important; 
+    }
+    .no-print, .formatting-toolbar, .sidebar-form, .add-signatory-form, .remove-btn { 
+      display: none !important; 
+    }
+    .ap-scope .page {
+      margin: 0 !important;
+      box-shadow: none !important;
+      border: none !important;
+      height: 297mm !important;
+      max-height: none !important;
+      overflow: visible !important;
+      padding: 0mm !important;
+      page-break-after: always;
+      page-break-inside: avoid;
+    }
+    .ap-scope .page:last-child {
+      page-break-after: avoid;
+    }
+    /* Show sidebar (EXECUTIVE BOARD) on first page only */
+    .ap-scope .page:first-of-type .sidebar { 
+      visibility: visible !important; 
+      display: block !important; 
+    }
+    .ap-scope .page:not(:first-of-type) .sidebar { 
+      visibility: hidden !important;
+    }
+    .ap-scope .pages-scale-wrapper { 
+      transform: none !important; 
+    }
+    .page-content, .main-text, .editable-content, .static-content {
+      overflow: visible !important;
+      height: auto !important;
+    }
   </style>
 </head>
 <body>
-  ${clone.innerHTML}
+  <div class="ap-scope">
+    ${clone.innerHTML}
+  </div>
 </body>
 </html>
     `;

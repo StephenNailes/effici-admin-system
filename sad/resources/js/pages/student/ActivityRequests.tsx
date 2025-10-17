@@ -150,7 +150,7 @@ export default function ActivityRequests() {
           {recent.length === 0 ? (
             <div className="text-gray-400 text-sm">No documents yet.</div>
           ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+            <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 gap-3">
               {recent.map((doc, idx) => (
                 <motion.button
                   key={doc.id}
@@ -163,7 +163,7 @@ export default function ActivityRequests() {
                   <img
                     src={`/student/requests/activity-plan/${doc.id}/thumbnail`}
                     alt={`Document ${doc.id} preview`}
-                    className="aspect-[8.5/11] w-full object-cover bg-white border border-gray-200 rounded-lg shadow overflow-hidden"
+                    className="aspect-[1/1.414] w-full object-cover bg-white border border-gray-200 rounded-lg shadow overflow-hidden"
                     onError={(e) => {
                       const target = e.currentTarget as HTMLImageElement;
                       target.style.display = 'none';
@@ -171,7 +171,7 @@ export default function ActivityRequests() {
                       if (ph) ph.style.display = 'flex';
                     }}
                   />
-                  <div className="hidden aspect-[8.5/11] w-full bg-white border border-gray-200 rounded-lg shadow overflow-hidden items-center justify-center text-gray-300">
+                  <div className="hidden aspect-[1/1.414] w-full bg-white border border-gray-200 rounded-lg shadow overflow-hidden items-center justify-center text-gray-300">
                     <FileText className="w-8 h-8" />
                   </div>
                   <div className="mt-2">

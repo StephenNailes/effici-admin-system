@@ -9,9 +9,9 @@ import { ToastContainer } from 'react-toastify';
 import axios from 'axios';
 import { installAxiosCsrf } from './lib/csrf';
 import 'react-toastify/dist/ReactToastify.css';
-const appName = import.meta.env.VITE_APP_NAME || 'Laravel';
+const appName = import.meta.env.VITE_APP_NAME || 'EfficiAdmin';
 
-// Configure axios and CSRF protection globally
+// Configure axios and CSRF protection globally 
 installAxiosCsrf();
 
 createInertiaApp({

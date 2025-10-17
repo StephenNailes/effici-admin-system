@@ -326,6 +326,7 @@ class ActivityPlanController extends Controller
 
                 $b = Browsershot::html($html)
                     ->timeout(30)
+                    ->emulateMedia('print')
                     ->waitUntilNetworkIdle()
                     ->windowSize($width, $height)
                     ->deviceScaleFactor(1)
@@ -421,6 +422,7 @@ class ActivityPlanController extends Controller
                 ->format('A4')
                 ->margins(0, 0, 0, 0)
                 ->showBackground()
+                ->emulateMedia('print')
                 ->waitUntilNetworkIdle()
                 ->pdf();
 
@@ -473,6 +475,7 @@ class ActivityPlanController extends Controller
                 ->format('A4')
                 ->margins(0, 0, 0, 0)
                 ->showBackground()
+                ->emulateMedia('print')
                 ->waitUntilNetworkIdle()
                 ->pdf();
 
