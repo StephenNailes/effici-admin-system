@@ -1692,7 +1692,7 @@ const App: React.FC = () => {
   // Handle PDF Preview
   const handlePreviewPDF = async () => {
     if (!plan?.id) {
-      alert('Please save the activity plan first before previewing.');
+      alert('Please save your draft first before previewing. Click the "Save Draft" button to save your document.');
       return;
     }
 
@@ -1737,7 +1737,7 @@ const App: React.FC = () => {
   // Handle PDF Generation
   const handleGeneratePDF = async () => {
     if (!plan?.id) {
-      alert('Please save the activity plan first before generating PDF.');
+      alert('Please save your draft first before generating PDF. Click the "Save Draft" button to save your document.');
       return;
     }
 
@@ -1836,11 +1836,12 @@ const App: React.FC = () => {
           preserveState: false,
           preserveScroll: false,
           onSuccess: () => {
-            // Will redirect to the new plan page
+            // Will redirect to the new plan page with saved draft
+            console.log('Draft created successfully');
           },
           onError: (errors) => {
             console.error('Failed to create draft:', errors);
-            alert('Failed to create draft. Please try again.');
+            alert('Failed to save draft. Please try again.');
             setIsSaving(false);
           }
         });

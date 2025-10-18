@@ -30,6 +30,10 @@ class EventController extends Controller
                     'id' => $event->id,
                     'title' => $event->title,
                     'date' => $event->date,
+                    'start_date' => $event->start_date,
+                    'end_date' => $event->end_date,
+                    'start_time' => $event->start_time,
+                    'end_time' => $event->end_time,
                     'description' => $event->description,
                     'created_by' => $event->created_by,
                     'user_id' => $event->user_id,
@@ -83,6 +87,10 @@ class EventController extends Controller
         $validated = $request->validate([
             'title' => 'required|string|max:255',
             'date' => 'required|date',
+            'start_date' => 'nullable|date',
+            'end_date' => 'nullable|date|after_or_equal:start_date',
+            'start_time' => 'nullable|date_format:H:i',
+            'end_time' => 'nullable|date_format:H:i',
             'description' => 'required|string',
             'images' => 'nullable|array|max:5',
             'images.*' => 'image|mimes:jpeg,jpg,png,gif|max:10240', // 10MB max per image
@@ -91,6 +99,10 @@ class EventController extends Controller
         $event = Event::create([
             'title' => $validated['title'],
             'date' => $validated['date'],
+            'start_date' => $validated['start_date'] ?? null,
+            'end_date' => $validated['end_date'] ?? null,
+            'start_time' => $validated['start_time'] ?? null,
+            'end_time' => $validated['end_time'] ?? null,
             'description' => $validated['description'],
             'created_by' => $user->role,
             'user_id' => $user->id,
@@ -150,6 +162,10 @@ class EventController extends Controller
         $validated = $request->validate([
             'title' => 'required|string|max:255',
             'date' => 'required|date',
+            'start_date' => 'nullable|date',
+            'end_date' => 'nullable|date|after_or_equal:start_date',
+            'start_time' => 'nullable|date_format:H:i',
+            'end_time' => 'nullable|date_format:H:i',
             'description' => 'required|string',
             'images' => 'nullable|array|max:5',
             'images.*' => 'image|mimes:jpeg,jpg,png,gif|max:10240',
@@ -160,6 +176,10 @@ class EventController extends Controller
         $event->update([
             'title' => $validated['title'],
             'date' => $validated['date'],
+            'start_date' => $validated['start_date'] ?? null,
+            'end_date' => $validated['end_date'] ?? null,
+            'start_time' => $validated['start_time'] ?? null,
+            'end_time' => $validated['end_time'] ?? null,
             'description' => $validated['description'],
         ]);
 

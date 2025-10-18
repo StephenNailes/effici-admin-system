@@ -9,6 +9,10 @@ export default function CreateEvent() {
   const { data, setData, post, processing, errors, reset } = useForm({
     title: '',
     date: '',
+    start_date: '',
+    end_date: '',
+    start_time: '',
+    end_time: '',
     description: '',
     images: [] as File[],
   });
@@ -153,7 +157,8 @@ export default function CreateEvent() {
               {/* Title Field */}
               <div>
                 <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
-                  Event Title *
+                  Event Title
+                  {!data.title.trim() && <span className="text-red-500 ml-1">*</span>}
                   <span className="text-xs text-gray-400">({data.title.length}/100)</span>
                 </label>
                 <input
@@ -194,10 +199,63 @@ export default function CreateEvent() {
                 />
               </div>
 
+              {/* Event Time Range (Optional) */}
+              <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                <h3 className="text-sm font-medium text-gray-700 mb-3">Event Schedule (Optional)</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Start Date */}
+                  <div>
+                    <label className="text-sm font-medium text-gray-600 mb-1 block">Start Date</label>
+                    <input
+                      type="date"
+                      value={data.start_date}
+                      onChange={(e) => handleDataChange('start_date', e.target.value)}
+                      min={data.date || new Date().toISOString().split('T')[0]}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 transition-all text-black outline-none"
+                    />
+                  </div>
+
+                  {/* Start Time */}
+                  <div>
+                    <label className="text-sm font-medium text-gray-600 mb-1 block">Start Time</label>
+                    <input
+                      type="time"
+                      value={data.start_time}
+                      onChange={(e) => handleDataChange('start_time', e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 transition-all text-black outline-none"
+                    />
+                  </div>
+
+                  {/* End Date */}
+                  <div>
+                    <label className="text-sm font-medium text-gray-600 mb-1 block">End Date</label>
+                    <input
+                      type="date"
+                      value={data.end_date}
+                      onChange={(e) => handleDataChange('end_date', e.target.value)}
+                      min={data.start_date || data.date || new Date().toISOString().split('T')[0]}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 transition-all text-black outline-none"
+                    />
+                  </div>
+
+                  {/* End Time */}
+                  <div>
+                    <label className="text-sm font-medium text-gray-600 mb-1 block">End Time</label>
+                    <input
+                      type="time"
+                      value={data.end_time}
+                      onChange={(e) => handleDataChange('end_time', e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 transition-all text-black outline-none"
+                    />
+                  </div>
+                </div>
+                <p className="text-xs text-gray-500 mt-2">Specify the exact time range for this event (e.g., workshop sessions, meetings)</p>
+              </div>
+
               {/* Description Field */}
               <div>
                 <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
-                  Event Description *
+                  Event Description
                   <button
                     type="button"
                     onClick={() => setShowURLInfo(!showURLInfo)}
@@ -206,6 +264,7 @@ export default function CreateEvent() {
                   >
                     <Link className="w-4 h-4" />
                   </button>
+                  {!data.description.trim() && <span className="text-red-500 ml-1">*</span>}
                   <span className="text-xs text-gray-400">({data.description.length}/1000)</span>
                 </label>
 

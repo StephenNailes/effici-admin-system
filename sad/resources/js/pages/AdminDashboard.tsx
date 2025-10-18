@@ -3,19 +3,22 @@ import { motion } from 'framer-motion';
 import { Calendar, Megaphone } from 'lucide-react';
 import { LinkifiedText } from '@/utils/linkify';
 import { useState } from 'react';
+import { formatDateTime } from '@/lib/utils';
 
 interface Event {
   title: string;
-  date: string;
+  date?: string; // legacy field; no longer displayed
   description: string;
   created_by: 'student' | 'admin_assistant' | 'dean';
+  created_at?: string; // posted timestamp
 }
 
 interface Announcement {
   title: string;
-  date: string;
+  date?: string; // legacy field; no longer displayed
   description: string;
   created_by: 'admin_assistant' | 'dean' | 'student';
+  created_at?: string; // posted timestamp
 }
 
 interface AdminDashboardProps {
@@ -195,7 +198,7 @@ export default function AdminDashboard({ events = [], announcements = [] }: Admi
                       <div className="font-semibold text-black flex items-center gap-2">
                         <Calendar className="w-4 h-4 text-red-500" /> {event.title}
                       </div>
-                      <div className="text-gray-500">{event.date}</div>
+                      <div className="text-gray-500 text-xs">{event.created_at ? formatDateTime(event.created_at) : '—'}</div>
                       <div className="text-black"><LinkifiedText text={event.description} /></div>
                     </motion.div>
                   ))
@@ -234,7 +237,7 @@ export default function AdminDashboard({ events = [], announcements = [] }: Admi
                       <div className="font-bold text-black flex items-center gap-2">
                         <Megaphone className="w-4 h-4 text-red-500" /> {a.title}
                       </div>
-                      <div className="text-xs text-gray-500">{a.date}</div>
+                      <div className="text-gray-500 text-xs">{a.created_at ? formatDateTime(a.created_at) : '—'}</div>
                       <p className="text-black"><LinkifiedText text={a.description} /></p>
                     </motion.div>
                   ))

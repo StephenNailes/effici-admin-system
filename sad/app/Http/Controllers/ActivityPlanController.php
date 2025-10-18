@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Log;
+use Inertia\Inertia;
 use Spatie\Browsershot\Browsershot;
 
 class ActivityPlanController extends Controller
@@ -24,6 +25,22 @@ class ActivityPlanController extends Controller
     /**
      * Create a draft plan (no approvals, no notifications - just a shell for saving files)
      */
+    /**
+     * Show the editor for creating a new activity plan (without saving to DB yet)
+     */
+    public function create()
+    {
+        if (Auth::user()?->role !== 'student_officer') {
+            abort(403, 'Only Student Officers can create activity plans.');
+        }
+
+        // Return the editor view without a plan
+        // User must manually save to create the DB record
+        return Inertia::render('student/ActivityPlan', [
+            'plan' => null, // No plan yet - will be created on first save
+        ]);
+    }
+
     public function createDraft(Request $request)
     {
         if (Auth::user()?->role !== 'student_officer') {

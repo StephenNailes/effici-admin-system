@@ -15,7 +15,7 @@ import {
   Megaphone
 } from 'lucide-react';
 import { router, usePage } from '@inertiajs/react';
-import { formatDateShort, formatTime12h } from '@/lib/utils';
+import { formatDateTime } from '@/lib/utils';
 import { LinkifiedText } from '@/utils/linkify';
 
 interface PostImage {
@@ -38,7 +38,7 @@ interface BasePost {
   id: number;
   title: string;
   description?: string;
-  created_by: 'student' | 'admin_assistant' | 'dean';
+  created_by: 'student' | 'admin_assistant' | 'dean' | 'student_officer';
   user_id?: number;
   user?: PostUser;
   images?: PostImage[];
@@ -49,7 +49,11 @@ interface BasePost {
 interface PostCardProps {
   post: BasePost;
   type: 'event' | 'announcement';
-  date?: string; // Events have dates, announcements might not
+  date?: string; // Legacy date field
+  start_date?: string;
+  end_date?: string;
+  start_time?: string;
+  end_time?: string;
   likes: { liked: boolean; count: number };
   commentsCount: number;
   canEditDelete: boolean;
@@ -70,6 +74,10 @@ export default function PostCard({
   post,
   type,
   date,
+  start_date,
+  end_date,
+  start_time,
+  end_time,
   likes,
   commentsCount,
   canEditDelete,
@@ -98,26 +106,7 @@ export default function PostCard({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const formatDate = (dateString: string) => formatDateShort(dateString);
-
-  const formatCreatedAt = (dateString: string) => {
-    try {
-      const date = new Date(dateString);
-      const now = new Date();
-      const diffInHours = (now.getTime() - date.getTime()) / (1000 * 60 * 60);
-      
-      if (diffInHours < 24) {
-        return formatTime12h(date);
-      } else {
-        return date.toLocaleDateString('en-US', {
-          month: 'short',
-          day: 'numeric'
-        });
-      }
-    } catch {
-      return dateString;
-    }
-  };
+  // Show only the posted timestamp (when the post was created)
 
   const nextImage = () => {
     if (post.images && post.images.length > 1) {
@@ -174,15 +163,9 @@ export default function PostCard({
               </h4>
               <TypeIconComponent className="w-4 h-4 text-red-500" />
             </div>
-            <div className="flex items-center text-xs text-gray-500 space-x-2">
-              {date && (
-                <>
-                  <span>{formatDate(date)}</span>
-                  <span>•</span>
-                </>
-              )}
+            <div className="flex items-center text-xs text-gray-500 space-x-2 flex-wrap">
               {post.created_at && (
-                <span>{formatCreatedAt(post.created_at)}</span>
+                <span>{formatDateTime(post.created_at)}</span>
               )}
             </div>
           </div>

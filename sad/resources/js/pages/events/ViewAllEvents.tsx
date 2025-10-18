@@ -25,8 +25,12 @@ interface Event {
   id: number; // add id for DB reference
   title: string;
   date: string;
+  start_date?: string;
+  end_date?: string;
+  start_time?: string;
+  end_time?: string;
   description?: string;
-  created_by: 'student' | 'admin_assistant' | 'dean';
+  created_by: 'student' | 'admin_assistant' | 'dean' | 'student_officer';
   user_id?: number; // fallback when relation missing
   user?: {
     id: number;
@@ -57,7 +61,7 @@ interface Comment {
 type AuthUser = {
   first_name: string;
   last_name: string;
-  role: 'student' | 'admin_assistant' | 'dean';
+  role: 'student' | 'admin_assistant' | 'dean' | 'student_officer';
   avatarUrl?: string;
 };
 
@@ -89,8 +93,8 @@ export default function ViewAllEvents() {
   const { auth, events = [] } = usePage<PageProps>().props; // Now events is a plain array
   const items: Event[] = Array.isArray(events) ? events : [];
 
-  // Check if user can create events (admin_assistant or dean)
-  const canCreateEvent = auth.user.role === 'admin_assistant' || auth.user.role === 'dean';
+  // Check if user can create events (admin_assistant, dean, or student_officer)
+  const canCreateEvent = auth.user.role === 'admin_assistant' || auth.user.role === 'dean' || auth.user.role === 'student_officer';
 
   const [comments, setComments] = useState<Record<number, Comment[]>>({});
   const [modalEventId, setModalEventId] = useState<number | null>(null);
@@ -265,8 +269,8 @@ export default function ViewAllEvents() {
   };
 
   const canEditDelete = () => {
-    // Allow all admin_assistants and deans to edit/delete any event
-    return auth.user.role === 'admin_assistant' || auth.user.role === 'dean';
+    // Allow all admin_assistants, deans, and student_officers to edit/delete any event
+    return auth.user.role === 'admin_assistant' || auth.user.role === 'dean' || auth.user.role === 'student_officer';
   };
 
   return (
@@ -330,6 +334,10 @@ export default function ViewAllEvents() {
                   post={event}
                   type="event"
                   date={event.date}
+                  start_date={event.start_date}
+                  end_date={event.end_date}
+                  start_time={event.start_time}
+                  end_time={event.end_time}
                   likes={likes[event.id] || { liked: false, count: 0 }}
                   commentsCount={(comments[event.id] || []).length}
                   canEditDelete={canEditDelete()}

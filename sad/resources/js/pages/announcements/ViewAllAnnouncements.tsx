@@ -25,8 +25,12 @@ interface Announcement {
   id: number;
   title: string;
   date: string;
+  start_date?: string;
+  end_date?: string;
+  start_time?: string;
+  end_time?: string;
   description: string;
-  created_by: 'admin_assistant' | 'dean' ; // <-- use snake_case
+  created_by: 'admin_assistant' | 'dean' | 'student_officer'; // <-- use snake_case
   user_id?: number; // fallback when relation missing
   user?: {
     id: number;
@@ -57,7 +61,7 @@ interface Comment {
 type AuthUser = {
   first_name: string;
   last_name: string;
-  role: 'student' | 'admin_assistant' | 'dean';
+  role: 'student' | 'admin_assistant' | 'dean' | 'student_officer';
   avatarUrl?: string;
 };
 
@@ -88,8 +92,8 @@ const cardVariants = {
 export default function ViewAllAnnouncements() {
   const { auth, announcements = [] } = usePage<PageProps>().props;
 
-  // Check if user can create announcements (admin_assistant or dean)
-  const canCreateAnnouncement = auth.user.role === 'admin_assistant' || auth.user.role === 'dean';
+  // Check if user can create announcements (admin_assistant, dean, or student_officer)
+  const canCreateAnnouncement = auth.user.role === 'admin_assistant' || auth.user.role === 'dean' || auth.user.role === 'student_officer';
 
   const items: Announcement[] = Array.isArray(announcements) ? announcements : [];
 
@@ -282,8 +286,8 @@ export default function ViewAllAnnouncements() {
   };
 
   const canEditDelete = () => {
-    // Allow all admin_assistants and deans to edit/delete any announcement
-    return auth.user.role === 'admin_assistant' || auth.user.role === 'dean';
+    // Allow all admin_assistants, deans, and student_officers to edit/delete any announcement
+    return auth.user.role === 'admin_assistant' || auth.user.role === 'dean' || auth.user.role === 'student_officer';
   };
 
   return (
@@ -347,6 +351,10 @@ export default function ViewAllAnnouncements() {
                   post={announcement}
                   type="announcement"
                   date={announcement.date}
+                  start_date={announcement.start_date}
+                  end_date={announcement.end_date}
+                  start_time={announcement.start_time}
+                  end_time={announcement.end_time}
                   likes={likes[announcement.id] || { liked: false, count: 0 }}
                   commentsCount={(comments[announcement.id] || []).length}
                   canEditDelete={canEditDelete()}

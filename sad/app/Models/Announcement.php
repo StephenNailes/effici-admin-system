@@ -8,7 +8,17 @@ use Illuminate\Database\Eloquent\Relations\MorphMany;
 
 class Announcement extends Model
 {
-    protected $fillable = ['title', 'date', 'description', 'created_by', 'user_id'];
+    protected $fillable = [
+        'title', 
+        'date', 
+        'description', 
+        'created_by', 
+        'user_id'
+    ];
+    
+    protected $casts = [
+        'date' => 'date',
+    ];
     
     protected static function boot()
     {

@@ -21,6 +21,7 @@ use App\Http\Controllers\ApprovalController;
 use App\Http\Controllers\RevisionController;
 use App\Http\Controllers\EventController;
 use App\Http\Controllers\AnnouncementController;
+use App\Http\Controllers\CalendarController;
 use App\Http\Controllers\HandoverController;
 use App\Http\Controllers\InvitationController;
 
@@ -118,6 +119,8 @@ Route::middleware(['auth', 'verified'])->prefix('student')->group(function () {
     Route::middleware(['role:student_officer'])->group(function () {
         Route::get('/requests/activity-plan', [ActivityPlanController::class, 'index'])
             ->name('student.requests.activity-plan');
+        Route::get('/requests/activity-plan/new', [ActivityPlanController::class, 'create'])
+            ->name('student.requests.activity-plan.create');
         Route::post('/requests/activity-plan/create-draft', [ActivityPlanController::class, 'createDraft'])
             ->name('student.requests.activity-plan.create-draft');
         Route::post('/requests/activity-plan/{id}/submit', [ActivityPlanController::class, 'submit'])
@@ -236,8 +239,10 @@ Route::middleware(['auth', 'verified', 'role:admin_assistant'])->group(function 
 
 // 🟩 Events + Announcements
 Route::middleware(['auth', 'verified'])->group(function () {
-    // Calendar (simple landing page)
-    Route::get('/calendar', fn () => Inertia::render('Calendar'))->name('calendar');
+    // Calendar with events/announcements
+    Route::get('/calendar', [CalendarController::class, 'index'])->name('calendar');
+    Route::get('/api/calendar/events', [CalendarController::class, 'getEvents'])->name('calendar.events');
+    
     Route::get('/events', [EventController::class, 'index'])->name('events.index');
     Route::get('/events/create', [EventController::class, 'create'])->name('events.create');
     Route::post('/events', [EventController::class, 'store'])->name('events.store');

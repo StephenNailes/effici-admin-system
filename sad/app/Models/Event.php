@@ -8,7 +8,23 @@ use Illuminate\Database\Eloquent\Relations\MorphMany;
 
 class Event extends Model
 {
-    protected $fillable = ['title', 'date', 'description', 'created_by', 'user_id'];
+    protected $fillable = [
+        'title', 
+        'date', 
+        'start_date', 
+        'end_date', 
+        'start_time', 
+        'end_time', 
+        'description', 
+        'created_by', 
+        'user_id'
+    ];
+    
+    protected $casts = [
+        'date' => 'date',
+        'start_date' => 'date',
+        'end_date' => 'date',
+    ];
     
     protected static function boot()
     {

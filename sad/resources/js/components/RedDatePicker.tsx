@@ -68,7 +68,10 @@ export default function RedDatePicker({ value, onChange, min, label, required, d
     <div className="relative" ref={wrapperRef}>
       {label && (
         <label htmlFor={id} className="block text-sm font-medium text-gray-700 mb-2">
-          {label} {required && '*'}
+          {label}
+          {required && !value && (
+            <span className="text-red-600 ml-1" aria-hidden> *</span>
+          )}
         </label>
       )}
       <button

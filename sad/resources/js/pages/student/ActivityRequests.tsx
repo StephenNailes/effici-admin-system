@@ -55,9 +55,9 @@ export default function ActivityRequests() {
   };
 
   const handleCreate = () => {
-    router.post('/student/requests/activity-plan/create-draft', { category: 'normal' }, {
-      preserveScroll: true,
-    });
+    // Navigate to editor without creating a DB record
+    // User must manually save draft to create the record
+    router.get('/student/requests/activity-plan/new');
   };
 
   return (

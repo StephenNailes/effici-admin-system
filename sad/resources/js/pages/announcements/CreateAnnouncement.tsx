@@ -157,7 +157,8 @@ export default function CreateAnnouncement() {
             {/* Title Field */}
             <div>
               <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
-                Announcement Title *
+                Announcement Title
+                {!data.title.trim() && <span className="text-red-500 ml-1">*</span>}
                 <span className="text-xs text-gray-400">({data.title.length}/100)</span>
               </label>
               <input
@@ -187,9 +188,6 @@ export default function CreateAnnouncement() {
 
             {/* Date Field */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Announcement Date *
-              </label>
               <RedDatePicker
                 label="Announcement Date"
                 required
@@ -201,10 +199,12 @@ export default function CreateAnnouncement() {
               />
             </div>
 
+            {/* Announcement schedule removed: no start/end date or time fields */}
+
             {/* Description Field */}
             <div>
               <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
-                Announcement Description *
+                Announcement Description
                 <button
                   type="button"
                   onClick={() => setShowURLInfo(!showURLInfo)}
@@ -213,6 +213,7 @@ export default function CreateAnnouncement() {
                 >
                   <Link className="w-4 h-4" />
                 </button>
+                {!data.description.trim() && <span className="text-red-500 ml-1">*</span>}
                 <span className="text-xs text-gray-400">({data.description.length}/1000)</span>
               </label>
               

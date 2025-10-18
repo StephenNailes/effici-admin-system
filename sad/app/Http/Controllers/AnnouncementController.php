@@ -29,6 +29,11 @@ class AnnouncementController extends Controller
                     'id' => $announcement->id,
                     'title' => $announcement->title,
                     'date' => $announcement->date,
+                    // datetime fields removed from announcements
+                    'start_date' => null,
+                    'end_date' => null,
+                    'start_time' => null,
+                    'end_time' => null,
                     'description' => $announcement->description,
                     'created_by' => $announcement->created_by,
                     'user_id' => $announcement->user_id,
