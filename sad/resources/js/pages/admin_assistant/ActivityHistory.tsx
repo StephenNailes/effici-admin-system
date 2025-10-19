@@ -24,7 +24,7 @@ const FilterModal = ({
   const [tempTypeFilter, setTempTypeFilter] = useState(typeFilter);
   const [tempStatusFilter, setTempStatusFilter] = useState(statusFilter);
 
-  const typeOptions = ["All Types", "Activity Plan", "Equipment"];
+  const typeOptions = ["All Types", "Activity Plan", "Equipment", "Role Update"];
   const statusOptions = [
     "All Status", "Pending", "Approved", "Completed", 
     "Under Revision", "Checked Out", 
@@ -242,14 +242,20 @@ export default function ActivityHistory() {
             console.log("Normalized activity status:", status);
           }
           return {
-            id: item.approval_id || item.id,
+            id: item.request_id || item.approval_id || item.id,
             student: item.student_name || "-",
-            type: item.request_type === "activity_plan" ? "Activity Plan" : "Equipment",
+            type: item.request_type === "activity_plan" 
+              ? "Activity Plan" 
+              : item.request_type === "role_update"
+                ? "Role Update"
+                : "Equipment",
             dateSubmitted: item.submitted_at ? item.submitted_at.slice(0, 10) : "-",
             category:
               item.request_type === "activity_plan"
                 ? item.activity_category || "-"
-                : item.equipment_purpose || "-",
+                : item.request_type === "role_update"
+                  ? item.activity_category || "-" // activity_category holds requested_role for role_update
+                  : item.equipment_purpose || "-",
             status,
             approverRole: item.approver_role ? item.approver_role.replace('_', ' ').split(' ').map((word: string) => word.charAt(0).toUpperCase() + word.slice(1)).join(' ') : null,
             approverName: item.approver_name || null,
@@ -513,7 +519,15 @@ export default function ActivityHistory() {
                       <td className="py-3 px-6">{activity.student}</td>
                       <td className="py-3 px-6">{activity.type}</td>
                       <td className="py-3 px-6">{activity.dateSubmitted}</td>
-                      <td className="py-3 px-6">{activity.category}</td>
+                      <td className="py-3 px-6">
+                        {activity.type === "Role Update" && activity.category?.toLowerCase() === "student_officer" ? (
+                          <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-blue-100 text-blue-700 text-xs font-semibold whitespace-nowrap">
+                            Student Officer
+                          </span>
+                        ) : (
+                          activity.category
+                        )}
+                      </td>
                       <td className="py-3 px-6">
                         {(() => {
                           const status = activity.status?.toLowerCase();
@@ -532,7 +546,7 @@ export default function ActivityHistory() {
                           } else if (status === "approved") {
                             return (
                               <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-emerald-100 text-emerald-700 text-xs font-semibold">
-                                Approved
+                                <Check className="w-3 h-3" /> Approved
                               </span>
                             );
                           } else if (status === "under revision") {

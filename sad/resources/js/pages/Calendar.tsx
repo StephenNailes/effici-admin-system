@@ -50,7 +50,7 @@ const hours = Array.from({ length: 24 }, (_, i) => i);
 const ROW_PX = 80; // px height per hour row for better spacing (larger cards)
 const HOURS_COL_PX = 104; // width of the left hours column to match header
 const TIME_OFFSET = 0; // no extra top offset; align events with hour lines
-const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
 // GMT label removed per design
 
@@ -141,7 +141,7 @@ const MonthView: React.FC<{
               return (
                 <div
                   key={day.toISOString()}
-                  className={`group/day h-28 sm:h-32 md:h-36 rounded-2xl p-2 sm:p-2.5 flex flex-col transition-colors ${outside ? 'bg-gray-50 text-gray-400' : 'bg-white hover:bg-gray-50/60'} ${today ? 'border border-transparent ring-2 ring-blue-300 ring-offset-1 ring-offset-white bg-blue-50' : 'border border-gray-200'}`}
+                  className={`group/day h-28 sm:h-32 md:h-36 rounded-2xl p-2 sm:p-2.5 flex flex-col transition-colors ${outside ? 'bg-gray-50 text-gray-400' : 'bg-white hover:bg-gray-50/60'} ${today ? 'border border-transparent ring-2 ring-blue-300 ring-offset-1 ring-offset-white bg-blue-50' : 'border border-gray-200'} ${!today ? 'hover:border-2 hover:border-black' : ''}`}
                   onClick={(e) => {
                     onSelectDay(day);
                     onOpenDay(day);
@@ -159,7 +159,7 @@ const MonthView: React.FC<{
                   <div className="flex items-start justify-between mb-1">
                     <div
                       data-role="date-number"
-                      className={`inline-flex items-center justify-center w-6 h-6 text-xs sm:text-sm font-semibold rounded-full ${today ? 'bg-blue-600 text-white' : selected ? 'bg-red-600 text-white' : outside ? 'text-gray-400' : 'text-black'} transition-colors`}
+                      className={`inline-flex items-center justify-center w-6 h-6 text-xs sm:text-sm font-semibold rounded-full ${today ? 'bg-blue-600 text-white' : selected ? 'bg-black text-white' : outside ? 'text-gray-400' : 'text-black'} transition-colors ${!today ? 'group-hover/day:bg-black group-hover/day:text-white' : ''}`}
                       title={day.toDateString()}
                     >
                       {day.getDate()}
@@ -531,7 +531,7 @@ export default function Calendar() {
               <div className="min-w-[160px] text-center text-lg font-semibold text-gray-900">{formatMonthYear(current)}</div>
               <button aria-label="Next" onClick={goNext} className="p-2 rounded-md border border-gray-300 hover:bg-gray-50 active:scale-[0.98] transition focus:outline-none focus:ring-0"><ChevronRight className="w-4 h-4" /></button>
             </div>
-            {/* Day view switch removed; month-only */}
+           
           </div>
         </div>
 

@@ -17,6 +17,43 @@ export default function Modal({ open, onClose, children }: ModalProps) {
     }
   }, [open]);
 
+  // Lock body scroll when one or more modals are open. Use a dataset counter
+  // to support multiple modal instances opened simultaneously.
+  useEffect(() => {
+    const body = document.body;
+    const getCount = () => Number(body.dataset.modalCount || '0');
+    const setCount = (n: number) => { body.dataset.modalCount = String(n); };
+
+    const applyLock = () => {
+      // only save original values when transitioning from 0 -> 1
+      if (getCount() === 0) {
+        // compute scrollbar width and add padding-right to avoid layout shift
+        const scrollBarWidth = window.innerWidth - document.documentElement.clientWidth;
+        if (scrollBarWidth > 0) {
+          body.style.paddingRight = `${scrollBarWidth}px`;
+        }
+        body.style.overflow = 'hidden';
+      }
+      setCount(getCount() + 1);
+    };
+
+    const removeLock = () => {
+      const newCount = Math.max(0, getCount() - 1);
+      setCount(newCount);
+      if (newCount === 0) {
+        // restore
+        body.style.overflow = '';
+        body.style.paddingRight = '';
+        delete body.dataset.modalCount;
+      }
+    };
+
+    if (open) applyLock();
+    return () => {
+      if (open) removeLock();
+    };
+  }, [open]);
+
   const safeClose = () => {
     const now = Date.now();
     if (now - openedAtRef.current < 150) {

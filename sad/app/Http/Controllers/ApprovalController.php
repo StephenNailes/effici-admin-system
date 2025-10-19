@@ -23,6 +23,7 @@ class ApprovalController extends Controller
             abort(403);
         }
 
+        // First, get all unique requests with the actual equipment/activity status
         $requests = DB::table('request_approvals as ra')
             ->leftJoin('equipment_requests as er', function ($join) {
                 $join->on('ra.request_id', '=', 'er.id')
@@ -35,13 +36,25 @@ class ApprovalController extends Controller
             ->leftJoin('users as u', function ($join) {
                 $join->on('u.id', '=', DB::raw('COALESCE(er.user_id, ap.user_id)'));
             })
-            ->leftJoin('users as approver', 'approver.id', '=', 'ra.approver_id')
+            // Get the approver who last acted on this request
+            ->leftJoin('users as approver', function($join) {
+                $join->on('approver.id', '=', DB::raw('(
+                    SELECT ra2.approver_id 
+                    FROM request_approvals ra2 
+                    WHERE ra2.request_id = ra.request_id 
+                    AND ra2.request_type = ra.request_type 
+                    AND ra2.approver_id IS NOT NULL
+                    ORDER BY ra2.updated_at DESC 
+                    LIMIT 1
+                )'));
+            })
             ->select(
-                'ra.id as approval_id',
+                DB::raw('MAX(ra.id) as approval_id'),
                 'ra.request_id',
                 DB::raw("CAST(ra.request_type AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci as request_type"),
-                DB::raw("CAST(ra.status AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci as approval_status"),
-                'ra.created_at as submitted_at',
+                // Use the most recent approval status from this role
+                DB::raw("CAST(MAX(ra.status) AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci as approval_status"),
+                DB::raw("MIN(ra.created_at) as submitted_at"),
                 DB::raw("CAST(ra.approver_role AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci as approver_role"),
                 DB::raw("CAST(COALESCE(er.category, ap.category) AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci as priority"),
                 DB::raw("CONCAT(u.first_name, ' ', u.last_name) as student_name"),
@@ -52,40 +65,38 @@ class ApprovalController extends Controller
                 DB::raw("CAST(ap.status AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci as activity_status")
             )
             ->where('ra.approver_role', $role)
-            ->orderBy('ra.created_at', 'desc');
+            // Group by unique request to avoid duplicates
+            ->groupBy('ra.request_id', 'ra.request_type', 'ra.approver_role', 'er.status', 'ap.status', 
+                     'er.category', 'ap.category', 'u.first_name', 'u.last_name', 
+                     'approver.first_name', 'approver.last_name', 'er.purpose')
+            ->orderBy('submitted_at', 'desc');
 
-        // For admin assistants, include role update requests handled by them
-        if ($role === 'admin_assistant') {
-            $roleUpdates = DB::table('role_update_requests as rur')
-                ->leftJoin('users as u', 'u.id', '=', 'rur.user_id')
-                ->leftJoin('users as approver', 'approver.id', '=', 'rur.reviewed_by')
-                ->select(
-                    DB::raw('NULL as approval_id'),
-                    'rur.id as request_id',
-                    DB::raw("CAST('role_update' AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci as request_type"),
-                    'rur.status as approval_status',
-                    'rur.created_at as submitted_at',
-                    DB::raw("CAST('admin_assistant' AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci as approver_role"),
-                    DB::raw('CAST(NULL AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci as priority'),
-                    DB::raw("CONCAT(u.first_name, ' ', u.last_name) as student_name"),
-                    DB::raw("CONCAT(approver.first_name, ' ', approver.last_name) as approver_name"),
-                    DB::raw('CAST(NULL AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci as activity_category'),
-                    DB::raw('CAST(NULL AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci as equipment_purpose'),
-                    DB::raw('CAST(NULL AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci as equipment_status'),
-                    DB::raw('CAST(NULL AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci as activity_status')
-                );
+        // For admin assistants and deans, include role update requests
+        $roleUpdates = DB::table('role_update_requests as rur')
+            ->leftJoin('users as u', 'u.id', '=', 'rur.user_id')
+            ->leftJoin('users as approver', 'approver.id', '=', 'rur.reviewed_by')
+            ->select(
+                DB::raw('NULL as approval_id'),
+                'rur.id as request_id',
+                DB::raw("CAST('role_update' AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci as request_type"),
+                DB::raw("CAST(rur.status AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci as approval_status"),
+                'rur.created_at as submitted_at',
+                DB::raw("CAST('" . $role . "' AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci as approver_role"),
+                DB::raw('CAST(NULL AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci as priority'),
+                DB::raw("CONCAT(u.first_name, ' ', u.last_name) as student_name"),
+                DB::raw("CONCAT(approver.first_name, ' ', approver.last_name) as approver_name"),
+                DB::raw("CAST(rur.requested_role AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci as activity_category"),
+                DB::raw('CAST(NULL AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci as equipment_purpose'),
+                DB::raw('CAST(NULL AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci as equipment_status'),
+                DB::raw('CAST(NULL AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci as activity_status')
+            );
 
-            // Union with existing $requests query
-            $requests = $requests->unionAll($roleUpdates)->orderBy('submitted_at', 'desc')->get();
-            // Normalize timestamps to ISO8601
-            foreach ($requests as $r) {
-                $r->submitted_at = $r->submitted_at ? Carbon::parse($r->submitted_at)->toIso8601String() : null;
-            }
-        } else {
-            $requests = $requests->get();
-            foreach ($requests as $r) {
-                $r->submitted_at = $r->submitted_at ? Carbon::parse($r->submitted_at)->toIso8601String() : null;
-            }
+        // Union with existing $requests query
+        $requests = $requests->unionAll($roleUpdates)->orderBy('submitted_at', 'desc')->get();
+        
+        // Normalize timestamps to ISO8601
+        foreach ($requests as $r) {
+            $r->submitted_at = $r->submitted_at ? Carbon::parse($r->submitted_at)->toIso8601String() : null;
         }
 
         // Add equipment items for equipment requests

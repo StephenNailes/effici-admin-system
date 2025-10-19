@@ -1,12 +1,16 @@
 import React, { useState, useEffect, useCallback, useRef, useLayoutEffect } from "react";
 import { createPortal } from "react-dom";
 import { router, usePage } from '@inertiajs/react';
+import { Inertia } from '@inertiajs/inertia';
 import { getCsrfMetaToken, refreshCsrfToken } from '@/lib/csrf';
 import ReactSignatureCanvas from 'react-signature-canvas';
 import MainLayout from "@/layouts/mainlayout";
 import SubmissionModal from "@/components/SubmissionModal";
 import SignatureWarningModal from "@/components/SignatureWarningModal";
 import PDFPreviewModal from "@/components/PDFPreviewModal";
+import HeaderSettingsModal from "@/components/HeaderSettingsModal";
+import InfoModal from "@/components/InfoModal";
+import UnsavedChangesModal from "@/components/UnsavedChangesModal";
 // Local type definitions (no external template export/generation)
 export type Member = { name: string; role: string };
 export type Signatory = { name: string; position: string };
@@ -16,6 +20,7 @@ import uicLogo from "/public/images/uic-logo.png";
 import tuvCertified from "/public/images/tuv-certified.jpg";
 import uicFooter from "/public/images/uic-footer.jpg";
 import axios from 'axios';
+import { toast } from 'react-toastify';
 import {
   Undo2,
   Redo2,
@@ -33,6 +38,10 @@ import {
   Eye as EyeIcon,
   FileText as FileTextIcon,
   Save as SaveIcon,
+  PenLine as PenIcon,
+  Table as TableIcon,
+  Settings,
+  Send as SendIcon,
 } from "lucide-react";
 
 /*---------- Types ----------*/
@@ -308,6 +317,9 @@ const GlobalStyles = () => (
     }
     .ap-scope .main-text li { margin: 0.2em 0; }
 
+  /* Slight nudge for the top date line (screen only) */
+  .ap-scope .main-text .ap-date { margin-left: -6mm; }11
+
     /* Table insertion menu (popover) */
     .table-menu {
       position: absolute;
@@ -492,6 +504,7 @@ const GlobalStyles = () => (
         height: auto !important;
       }
   .header-logo { margin-left: -9px !important; }
+  /* Date keeps its screen nudge in print preview/PDF as requested */
     }
     /* --- E-Signature styles --- */
     .signature-draggable { 
@@ -547,8 +560,9 @@ type ToolbarProps = {
   onPreview?: () => void;
   onGeneratePDF?: () => void;
   onSave?: () => void;
+  onOpenHeaderSettings?: () => void;
 };
-const Toolbar: React.FC<ToolbarProps> = ({ onZoomChange, onStartSignature, onSubmit, onPreview, onGeneratePDF, onSave }) => {
+const Toolbar: React.FC<ToolbarProps> = ({ onZoomChange, onStartSignature, onSubmit, onPreview, onGeneratePDF, onSave, onOpenHeaderSettings }) => {
   const exec = (command: string, value?: string) => document.execCommand(command, false, value ?? "");
   const [zoom, setZoom] = useState<number>(1);
   const [font, setFont] = useState<string>("Times New Roman");
@@ -576,8 +590,8 @@ const Toolbar: React.FC<ToolbarProps> = ({ onZoomChange, onStartSignature, onSub
     return null;
   };
   const insertSimpleTable = (rows: number, cols: number) => {
-    // Build table HTML
-    let html = '<table style="width: 100%; border-collapse: collapse;">';
+    // Build table HTML with explicit tbody and spacer paragraphs so it's a top-level block
+    let html = '<p><br></p><table style="width: 100%; border-collapse: collapse;">\n<tbody>';
     for (let r = 0; r < rows; r++) {
       html += '<tr>';
       for (let c = 0; c < cols; c++) {
@@ -585,7 +599,7 @@ const Toolbar: React.FC<ToolbarProps> = ({ onZoomChange, onStartSignature, onSub
       }
       html += '</tr>';
     }
-    html += '</table><p><br></p>';
+    html += '</tbody></table><p><br></p>';
     
     // Try to use saved selection first (from toolbar interaction)
     let range = savedSelectionRef.current;
@@ -603,6 +617,15 @@ const Toolbar: React.FC<ToolbarProps> = ({ onZoomChange, onStartSignature, onSub
       const editableParent = (range.commonAncestorContainer as Node).parentElement?.closest('.editable-content');
       
       if (editableParent) {
+        // If selection is inside a heading (H1..H6), adjust insertion to after the heading block
+        const blockAncestor = (range.commonAncestorContainer as Node).parentElement?.closest('h1,h2,h3,h4,h5,h6,p,div,li,td,th') as HTMLElement | null;
+        if (blockAncestor && /^H[1-6]$/i.test(blockAncestor.tagName)) {
+          const newRange = document.createRange();
+          newRange.setStartAfter(blockAncestor);
+          newRange.collapse(true);
+          range = newRange;
+        }
+
         // Delete any selected content first
         range.deleteContents();
         
@@ -618,6 +641,15 @@ const Toolbar: React.FC<ToolbarProps> = ({ onZoomChange, onStartSignature, onSub
         
         range.insertNode(fragment);
         
+        // If the browser placed a table inside a <p>, unwrap it by splitting the paragraph
+        const parentP = (range.commonAncestorContainer as Node).parentElement?.closest('p');
+        if (parentP && parentP.querySelector('table')) {
+          const tableEl = parentP.querySelector('table');
+          if (tableEl && parentP.parentElement) {
+            parentP.parentElement.insertBefore(tableEl, parentP.nextSibling);
+          }
+        }
+
         // Move cursor after the inserted content
         range.collapse(false);
         const selection = window.getSelection();
@@ -625,6 +657,8 @@ const Toolbar: React.FC<ToolbarProps> = ({ onZoomChange, onStartSignature, onSub
           selection.removeAllRanges();
           selection.addRange(range);
         }
+        // Dispatch input event so our React onInput handler captures the new HTML and state updates immediately
+        (editableParent as HTMLElement).dispatchEvent(new Event('input', { bubbles: true }));
         
         // Clear saved selection
         savedSelectionRef.current = null;
@@ -739,10 +773,15 @@ const Toolbar: React.FC<ToolbarProps> = ({ onZoomChange, onStartSignature, onSub
       
       {/* Document Actions */}
       <div className="group">
-        <button className="btn" title="Save Draft" onClick={() => onSave?.()}><SaveIcon size={18} /> Save</button>
-        <button className="btn" title="Preview PDF" onClick={() => onPreview?.()}><EyeIcon size={18} /> Preview</button>
-        <button className="btn" title="Generate PDF" onClick={() => onGeneratePDF?.()}><FileTextIcon size={18} /> Generate PDF</button>
-        <button className="btn" title="Submit for Approval" onClick={() => onSubmit?.()}>✅ Submit</button>
+        <button className="btn" aria-label="Save Draft" title="Save Draft" onClick={() => onSave?.()}><SaveIcon size={18} /></button>
+        <button className="btn" aria-label="Preview PDF" title="Preview PDF" onClick={() => onPreview?.()}><EyeIcon size={18} /></button>
+        <button className="btn" aria-label="Generate PDF" title="Generate PDF" onClick={() => onGeneratePDF?.()}><FileTextIcon size={18} /></button>
+        <button className="btn" title="Submit for Approval" aria-label="Submit for Approval" onClick={() => onSubmit?.()}>
+          <SendIcon size={18} />
+        </button>
+        <button className="btn" aria-label="Header settings" title="Header settings" onClick={() => onOpenHeaderSettings?.()}>
+          <Settings size={18} />
+        </button>
       </div>
       <div className="divider" />
 
@@ -823,14 +862,16 @@ const Toolbar: React.FC<ToolbarProps> = ({ onZoomChange, onStartSignature, onSub
             onStartSignature?.(r ?? null);
           }}
         >
-          Add E-Signature
+          <PenIcon size={18} />
         </button>
       </div>
       <div className="divider" />
 
       {/* Tables (Google Docs-like) */}
       <div className="group" style={{ position: 'relative' }}>
-        <button className="btn" title="Table" ref={(el)=>{/* attach for position */}} onClick={(e)=>openTableMenu(e.currentTarget)}>Table</button>
+        <button className="btn" aria-label="Insert table" title="Insert table" ref={(el)=>{/* attach for position */}} onClick={(e)=>openTableMenu(e.currentTarget)}>
+          <TableIcon size={18} />
+        </button>
         {showTableMenu && (
           <TableMenu x={tableMenuPos.x} y={tableMenuPos.y} onClose={()=>setShowTableMenu(false)} onInsert={insertSimpleTable} />
         )}
@@ -889,7 +930,7 @@ const TableMenu: React.FC<TableMenuProps> = ({ x, y, onInsert, onClose }) => {
     document.body
   );
 };/*---------- Layout Components ----------*/
-const Header: React.FC = () => (
+const Header: React.FC<{ headerEmail: string; headerSociety: string }> = ({ headerEmail, headerSociety }) => (
   <header id="page-header" className="flex-shrink-0 relative">
     {/* Vertical line extending from top to horizontal line */}
     <div className="header-vertical-rule border-pink-500"></div>
@@ -921,8 +962,8 @@ const Header: React.FC = () => (
           </div>
           <div className="flex items-center gap-2">
             <IconMail className="w-4 h-4 text-pink-500 flex-shrink-0" />
-            <a href="mailto:sites@uic.edu.ph" className="hover:underline text-pink-500">sites@uic.edu.ph</a>
-            <span className="text-pink-600 font-bold header-society whitespace-nowrap ml-6">Society of Information Technology Education Students</span>
+            <a href={`mailto:${headerEmail}`} className="hover:underline text-pink-500">{headerEmail}</a>
+            <span className="text-pink-600 font-bold header-society whitespace-nowrap ml-6">{headerSociety}</span>
           </div>
         </div>
       </div>
@@ -1384,15 +1425,17 @@ interface PageProps {
   onDeleteMember: (index: number) => void;
   showSignatories: boolean;
   signatoriesComponent: React.ReactNode;
+  headerEmail: string;
+  headerSociety: string;
 }
 
-const Page: React.FC<PageProps> = ({ children, pageIndex, totalPages, members, onAddMember, onDeleteMember, showSignatories, signatoriesComponent }) => {
+const Page: React.FC<PageProps> = ({ children, pageIndex, totalPages, members, onAddMember, onDeleteMember, showSignatories, signatoriesComponent, headerEmail, headerSociety }) => {
     const isFirstPage = pageIndex === 0;
     const useStandardFooter = isFirstPage;
 
     return (
         <div className="page">
-            {isFirstPage ? <Header /> : <SubsequentPageHeader />}
+            {isFirstPage ? <Header headerEmail={headerEmail} headerSociety={headerSociety} /> : <SubsequentPageHeader />}
             <main className="page-content">
                 <Sidebar 
                     isVisible={isFirstPage} 
@@ -1429,6 +1472,7 @@ const App: React.FC = () => {
   const page = usePage();
   // Expecting optional plan prop when editing/viewing a specific plan
   const plan: any = (page.props as any).plan ?? null;
+  const draftStorageKey = plan?.id ? `activity_plan_draft_${plan.id}` : 'activity_plan_draft_new';
   // PDF generation removed; drafts remain HTML-only
   // CSRF priming to avoid 419 on POST
   const [csrfReady, setCsrfReady] = useState(false);
@@ -1448,7 +1492,7 @@ const App: React.FC = () => {
     ensureCsrf().finally(() => setCsrfReady(true));
   }, [ensureCsrf]);
   const getInitialContent = () => `
-    <div style="text-align: left;" class="text-sm font-semibold">SEPTEMBER 22, 2025</div><br>
+    <div style="text-align: left;" class="text-sm font-semibold ap-date">SEPTEMBER 22, 2025</div><br>
     <h2 style="text-align: center;" class="text-2xl font-bold mb-4">ACTIVITY PLAN</h2>
     <h3 class="font-bold text-lg mb-2">I. NAME OF THE ACTIVITY:</h3><p class="ml-4">&lt;content&gt;</p><br>
     <h3 class="font-bold text-lg mb-2">II. RATIONALE:</h3><p class="ml-4 text-justify">&lt;content&gt;</p><br>
@@ -1485,6 +1529,10 @@ const App: React.FC = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  // Leave editor confirmation state
+  const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
+  const pendingNavRef = useRef<null | (() => void)>(null);
+  const allowNextNavRef = useRef(false);
   const [pendingSaveHtml, setPendingSaveHtml] = useState<string | null>(null);
   
   // PDF Preview & Generation States
@@ -1492,6 +1540,9 @@ const App: React.FC = () => {
   const [pdfPreviewUrl, setPdfPreviewUrl] = useState<string | null>(null);
   const [pdfGenerating, setPdfGenerating] = useState(false);
   const [pdfFilename, setPdfFilename] = useState<string | null>(null);
+  const [showPreviewSaveFirst, setShowPreviewSaveFirst] = useState(false);
+  const [showGenerateSaveFirst, setShowGenerateSaveFirst] = useState(false);
+  const [showPdfSuccess, setShowPdfSuccess] = useState(false);
   
   // TODO: Get these from backend/props based on user role and activity plan status
   const canSignAsPreparedBy = true; // Only the creator can sign
@@ -1520,6 +1571,205 @@ const App: React.FC = () => {
           [category]: prev[category].filter((_, i) => i !== index)
       }));
   };
+
+  // Header editable contact info (email and society name)
+  const [headerEmail, setHeaderEmail] = useState<string>('sites@uic.edu.ph');
+  const [headerSociety, setHeaderSociety] = useState<string>('Society of Information Technology Education Students');
+  const [isHeaderSettingsOpen, setIsHeaderSettingsOpen] = useState<boolean>(false);
+  const [isDataLoaded, setIsDataLoaded] = useState<boolean>(false);
+  const [lastSavedSnapshot, setLastSavedSnapshot] = useState<string | null>(null);
+  // Debounce a combined payload to trigger autosave after we have header states
+  const debouncedPayload = useDebounce(
+    { pages, members, signatories, signatures, headerEmail, headerSociety },
+    1500
+  );
+
+  // --- Utility: detect template-only vs meaningful content ---
+  const stripPlaceholders = useCallback((html?: string) => {
+    if (!html) return '';
+    const div = document.createElement('div');
+    div.innerHTML = html;
+    const decoded = div.textContent || '';
+    const patterns: RegExp[] = [
+      /SEPTEMBER\s+\d{1,2},\s*\d{4}/i,
+      /ACTIVITY\s+PLAN/i,
+      /I\.\s*NAME OF THE ACTIVITY:/i,
+      /II\.\s*RATIONALE:/i,
+      /III\.\s*DATE:/i,
+      /IV\.\s*SCHEDULE\/VENUE:/i,
+      /V\.\s*PROVISIONS:/i,
+      /VI\.\s*EVALUATION FORM:/i,
+      /<content>/i,
+      /content/i,
+    ];
+    let text = decoded;
+    patterns.forEach((re) => { text = text.replace(re, ' '); });
+    return text.replace(/\s+/g, ' ').trim();
+  }, []);
+  const hasMeaningfulUserText = useCallback((html?: string) => stripPlaceholders(html).length > 0, [stripPlaceholders]);
+
+  // Load persisted content (DB document_data or localStorage) on mount/plan change
+  useEffect(() => {
+    console.log('=== LOAD EFFECT TRIGGERED ===');
+    console.log('plan?.id:', plan?.id);
+    console.log('plan?.document_data:', plan?.document_data);
+    console.log('draftStorageKey:', draftStorageKey);
+    
+    try {
+      // If this is a brand new document (no plan ID), clear any old localStorage data
+      // to ensure we start fresh every time user clicks "Create Document"
+      if (!plan?.id) {
+        console.log('No plan ID - resetting to default state');
+        localStorage.removeItem(draftStorageKey);
+        // Reset to default state
+        setPages([getInitialContent()]);
+        setMembers([]);
+        setSignatories({
+          "Prepared by:": [],
+          "Noted by:": [
+            { name: "MRS. ANAFLOR E. SACOPAYO, MBA", position: "Director of Student Affairs and Discipline" },
+          ],
+          "Approved by:": [
+            { name: "DR. AVEENIR B. DAYAGANON", position: "Vice President for Academics" },
+          ]
+        });
+        setSignatures([]);
+        setHeaderEmail('sites@uic.edu.ph');
+        setHeaderSociety('Society of Information Technology Education Students');
+        setIsDataLoaded(true);
+        return; // Don't try to load anything
+      }
+
+      // For existing documents (with plan ID), try to load saved data
+      let loaded: any = null;
+      
+      // First, check if there's pending draft data from a fresh save (before redirect)
+      const pendingRaw = localStorage.getItem('activity_plan_draft_pending');
+      if (pendingRaw) {
+        console.log('Found pending draft data');
+        try {
+          loaded = JSON.parse(pendingRaw);
+          // Clear the pending draft since we're loading it now
+          localStorage.removeItem('activity_plan_draft_pending');
+          console.log('Loaded pending draft data after redirect');
+        } catch (e) {
+          console.error('Failed to parse pending draft:', e);
+        }
+      }
+      
+      // Load both DB and localStorage if present, then choose best
+      let dbLoaded: any = null;
+      if (plan?.document_data) {
+        console.log('Loading from plan.document_data');
+        try {
+          dbLoaded = typeof plan.document_data === 'string' ? JSON.parse(plan.document_data) : plan.document_data;
+          console.log('Loaded from document_data:', dbLoaded);
+        } catch (e) {
+          console.error('Failed to parse document_data:', e);
+        }
+      }
+      let lsLoaded: any = null;
+      console.log('Checking localStorage key:', draftStorageKey);
+      const raw = localStorage.getItem(draftStorageKey);
+      if (raw) {
+        console.log('Found localStorage data');
+        try { lsLoaded = JSON.parse(raw); } catch (e) { console.error('localStorage parse error:', e); }
+      }
+
+      if (!loaded) {
+        // Decide which to use
+        const dbHas = Array.isArray(dbLoaded?.pages) && dbLoaded.pages.some((p: string) => hasMeaningfulUserText(p));
+        const lsHas = Array.isArray(lsLoaded?.pages) && lsLoaded.pages.some((p: string) => hasMeaningfulUserText(p));
+        if (dbHas && lsHas) {
+          // Prefer the most recent using timestamp if both meaningful
+          const dbTs = dbLoaded?.timestamp ? Date.parse(dbLoaded.timestamp) : 0;
+          const lsTs = lsLoaded?.timestamp ? Date.parse(lsLoaded.timestamp) : 0;
+          loaded = dbTs >= lsTs ? dbLoaded : lsLoaded;
+        } else if (dbHas) {
+          loaded = dbLoaded;
+        } else if (lsHas) {
+          loaded = lsLoaded;
+        } else {
+          // If neither has meaningful content but one exists, fall back to DB first
+          loaded = dbLoaded ?? lsLoaded;
+        }
+      }
+      
+      if (loaded) {
+        console.log('Restoring state from loaded data...');
+        console.log('Loaded pages:', loaded.pages);
+        if (Array.isArray(loaded.pages) && loaded.pages.length > 0) {
+          setPages(loaded.pages);
+        } else if (typeof loaded.html === 'string' && loaded.html.trim()) {
+          setPages([loaded.html]);
+        }
+        if (Array.isArray(loaded.members)) setMembers(loaded.members);
+        if (loaded.signatories && typeof loaded.signatories === 'object') setSignatories(loaded.signatories);
+        if (Array.isArray(loaded.signatures)) setSignatures(loaded.signatures);
+        if (typeof loaded.headerEmail === 'string') setHeaderEmail(loaded.headerEmail);
+        if (typeof loaded.headerSociety === 'string') setHeaderSociety(loaded.headerSociety);
+        try { setLastSavedSnapshot(JSON.stringify({
+          pages: loaded.pages,
+          members: loaded.members,
+          signatories: loaded.signatories,
+          signatures: loaded.signatures,
+          headerEmail: loaded.headerEmail,
+          headerSociety: loaded.headerSociety,
+        })); } catch {}
+      } else {
+        console.log('No data to load - using defaults');
+      }
+      setIsDataLoaded(true);
+    } catch (e) {
+      console.error('Load effect error:', e);
+      setIsDataLoaded(true);
+      // no-op
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [plan?.id, plan?.document_data]);
+
+  // Auto-save pending draft data to database after redirect
+  useEffect(() => {
+    const savePendingDraft = async () => {
+      // Only run if we have a plan ID, data is loaded, and we have actual content to save
+      if (!plan?.id || !isDataLoaded || isSaving) return;
+      
+      // Check if we have pending draft data (from first-time save redirect)
+      const hasPendingDraft = localStorage.getItem('activity_plan_draft_pending');
+      
+      // Only auto-save if there was pending draft data from a redirect
+      if (!hasPendingDraft) {
+        console.log('No pending draft - skipping auto-save');
+        return;
+      }
+      
+      // Check if pages have actual content (not just the template)
+      const hasContent = pages.some(page => {
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = page;
+        const text = tempDiv.textContent || '';
+        // Check if there's content beyond the template placeholders
+        return text.trim().length > 0 && !text.includes('<content>');
+      });
+      
+      // Also check if we have any members or modified signatories
+      const hasMembers = members.length > 0;
+      const hasModifiedSignatories = 
+        signatories["Prepared by:"].length > 0 ||
+        signatories["Noted by:"].length !== 1 || // Default has 1
+        signatories["Approved by:"].length !== 1; // Default has 1
+      
+      // If there's any user-entered content and we haven't saved yet, save immediately
+      if ((hasContent || hasMembers || hasModifiedSignatories) && !lastSaved) {
+        console.log('Auto-saving pending draft to database...');
+        await handleSaveDraft();
+      }
+    };
+    
+    // Small delay to ensure state is fully updated after load
+    const timer = setTimeout(savePendingDraft, 500);
+    return () => clearTimeout(timer);
+  }, [plan?.id, isDataLoaded, pages, members, signatories, lastSaved, isSaving]);
 
   const handleAddSignature = (role: 'prepared_by' | 'dean') => {
     setSignatureRole(role);
@@ -1692,7 +1942,7 @@ const App: React.FC = () => {
   // Handle PDF Preview
   const handlePreviewPDF = async () => {
     if (!plan?.id) {
-      alert('Please save your draft first before previewing. Click the "Save Draft" button to save your document.');
+      setShowPreviewSaveFirst(true);
       return;
     }
 
@@ -1737,7 +1987,7 @@ const App: React.FC = () => {
   // Handle PDF Generation
   const handleGeneratePDF = async () => {
     if (!plan?.id) {
-      alert('Please save your draft first before generating PDF. Click the "Save Draft" button to save your document.');
+      setShowGenerateSaveFirst(true);
       return;
     }
 
@@ -1767,7 +2017,7 @@ const App: React.FC = () => {
       );
 
       if (response.data.success) {
-        alert('PDF generated successfully!');
+        setShowPdfSuccess(true);
         // Optionally download the PDF
         window.open(response.data.pdf_url, '_blank');
       } else {
@@ -1830,6 +2080,25 @@ const App: React.FC = () => {
       
       // If no plan exists, create a draft first using Inertia
       if (!plan?.id) {
+        // IMPORTANT: Save current state to localStorage BEFORE creating draft
+        // so it persists through the redirect to the new plan page
+        const draftData = {
+          pages,
+          members,
+          signatories,
+          signatures,
+          headerEmail,
+          headerSociety,
+          timestamp: new Date().toISOString(),
+        };
+        
+        // Save to a temporary key that will be picked up after redirect
+        try {
+          localStorage.setItem('activity_plan_draft_pending', JSON.stringify(draftData));
+        } catch (e) {
+          console.error('Failed to save draft to localStorage:', e);
+        }
+        
         router.post('/student/requests/activity-plan/create-draft', {
           category: 'normal'
         }, {
@@ -1838,6 +2107,7 @@ const App: React.FC = () => {
           onSuccess: () => {
             // Will redirect to the new plan page with saved draft
             console.log('Draft created successfully');
+            toast.success('Draft created');
           },
           onError: (errors) => {
             console.error('Failed to create draft:', errors);
@@ -1851,18 +2121,21 @@ const App: React.FC = () => {
       // Save the current state to database
       const html = captureDocumentHTML();
       
-      // Prepare the data to save
+      // Prepare the data to save (excluding HTML to avoid duplication)
       const draftData = {
-        html,
         pages,
         members,
         signatories,
         signatures,
+        headerEmail,
+        headerSociety,
         timestamp: new Date().toISOString(),
       };
       
       // Save to database via API
       console.log('Saving document for plan ID:', plan.id);
+      console.log('Current pages state:', pages);
+      console.log('Draft data being saved:', draftData);
       const response = await axios.post(
         `/student/requests/activity-plan/${plan.id}/save-document`,
         {
@@ -1880,20 +2153,37 @@ const App: React.FC = () => {
 
       if (response.data.success) {
         // Also store in localStorage as backup
-        localStorage.setItem(`activity_plan_draft_${plan.id}`, JSON.stringify(draftData));
+        localStorage.setItem(draftStorageKey, JSON.stringify(draftData));
+
+        // Show toast only the first time the user successfully saves
+        if (!lastSaved) {
+          toast.success('Draft saved');
+        }
 
         setLastSaved(new Date());
         setHasUnsavedChanges(false);
 
-        // Show success message briefly (draft saved)
-        const notification = document.createElement('div');
-        notification.className = 'fixed top-4 right-4 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg z-50 animate-fade-in';
-        notification.textContent = '✓ Draft saved successfully';
-        document.body.appendChild(notification);
+  try { setLastSavedSnapshot(JSON.stringify(draftData)); } catch {}
 
-        setTimeout(() => {
-          notification.remove();
-        }, 2000);
+        // If the server returned updated document_data, hydrate immediately to avoid flicker/stale placeholders
+        if (response.data.document_data) {
+          try {
+            const serverData = typeof response.data.document_data === 'string' ? JSON.parse(response.data.document_data) : response.data.document_data;
+            if (serverData && Array.isArray(serverData.pages)) {
+              setPages(serverData.pages);
+            }
+            if (Array.isArray(serverData.members)) setMembers(serverData.members);
+            if (serverData.signatories) setSignatories(serverData.signatories);
+            if (Array.isArray(serverData.signatures)) setSignatures(serverData.signatures);
+            if (typeof serverData.headerEmail === 'string') setHeaderEmail(serverData.headerEmail);
+            if (typeof serverData.headerSociety === 'string') setHeaderSociety(serverData.headerSociety);
+          } catch (e) {
+            // ignore parse errors, fall back to reload
+          }
+        }
+
+        // Still issue a minimal reload for plan prop to keep props consistent
+        router.reload({ only: ['plan'] });
       } else {
         throw new Error(response.data.message || 'Failed to save document');
       }
@@ -1905,6 +2195,46 @@ const App: React.FC = () => {
       setIsSaving(false);
     }
   };
+
+  // Silent autosave (no toast, no reload)
+  const handleAutoSave = useCallback(async () => {
+    if (!plan?.id || isSaving) return;
+    setIsSaving(true);
+    try {
+      const csrfToken = getCsrfMetaToken();
+      const html = captureDocumentHTML();
+      const draftData = {
+        pages,
+        members,
+        signatories,
+        signatures,
+        headerEmail,
+        headerSociety,
+        timestamp: new Date().toISOString(),
+      };
+      const response = await axios.post(
+        `/student/requests/activity-plan/${plan.id}/save-document`,
+        { document_html: html, document_data: JSON.stringify(draftData) },
+        { headers: { 'X-CSRF-TOKEN': csrfToken, 'Content-Type': 'application/json' } }
+      );
+      if (response.data?.success) {
+        localStorage.setItem(draftStorageKey, JSON.stringify(draftData));
+        setLastSaved(new Date());
+        setHasUnsavedChanges(false);
+        try { setLastSavedSnapshot(JSON.stringify(draftData)); } catch {}
+        if (response.data.document_data) {
+          try {
+            const serverData = typeof response.data.document_data === 'string' ? JSON.parse(response.data.document_data) : response.data.document_data;
+            if (serverData && Array.isArray(serverData.pages)) setPages(serverData.pages);
+          } catch {}
+        }
+      }
+    } catch (e) {
+      // Silent failure—defer to next autosave/explicit save
+    } finally {
+      setIsSaving(false);
+    }
+  }, [plan?.id, isSaving, pages, members, signatories, signatures, headerEmail, headerSociety, draftStorageKey]);
 
   // Mark as having unsaved changes when content changes
   useEffect(() => {
@@ -1926,7 +2256,85 @@ const App: React.FC = () => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [pages, members, signatories, signatures, plan?.id, isSaving]);
 
+  // Warn on hard navigation (reload/close/tab navigation)
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (!hasUnsavedChanges) return;
+      e.preventDefault();
+      e.returnValue = '';
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [hasUnsavedChanges]);
+
+  // Intercept Inertia navigations while there are unsaved changes
+  useEffect(() => {
+    const onInertiaBefore = (event: any) => {
+      // Allow the immediately next navigation if we've explicitly confirmed
+      if (allowNextNavRef.current) {
+        allowNextNavRef.current = false;
+        return;
+      }
+      if (!hasUnsavedChanges) return;
+      // Cancel this visit and ask the user
+      if (event?.preventDefault) event.preventDefault();
+      const url = event?.detail?.visit?.url || event?.detail?.url || null;
+      const method = (event?.detail?.visit?.method || 'get').toLowerCase();
+      pendingNavRef.current = () => {
+        allowNextNavRef.current = true;
+        if (url) {
+          Inertia.visit(url, { method: method as any });
+        }
+      };
+      setShowLeaveConfirm(true);
+    };
+    document.addEventListener('inertia:before', onInertiaBefore as any);
+    return () => document.removeEventListener('inertia:before', onInertiaBefore as any);
+  }, [hasUnsavedChanges]);
+
   // Removed autosave/draft tracking
+  // Lightweight autosave to localStorage so content survives navigation without explicit save
+  useEffect(() => {
+    // Don't autosave to localStorage until data is loaded
+    if (!isDataLoaded) return;
+    
+    const toSave = {
+      html: undefined, // keep light; full HTML captured only on explicit save
+      pages: debouncedPages,
+      members,
+      signatories,
+      signatures,
+      headerEmail,
+      headerSociety,
+      timestamp: new Date().toISOString(),
+    };
+    try {
+      localStorage.setItem(draftStorageKey, JSON.stringify(toSave));
+    } catch (e) {
+      // storage might be full/blocked; ignore silently
+    }
+  }, [debouncedPages, members, signatories, signatures, headerEmail, headerSociety, draftStorageKey, isDataLoaded]);
+
+  // Debounced autosave to server: user shouldn’t need to press Save Draft to persist text
+  useEffect(() => {
+    if (!plan?.id || !isDataLoaded || isSaving) return;
+    const currentSnapshot = JSON.stringify({
+      pages: debouncedPayload.pages,
+      members: debouncedPayload.members,
+      signatories: debouncedPayload.signatories,
+      signatures: debouncedPayload.signatures,
+      headerEmail: debouncedPayload.headerEmail,
+      headerSociety: debouncedPayload.headerSociety,
+    });
+    // Only autosave if something really changed since last save
+    if (lastSavedSnapshot === currentSnapshot) return;
+    // Only autosave when we detect meaningful content or meta changes (members/signatories/header)
+    const hasMeaningful = Array.isArray(debouncedPayload.pages) && debouncedPayload.pages.some((p) => hasMeaningfulUserText(p));
+    const metaChanged = true; // members/signatories/header are part of snapshot comparison above
+    if (hasMeaningful || metaChanged) {
+      handleAutoSave();
+    }
+  }, [debouncedPayload, plan?.id, isDataLoaded, isSaving, lastSavedSnapshot, hasMeaningfulUserText, handleAutoSave]);
 
   useEffect(() => {
     const measureContentHeight = (pageSelector: string) => {
@@ -1985,9 +2393,11 @@ const App: React.FC = () => {
       if (measureElement.scrollHeight > (maxContentHeight - HEIGHT_BUFFER)) {
         const overflowingNode = currentPageNodes.pop() as HTMLElement | ChildNode | undefined;
         const baseContentHtml = currentPageNodes.map((n: any) => (n as any).outerHTML || n.textContent).join('');
-        const isElement = !!(overflowingNode && (overflowingNode as any).nodeType === Node.ELEMENT_NODE);
-        const tagName = isElement ? (overflowingNode as HTMLElement).tagName?.toLowerCase() : '';
-        const isAtomicBlock = tagName === 'table' || tagName === 'ul' || tagName === 'ol';
+    const isElement = !!(overflowingNode && (overflowingNode as any).nodeType === Node.ELEMENT_NODE);
+    const tagName = isElement ? (overflowingNode as HTMLElement).tagName?.toLowerCase() : '';
+    // Treat tables, lists, and any element containing a table as atomic (do not split)
+    const containsTable = isElement && !!(overflowingNode as HTMLElement).querySelector?.('table');
+    const isAtomicBlock = tagName === 'table' || tagName === 'ul' || tagName === 'ol' || containsTable;
         const isSplittable = isElement && !isAtomicBlock && (overflowingNode as any).textContent && (overflowingNode as any).textContent.includes(' ');
 
         if (isSplittable) {
@@ -2060,10 +2470,13 @@ const App: React.FC = () => {
   }, [layoutHeights, signatoriesHeight, signatories]); 
 
   useEffect(() => {
-    calculateAndSetPages(debouncedPages);
-  }, [debouncedPages, calculateAndSetPages]);
+    if (isDataLoaded) {
+      calculateAndSetPages(debouncedPages);
+    }
+  }, [debouncedPages, calculateAndSetPages, isDataLoaded]);
   
   const handleContentChange = (index: number, newHtml: string) => {
+    console.log(`Content changed for page ${index}:`, newHtml.substring(0, 200) + '...');
     const selection = window.getSelection();
     if (selection && selection.rangeCount > 0) {
       const range = selection.getRangeAt(0);
@@ -2081,6 +2494,7 @@ const App: React.FC = () => {
     tempPages[index] = newHtml;
     setPages(tempPages);
     setActivePageIndex(index);
+    setHasUnsavedChanges(true);
   };
 
   useLayoutEffect(() => {
@@ -2161,7 +2575,14 @@ const App: React.FC = () => {
       {/* Back button only; header removed */}
       <div className="no-print px-6 pt-6">
         <button
-          onClick={() => router.get('/student/requests/activity-plan')}
+          onClick={() => {
+            if (hasUnsavedChanges) {
+              pendingNavRef.current = () => router.get('/student/requests/activity-plan');
+              setShowLeaveConfirm(true);
+            } else {
+              router.get('/student/requests/activity-plan');
+            }
+          }}
           className="inline-flex items-center gap-2 text-sm text-gray-600 hover:text-red-600 transition"
           aria-label="Back to Activity Requests"
         >
@@ -2171,6 +2592,7 @@ const App: React.FC = () => {
           Back to Activity Requests
         </button>
       </div>
+      {/* Hidden measurement pages (no-print) */}
       <div className="no-print" style={{ position: 'absolute', left: '-9999px', visibility: 'hidden', pointerEvents: 'none' }}>
         <div id="measure-page-1">
           <Page 
@@ -2181,6 +2603,8 @@ const App: React.FC = () => {
             onDeleteMember={() => {}}
             showSignatories={false}
             signatoriesComponent={<div />}
+            headerEmail={headerEmail}
+            headerSociety={headerSociety}
           >
             <div />
           </Page>
@@ -2194,6 +2618,8 @@ const App: React.FC = () => {
             onDeleteMember={() => {}}
             showSignatories={false}
             signatoriesComponent={<div />}
+            headerEmail={headerEmail}
+            headerSociety={headerSociety}
           >
             <div />
           </Page>
@@ -2210,12 +2636,14 @@ const App: React.FC = () => {
       
       <div ref={pageContainerRef} className="App">
     <GlobalStyles />
+  {/* Header settings UI moved to toolbar modal */}
   <Toolbar 
     onZoomChange={setZoomScale} 
     onStartSignature={(range)=>handleToolbarStartSignature(range)}
     onSave={handleSaveDraft}
     onPreview={handlePreviewPDF}
     onGeneratePDF={handleGeneratePDF}
+    onOpenHeaderSettings={() => setIsHeaderSettingsOpen(true)}
     onSubmit={() => {
       // Show confirmation modal instead of submitting directly
       setShowSubmissionModal(true);
@@ -2241,6 +2669,8 @@ const App: React.FC = () => {
                         onSignatureMove={handleSignatureMove}
                     />
                   }
+                  headerEmail={headerEmail}
+                  headerSociety={headerSociety}
                 >
                   {activePageIndex === index ? (
                     <EditableContent id={`editable-content-page-${index}`} html={pageHtml} onContentChange={(newHtml) => handleContentChange(index, newHtml)} />
@@ -2287,6 +2717,62 @@ const App: React.FC = () => {
         onDownload={handleDownloadPdf}
         isLoading={pdfGenerating}
         title="Activity Plan Preview"
+      />
+
+      {/* Header Settings Modal */}
+      <HeaderSettingsModal
+        isOpen={isHeaderSettingsOpen}
+        headerEmail={headerEmail}
+        headerSociety={headerSociety}
+        onChangeEmail={setHeaderEmail}
+        onChangeSociety={setHeaderSociety}
+        onClose={() => setIsHeaderSettingsOpen(false)}
+      />
+
+      {/* Small info modals */}
+      <InfoModal
+        open={showPreviewSaveFirst}
+        onClose={() => setShowPreviewSaveFirst(false)}
+        variant="warning"
+        title="Save draft required"
+        message={
+          <span>
+            Please save your draft first before previewing. Click the <span className="font-semibold">Save Draft</span> button to save your document.
+          </span>
+        }
+      />
+      <InfoModal
+        open={showGenerateSaveFirst}
+        onClose={() => setShowGenerateSaveFirst(false)}
+        variant="warning"
+        title="Save draft required"
+        message={
+          <span>
+            Please save your draft first before generating PDF. Click the <span className="font-semibold">Save Draft</span> button to save your document.
+          </span>
+        }
+      />
+      <InfoModal
+        open={showPdfSuccess}
+        onClose={() => setShowPdfSuccess(false)}
+        variant="success"
+        title="PDF generated successfully!"
+        message="Your PDF has been generated. You can download it from the opened tab."
+      />
+
+      <UnsavedChangesModal
+        open={showLeaveConfirm}
+        onCancel={() => {
+          setShowLeaveConfirm(false);
+          pendingNavRef.current = null;
+        }}
+        onExit={() => {
+          setShowLeaveConfirm(false);
+          const go = pendingNavRef.current;
+          pendingNavRef.current = null;
+          allowNextNavRef.current = true;
+          if (go) go();
+        }}
       />
       </div>
     </MainLayout>

@@ -1,9 +1,10 @@
 import MainLayout from '@/layouts/mainlayout';
-import { usePage, router } from '@inertiajs/react';
+import { usePage } from '@inertiajs/react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Calendar, Briefcase, Building2, Clock, ChevronDown, ChevronUp, Hourglass, BadgeCheck, CircleX, UserCheck2, UserX2 } from 'lucide-react';
 import { formatDateShort } from '@/lib/utils';
 import { useState } from 'react';
+import { useInertiaSubmit } from '@/hooks/useInertiaSubmit';
 
 type RequestUser = {
   id: number;
@@ -34,9 +35,10 @@ export default function RoleRequests() {
   const { requests } = usePage().props as any;
   const items: RequestItem[] = requests?.data ?? [];
   const [expandedId, setExpandedId] = useState<number | null>(null);
+  const { submit } = useInertiaSubmit();
 
-  const process = (id: number, action: 'approve' | 'reject') => {
-    router.patch(`/admin/role-requests/${id}`, { action }, {
+  const process = async (id: number, action: 'approve' | 'reject') => {
+    await submit('patch', `/admin/role-requests/${id}`, { action }, {
       preserveScroll: true,
     });
   };

@@ -254,8 +254,13 @@ class ActivityPlanController extends Controller
             ->where('user_id', Auth::id())
             ->firstOrFail();
 
+        $planData = $plan->toArray();
+        
+        // Explicitly set document_data from currentFile to ensure it's available
+        $planData['document_data'] = $plan->currentFile?->document_data;
+
         return inertia('student/ActivityPlan', [
-            'plan' => $plan,
+            'plan' => $planData,
         ]);
     }
 
@@ -561,44 +566,158 @@ class ActivityPlanController extends Controller
 
             Log::info('Starting document save', ['plan_id' => $plan->id, 'user_id' => Auth::id()]);
 
-            // Create filename
-            $filename = 'activity_plan_' . $plan->id . '_' . date('Y-m-d_His') . '.html';
-            $path = 'activity_plans/' . $filename;
+            // Prepare incoming document_data as array for sanity checks
+            $incomingDataRaw = $validated['document_data'] ?? null;
+            $incomingData = null;
+            if (is_string($incomingDataRaw) && strlen($incomingDataRaw) > 0) {
+                try {
+                    $incomingData = json_decode($incomingDataRaw, true, 512, JSON_THROW_ON_ERROR);
+                } catch (\Throwable $e) {
+                    Log::warning('Incoming document_data is not valid JSON; storing raw string', ['error' => $e->getMessage()]);
+                }
+            }
 
-            // Store HTML file
-            Storage::disk('public')->put($path, $validated['document_html']);
-            Log::info('HTML file stored', ['path' => $path]);
+            // Helper closures
+            $stripPlaceholders = function (?string $html): string {
+                if (!$html) return '';
+                // Decode entities and strip tags
+                $decoded = html_entity_decode($html, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+                $text = strip_tags($decoded);
+                // Remove well-known static headings and placeholders to detect user-entered content
+                $patterns = [
+                    '/SEPTEMBER\s+\d{1,2},\s*\d{4}/i',
+                    '/ACTIVITY\s+PLAN/i',
+                    '/I\.\s*NAME OF THE ACTIVITY:/i',
+                    '/II\.\s*RATIONALE:/i',
+                    '/III\.\s*DATE:/i',
+                    '/IV\.\s*SCHEDULE\/VENUE:/i',
+                    '/V\.\s*PROVISIONS:/i',
+                    '/VI\.\s*EVALUATION FORM:/i',
+                    '/<content>/i',
+                    '/content/i',
+                ];
+                $clean = preg_replace($patterns, ' ', $text);
+                return trim(preg_replace('/\s+/', ' ', $clean ?? ''));
+            };
+            $hasMeaningfulUserText = function (?string $html) use ($stripPlaceholders): bool {
+                return strlen($stripPlaceholders($html)) > 0;
+            };
 
-            // Get file size
-            $fileSize = Storage::disk('public')->size($path);
-            Log::info('File size calculated', ['size' => $fileSize]);
+            // Check if there's already a current file for this plan
+            $existingFile = $plan->currentFile;
 
-            // Create file record in activity_plan_files
-            $file = \App\Models\ActivityPlanFile::create([
-                'activity_plan_id' => $plan->id,
-                'file_name' => $filename,
-                'file_path' => $path,
-                'file_type' => 'text/html',
-                'file_size' => $fileSize,
-                'uploaded_at' => now(),
-            ]);
-            Log::info('File record created', ['file_id' => $file->id]);
+            if ($existingFile) {
+                // UPDATE existing file record
+                Log::info('Updating existing file', ['file_id' => $existingFile->id]);
 
-            // Update plan to reference this file as current
-            $updateResult = $plan->update([
-                'current_file_id' => $file->id,
-            ]);
-            Log::info('Plan update attempted', [
-                'result' => $updateResult,
-                'current_file_id' => $file->id,
-                'plan_id' => $plan->id
-            ]);
+                // Delete old HTML file if it exists
+                if (Storage::disk('public')->exists($existingFile->file_path)) {
+                    Storage::disk('public')->delete($existingFile->file_path);
+                    Log::info('Deleted old HTML file', ['path' => $existingFile->file_path]);
+                }
 
-            // Refresh the model to verify the update
+                // Create new filename with timestamp
+                $filename = 'activity_plan_' . $plan->id . '_' . date('Y-m-d_His') . '.html';
+                $path = 'activity_plans/' . $filename;
+
+                // Store new HTML file
+                Storage::disk('public')->put($path, $validated['document_html']);
+                Log::info('New HTML file stored', ['path' => $path]);
+
+                // Get file size
+                $fileSize = Storage::disk('public')->size($path);
+
+                // Merge-protect document_data: avoid overwriting user content with placeholders
+                $finalDocData = $validated['document_data'] ?? $existingFile->document_data;
+                if ($incomingData !== null) {
+                    $currentData = null;
+                    try {
+                        $currentData = $existingFile->document_data ? json_decode($existingFile->document_data, true) : null;
+                    } catch (\Throwable $e) {
+                        $currentData = null;
+                    }
+
+                    if (is_array($currentData) && isset($currentData['pages']) && is_array($currentData['pages']) && isset($incomingData['pages']) && is_array($incomingData['pages'])) {
+                        $mergedPages = $incomingData['pages'];
+                        $modified = false;
+                        $max = max(count($currentData['pages']), count($incomingData['pages']));
+                        for ($i = 0; $i < $max; $i++) {
+                            $newPage = $incomingData['pages'][$i] ?? '';
+                            $oldPage = $currentData['pages'][$i] ?? '';
+                            $newHas = $hasMeaningfulUserText($newPage);
+                            $oldHas = $hasMeaningfulUserText($oldPage);
+                            // If new page looks like template-only but old had content, keep old to protect against unintended overwrite
+                            if (!$newHas && $oldHas) {
+                                $mergedPages[$i] = $oldPage;
+                                $modified = true;
+                            }
+                        }
+                        if ($modified) {
+                            $incomingData['pages'] = $mergedPages;
+                        }
+                    }
+                    // Use the (possibly merged) incoming data as JSON
+                    try {
+                        $finalDocData = json_encode($incomingData, JSON_UNESCAPED_UNICODE);
+                    } catch (\Throwable $e) {
+                        // fallback to raw
+                        $finalDocData = $validated['document_data'] ?? $existingFile->document_data;
+                    }
+                }
+
+                // Update the existing file record
+                $existingFile->update([
+                    'file_name' => $filename,
+                    'file_path' => $path,
+                    'file_size' => $fileSize,
+                    'uploaded_at' => now(),
+                    'document_data' => $finalDocData,
+                ]);
+
+                $file = $existingFile;
+                Log::info('File record updated', ['file_id' => $file->id]);
+
+            } else {
+                // CREATE new file record (first save)
+                Log::info('Creating new file record (first save)');
+
+                $filename = 'activity_plan_' . $plan->id . '_' . date('Y-m-d_His') . '.html';
+                $path = 'activity_plans/' . $filename;
+
+                // Store HTML file
+                Storage::disk('public')->put($path, $validated['document_html']);
+                Log::info('HTML file stored', ['path' => $path]);
+
+                // Get file size
+                $fileSize = Storage::disk('public')->size($path);
+                Log::info('File size calculated', ['size' => $fileSize]);
+
+                // Create file record in activity_plan_files
+                $file = \App\Models\ActivityPlanFile::create([
+                    'activity_plan_id' => $plan->id,
+                    'file_name' => $filename,
+                    'file_path' => $path,
+                    'file_type' => 'text/html',
+                    'file_size' => $fileSize,
+                    'uploaded_at' => now(),
+                    'document_data' => $validated['document_data'],
+                ]);
+                Log::info('File record created', ['file_id' => $file->id]);
+
+                // Update plan to reference this file as current
+                $updateResult = $plan->update([
+                    'current_file_id' => $file->id,
+                ]);
+                Log::info('Plan updated with new file', [
+                    'result' => $updateResult,
+                    'current_file_id' => $file->id,
+                ]);
+            }
+
+            // Refresh the model to verify
             $plan->refresh();
             Log::info('Plan refreshed', [
                 'current_file_id' => $plan->current_file_id,
-                'pdf_path' => $plan->pdf_path
             ]);
 
             DB::commit();
@@ -610,6 +729,8 @@ class ActivityPlanController extends Controller
                 'file_id' => $file->id,
                 'file_path' => $path,
                 'current_file_id' => $plan->current_file_id,
+                // return back the persisted document_data so the client can sync immediately
+                'document_data' => $file->document_data,
             ]);
 
         } catch (\Exception $e) {

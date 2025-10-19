@@ -87,7 +87,7 @@ export default function Revision({ revisions = [] }: RevisionProps) {
             Revision Requests
           </h1>
           <p className="text-gray-600 text-base">
-            These requests need your attention:
+            These requests need your attention
           </p>
         </motion.div>
 

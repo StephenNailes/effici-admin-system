@@ -13,6 +13,7 @@ class ActivityPlanFile extends Model
         'file_type',
         'file_size',
         'uploaded_at',
+        'document_data',
     ];
 
     public function activityPlan()

@@ -71,8 +71,8 @@ export default function ActivityRequests() {
 
         {/* Stat Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-          <StatCard icon={<FileText className="text-blue-600" />} label="Total Act. Requests" value={counts.total} color="bg-blue-50" delay={0.00} />
-          <StatCard icon={<Clock className="text-orange-600" />} label="Pending Act. Requests" value={counts.pending} color="bg-orange-50" delay={0.05} />
+          <StatCard icon={<FileText className="text-blue-600" />} label="Total Requests" value={counts.total} color="bg-blue-50" delay={0.00} />
+          <StatCard icon={<Clock className="text-orange-600" />} label="Pending Requests" value={counts.pending} color="bg-orange-50" delay={0.05} />
           <StatCard icon={<CheckCircle2 className="text-green-600" />} label="Approved" value={counts.approved} color="bg-green-50" delay={0.10} />
           <StatCard icon={<Pencil className="text-rose-600" />} label="Needs Revision" value={counts.needsRevision} color="bg-rose-50" delay={0.15} />
         </div>
