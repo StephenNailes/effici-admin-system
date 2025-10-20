@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
 use App\Models\RequestApproval;
 use App\Models\ActivityPlan;
 use App\Models\User;
@@ -26,12 +28,33 @@ class NotificationController extends Controller
      */
     public function index(Request $request)
     {
+        $startTime = microtime(true);
         $user = Auth::user();
         $perPage = (int) $request->get('per_page', 10);
         $page = (int) $request->get('page', 1);
 
-        $result = $this->notificationService->getForUserPaginated($user->id, $perPage, $page);
-        $unreadCount = $this->notificationService->getUnreadCount($user->id);
+        // Create cache key based on user ID, page, and perPage
+        $cacheKey = "notif:u{$user->id}:p{$page}:{$perPage}";
+        
+        // Use file cache store for faster performance, cache for 2 seconds only
+        $cacheStart = microtime(true);
+        $result = Cache::store('file')->remember($cacheKey, 2, function () use ($user, $perPage, $page) {
+            $queryStart = microtime(true);
+            $result = $this->notificationService->getForUserPaginated($user->id, $perPage, $page);
+            $queryTime = (microtime(true) - $queryStart) * 1000;
+            Log::info("📊 Notification query took: {$queryTime}ms");
+            return $result;
+        });
+        $cacheTime = (microtime(true) - $cacheStart) * 1000;
+        
+        // Cache unread count separately with same TTL
+        $unreadCountKey = "notif:u{$user->id}:count";
+        $unreadCount = Cache::store('file')->remember($unreadCountKey, 2, function () use ($user) {
+            return $this->notificationService->getUnreadCount($user->id);
+        });
+
+        $totalTime = (microtime(true) - $startTime) * 1000;
+        Log::info("⏱️ Total notification fetch: {$totalTime}ms (cache: {$cacheTime}ms)");
 
         return response()->json([
             'notifications' => $result['data'],
@@ -50,6 +73,8 @@ class NotificationController extends Controller
         $success = $this->notificationService->markAsRead($id, $user->id);
         
         if ($success) {
+            // Clear the cache for this user when notifications are marked as read
+            $this->clearUserNotificationCache($user->id);
             return response()->json(['success' => true]);
         }
         
@@ -65,6 +90,9 @@ class NotificationController extends Controller
         
         $updated = $this->notificationService->markAllAsRead($user->id);
         
+        // Clear the cache for this user
+        $this->clearUserNotificationCache($user->id);
+        
         return response()->json(['success' => true, 'marked_count' => $updated]);
     }
 
@@ -74,7 +102,12 @@ class NotificationController extends Controller
     public function getUnreadCount()
     {
         $user = Auth::user();
-        $count = $this->notificationService->getUnreadCount($user->id);
+        
+        // Cache the unread count with same key as index method, use file cache
+        $cacheKey = "notif:u{$user->id}:count";
+        $count = Cache::store('file')->remember($cacheKey, 2, function () use ($user) {
+            return $this->notificationService->getUnreadCount($user->id);
+        });
             
         return response()->json(['unread_count' => $count]);
     }
@@ -89,10 +122,31 @@ class NotificationController extends Controller
         $success = $this->notificationService->deleteNotification($id, $user->id);
         
         if ($success) {
+            // Clear the cache for this user
+            $this->clearUserNotificationCache($user->id);
             return response()->json(['success' => true]);
         }
         
         return response()->json(['success' => false, 'message' => 'Notification not found'], 404);
+    }
+
+    /**
+     * Clear all notification cache entries for a user
+     */
+    private function clearUserNotificationCache($userId)
+    {
+        // Use file cache store with shorter keys
+        $fileCache = Cache::store('file');
+        
+        // Clear unread count cache
+        $fileCache->forget("notif:u{$userId}:count");
+        
+        // Clear paginated notification caches (clear up to 5 pages - reduced from 10)
+        for ($page = 1; $page <= 5; $page++) {
+            foreach ([10, 20] as $perPage) { // Reduced from [10, 20, 50]
+                $fileCache->forget("notif:u{$userId}:p{$page}:{$perPage}");
+            }
+        }
     }
 
     /**

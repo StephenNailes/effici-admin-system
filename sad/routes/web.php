@@ -323,11 +323,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     // Notification API
     Route::prefix('api/notifications')->group(function () {
-        Route::get('/', [App\Http\Controllers\NotificationController::class, 'index']);
+        // Limit to 20 requests per minute to prevent excessive polling
+        Route::get('/', [App\Http\Controllers\NotificationController::class, 'index'])->middleware('throttle:20,1');
         Route::post('/{id}/read', [App\Http\Controllers\NotificationController::class, 'markAsRead'])->middleware('throttle:30,1');
         Route::delete('/{id}', [App\Http\Controllers\NotificationController::class, 'delete']);
         Route::post('/mark-all-read', [App\Http\Controllers\NotificationController::class, 'markAllAsRead'])->middleware('throttle:6,1');
-        Route::get('/unread-count', [App\Http\Controllers\NotificationController::class, 'getUnreadCount'])->middleware('throttle:12,1');
+        Route::get('/unread-count', [App\Http\Controllers\NotificationController::class, 'getUnreadCount'])->middleware('throttle:20,1');
     });
 });
 

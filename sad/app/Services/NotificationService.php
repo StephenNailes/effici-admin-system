@@ -6,6 +6,7 @@ use App\Models\Notification;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Cache;
 
 class NotificationService
 {
@@ -14,7 +15,7 @@ class NotificationService
      */
     public function create(array $data): Notification
     {
-        return Notification::create([
+        $notification = Notification::create([
             'user_id' => $data['user_id'],
             'type' => $data['type'],
             'title' => $data['title'],
@@ -23,6 +24,9 @@ class NotificationService
             'action_url' => $data['action_url'] ?? null,
             'priority' => $data['priority'] ?? 'normal'
         ]);
+        // Invalidate caches for this user so new notifications appear immediately
+        $this->clearUserNotificationCache((int)$data['user_id']);
+        return $notification;
     }
 
     /**
@@ -131,22 +135,24 @@ class NotificationService
             : "/admin/requests";
 
         // Generate appropriate title and message based on priority
+        // Humanize the request type for messages
+        $humanType = str_replace('_', ' ', (string) $requestType);
         switch ($priority) {
             case 'urgent':
                 $title = $requestType === 'activity_plan' ? '🚨 URGENT: Activity Plan Request' : '🚨 URGENT: Equipment Request';
-                $message = "URGENT REQUEST: {$studentName} submitted a {$requestType} request requiring immediate attention";
+                $message = "URGENT REQUEST: {$studentName} submitted a {$humanType} request requiring immediate attention";
                 break;
             case 'high':
                 $title = $requestType === 'activity_plan' ? '⚡ HIGH: Activity Plan Request' : '⚡ HIGH: Equipment Request';
-                $message = "HIGH PRIORITY: {$studentName} submitted a {$requestType} request";
+                $message = "HIGH PRIORITY: {$studentName} submitted a {$humanType} request";
                 break;
             case 'low':
                 $title = $requestType === 'activity_plan' ? 'Activity Plan Request' : 'Equipment Request';
-                $message = "{$studentName} submitted a {$requestType} request (low priority)";
+                $message = "{$studentName} submitted a {$humanType} request (low priority)";
                 break;
             default: // normal
                 $title = $requestType === 'activity_plan' ? 'New Activity Plan Request' : 'New Equipment Request';
-                $message = "{$studentName} submitted a new {$requestType} request for review";
+                $message = "{$studentName} submitted a new {$humanType} request for review";
                 break;
         }
 
@@ -259,7 +265,10 @@ class NotificationService
      */
     public function getUnreadCount($userId): int
     {
-        return Notification::forUser($userId)->unread()->count();
+        // Use simple count query without loading full models
+        return Notification::where('user_id', $userId)
+            ->whereNull('read_at')
+            ->count();
     }
 
     /**
@@ -268,6 +277,7 @@ class NotificationService
     public function getForUser($userId, $limit = 10, $offset = 0)
     {
         return Notification::forUser($userId)
+            ->select(['id', 'type', 'title', 'message', 'data', 'action_url', 'priority', 'read_at', 'created_at'])
             ->orderBy('created_at', 'desc')
             ->limit($limit)
             ->offset($offset)
@@ -293,24 +303,31 @@ class NotificationService
      */
     public function getForUserPaginated($userId, $perPage = 10, $page = 1): array
     {
-        $paginator = Notification::forUser($userId)
+        // Optimize query by selecting only needed columns and using direct array mapping
+        $paginator = Notification::where('user_id', $userId)
+            ->select(['id', 'type', 'title', 'message', 'data', 'action_url', 'priority', 'read_at', 'created_at'])
             ->orderBy('created_at', 'desc')
             ->paginate($perPage, ['*'], 'page', $page);
 
-        $data = collect($paginator->items())->map(function ($notification) {
-            return [
+        // Use toArray() directly instead of collect()->map() for better performance
+        $data = [];
+        foreach ($paginator->items() as $notification) {
+            $createdAt = $notification->created_at;
+            $priorityRaw = is_string($notification->priority) ? strtolower(trim($notification->priority)) : ($notification->priority ?? 'normal');
+            $priority = in_array($priorityRaw, ['low', 'normal', 'high', 'urgent']) ? $priorityRaw : 'normal';
+            $data[] = [
                 'id' => $notification->id,
                 'type' => $notification->type,
                 'title' => $notification->title,
                 'message' => $notification->message,
                 'data' => $notification->data,
                 'action_url' => $notification->action_url,
-                'priority' => $notification->priority,
-                'is_read' => $notification->isRead(),
-                'time_ago' => $notification->time_ago,
-                'created_at' => $notification->created_at->toISOString()
+                'priority' => $priority,
+                'is_read' => !is_null($notification->read_at),
+                'time_ago' => $createdAt->diffForHumans(),
+                'created_at' => $createdAt->toISOString()
             ];
-        })->all();
+        }
 
         return [
             'data' => $data,
@@ -334,6 +351,7 @@ class NotificationService
 
         if ($notification) {
             $notification->markAsRead();
+            $this->clearUserNotificationCache((int)$userId);
             return true;
         }
 
@@ -345,9 +363,13 @@ class NotificationService
      */
     public function markAllAsRead($userId): int
     {
-        return Notification::forUser($userId)
+        $updated = Notification::forUser($userId)
             ->unread()
             ->update(['read_at' => now()]);
+        if ($updated > 0) {
+            $this->clearUserNotificationCache((int)$userId);
+        }
+        return $updated;
     }
 
     /**
@@ -361,10 +383,28 @@ class NotificationService
 
         if ($notification) {
             $notification->delete();
+            $this->clearUserNotificationCache((int)$userId);
             return true;
         }
 
         return false;
+    }
+
+    /**
+     * Clear paginated and counter caches for a specific user.
+     * Mirrors controller cache keys but kept lightweight.
+     */
+    private function clearUserNotificationCache(int $userId): void
+    {
+        $fileCache = Cache::store('file');
+        // Count
+        $fileCache->forget("notif:u{$userId}:count");
+        // A few pages with common perPage sizes
+        for ($page = 1; $page <= 5; $page++) {
+            foreach ([10, 20] as $perPage) {
+                $fileCache->forget("notif:u{$userId}:p{$page}:{$perPage}");
+            }
+        }
     }
 
     /**

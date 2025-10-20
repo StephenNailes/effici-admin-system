@@ -3,8 +3,9 @@ import { createPortal } from 'react-dom';
 import { FaBell, FaTimes, FaCheck, FaExclamationTriangle, FaTrash } from 'react-icons/fa';
 // Removed lucide-react icons to simplify and avoid unused imports
 import { router } from '@inertiajs/react';
-import axios from 'axios';
+import { toast } from 'react-toastify';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useNotifications } from '@/contexts/NotificationContext';
 
 interface NotificationData {
   id: number;
@@ -27,11 +28,20 @@ interface NotificationPanelProps {
 }
 
 export default function NotificationPanel({ className = '', onOpen, isOpen: externalIsOpen, onClose }: NotificationPanelProps) {
-  const [notifications, setNotifications] = useState<NotificationData[]>([]);
-  const [unreadCount, setUnreadCount] = useState(0);
   const [internalIsOpen, setInternalIsOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
+
+  // Use shared notification context
+  const { 
+    notifications, 
+    unreadCount, 
+    markAsRead, 
+    markAllAsRead: contextMarkAllAsRead, 
+    deleteNotification,
+    fetchedAt,
+    fetchNotifications,
+  } = useNotifications();
 
   // Remove emoji characters for cleaner, icon-driven UI (no emoji)
   const stripEmoji = (input: string) => {
@@ -48,122 +58,38 @@ export default function NotificationPanel({ className = '', onOpen, isOpen: exte
   // Debug: Track isOpen changes
   useEffect(() => {
     console.log('NotificationPanel - isOpen changed to:', isOpen);
-  }, [isOpen]);
-
-  // Fetch notifications on component mount and periodically
-  useEffect(() => {
-    fetchNotifications();
-    
-    // Poll for new notifications every 30 seconds
-    const interval = setInterval(fetchNotifications, 30000);
-    
-    // Refresh notifications when page becomes visible (handles navigation back)
-    const handleVisibilityChange = () => {
-      if (!document.hidden) {
-        fetchNotifications();
-      }
-    };
-    
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    
-    return () => {
-      clearInterval(interval);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-    };
-  }, []);
-
-  // Handle click outside to close notification panel
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      // Find the notification panel element
-      const notificationPanel = document.querySelector('[data-notification-panel]');
-      const notificationButton = document.querySelector('[data-notification-button]');
-      
-      if (notificationPanel && notificationButton) {
-        // Don't close if clicking on the panel or button
-        if (notificationPanel.contains(event.target as Node) || 
-            notificationButton.contains(event.target as Node)) {
-          return;
-        }
-        setIsOpen(false);
-      }
-    };
-
+    if (isOpen && fetchedAt) {
+      // Log how long it took since fetch to reflect in the panel
+      const elapsedMs = Date.now() - fetchedAt;
+      const secs = (elapsedMs / 1000).toFixed(2);
+      const mins = (elapsedMs / 1000 / 60).toFixed(2);
+      console.log(`🕒 Notifications reflected in panel after ${secs}s (~${mins}m) from fetch.`);
+    }
+    // Guard: when opening, refresh if we have no data or it's stale (>15s)
     if (isOpen) {
-      // Use a small delay to avoid immediate closure
-      setTimeout(() => {
-        document.addEventListener('mousedown', handleClickOutside);
-      }, 100);
+      const stale = !fetchedAt || (Date.now() - fetchedAt > 15000);
+      const empty = !notifications || notifications.length === 0;
+      if (stale || empty) {
+        console.log('🔄 Refreshing notifications on open', { stale, empty });
+        fetchNotifications(true);
+      }
     }
-
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
   }, [isOpen]);
-
-  const fetchNotifications = async () => {
-    try {
-      // The axios interceptor will automatically add CSRF token and headers
-      const response = await axios.get('/api/notifications');
-      setNotifications(response.data.notifications || []);
-      setUnreadCount(response.data.unread_count || 0);
-    } catch (error) {
-      console.error('Error fetching notifications:', error);
-    }
-  };
 
   // Filter urgent and high priority notifications for urgent section
   const urgentNotifications = notifications.filter(n => (n.priority === 'urgent' || n.priority === 'high') && !n.is_read);
-  const regularNotifications = notifications.filter(n => (n.priority === 'normal' || n.priority === 'low') || n.is_read);
+  // Include notifications with unknown/null priority as regular so they remain visible
+  const regularNotifications = notifications.filter(n => !(n.priority === 'urgent' || n.priority === 'high') || n.is_read);
 
-  const markAsRead = async (notificationId: number) => {
-    try {
-      // The axios interceptor will automatically add CSRF token
-      const response = await axios.post(`/api/notifications/${notificationId}/read`);
-      
-      if (response.data.success) {
-        setNotifications(prev => prev.map(n => 
-          n.id === notificationId ? { ...n, is_read: true } : n
-        ));
-        setUnreadCount(prev => Math.max(0, prev - 1));
-      }
-    } catch (error) {
-      console.error('Error marking notification as read:', error);
-    }
-  };
-
-  const markAllAsRead = async () => {
+  const handleMarkAllAsRead = async () => {
     try {
       setLoading(true);
-      // The axios interceptor will automatically add CSRF token
-      const response = await axios.post('/api/notifications/mark-all-read');
-      
-      if (response.data.success) {
-        setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
-        setUnreadCount(0);
-      }
+      await contextMarkAllAsRead();
     } catch (error) {
       console.error('Error marking all notifications as read:', error);
-      // Optionally show a user-friendly error message
       alert('Failed to mark notifications as read. Please try again.');
     } finally {
       setLoading(false);
-    }
-  };  const deleteNotification = async (notificationId: number) => {
-    try {
-      // The axios interceptor will automatically add CSRF token
-      const response = await axios.delete(`/api/notifications/${notificationId}`);
-      
-      if (response.data.success) {
-        setNotifications(prev => prev.filter(n => n.id !== notificationId));
-        // Update unread count if the deleted notification was unread
-        const deletedNotification = notifications.find(n => n.id === notificationId);
-        if (deletedNotification && !deletedNotification.is_read) {
-          setUnreadCount(prev => Math.max(0, prev - 1));
-        }
-      }
-    } catch (error) {
-      console.error('Error deleting notification:', error);
     }
   };
 
@@ -425,7 +351,7 @@ export default function NotificationPanel({ className = '', onOpen, isOpen: exte
           {(urgentNotifications.length > 0 || regularNotifications.length > 0) && unreadCount > 0 && (
             <div className="px-4 py-3 border-t border-gray-200 bg-gray-50">
               <button
-                onClick={markAllAsRead}
+                onClick={handleMarkAllAsRead}
                 disabled={loading}
                 className="w-full text-sm text-gray-600 hover:text-gray-800 disabled:opacity-50 transition"
               >

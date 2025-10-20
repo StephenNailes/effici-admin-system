@@ -5,6 +5,7 @@ import { Download, Maximize2, Check, X, ArrowLeft, Users, PenTool, Save, Trash2,
 import axios from "axios";
 import { router } from "@inertiajs/react";
 import PDFPreviewModal from "@/components/PDFPreviewModal";
+import { toast } from 'react-toastify';
 import ReactSignatureCanvas from 'react-signature-canvas';
 
 interface Props {
@@ -76,7 +77,8 @@ export default function ActivityPlanApproval({ id }: Props) {
           'Content-Type': 'application/json'
         }
       });
-      router.visit('/dean/requests');
+  toast.success('Activity plan approved.');
+  router.visit('/dean/requests');
     } catch (err) {
       console.error('Error approving activity plan:', err);
     } finally {
@@ -271,7 +273,8 @@ export default function ActivityPlanApproval({ id }: Props) {
           'Content-Type': 'application/json'
         }
       });
-      router.visit('/dean/requests');
+  toast.info('Revision requested for this activity plan.');
+  router.visit('/dean/requests');
     } catch (err) {
       console.error('Error requesting revision:', err);
     } finally {

@@ -2,7 +2,8 @@ import React from 'react';
 import MainLayout from '@/layouts/mainlayout';
 import { router, usePage } from '@inertiajs/react';
 import { motion } from 'framer-motion';
-import { FileText, Clock, CheckCircle2, Pencil, ChevronLeft, ChevronRight, Eye, Edit } from 'lucide-react';
+import { FileText, Clock, CheckCircle2, Pencil, ChevronLeft, ChevronRight, Eye, Edit, AlertTriangle } from 'lucide-react';
+import InfoModal from '@/components/InfoModal';
 
 interface PlanSummary {
   id: number;
@@ -67,6 +68,8 @@ export default function ActivityRequests() {
   const handleEdit = (planId: number) => {
     router.get(`/student/requests/activity-plan/${planId}`);
   };
+  const [guardOpen, setGuardOpen] = React.useState(false);
+  const [guardMessage, setGuardMessage] = React.useState<React.ReactNode>('');
 
   const getStatusColor = (status: string) => {
     const colors: Record<string, string> = {
@@ -236,7 +239,27 @@ export default function ActivityRequests() {
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: idx * 0.05 }}
                   className="group text-left"
-                  onClick={() => router.get(`/student/requests/activity-plan/${doc.id}`)}
+                  onClick={() => {
+                    if (doc.status === 'pending') {
+                      setGuardMessage(
+                        <span>
+                         The activity plan is currently under review by the admin. You cannot edit this file unless you are asked to make revisions.
+                        </span>
+                      );
+                      setGuardOpen(true);
+                      return;
+                    }
+                    if (doc.status === 'approved') {
+                      setGuardMessage(
+                        <span>
+                         The activity plan has been approved and is currently being implemented. Editing is disabled for approved files.
+                        </span>
+                      );
+                      setGuardOpen(true);
+                      return;
+                    }
+                    router.get(`/student/requests/activity-plan/${doc.id}`);
+                  }}
                 >
                   <img
                     src={`/student/requests/activity-plan/${doc.id}/thumbnail`}
@@ -254,13 +277,25 @@ export default function ActivityRequests() {
                   </div>
                   <div className="mt-2">
                     <div className="text-sm font-medium text-gray-800 truncate">{`Document #${doc.id}`}</div>
-                    <div className="text-xs text-gray-500">{doc.status}</div>
+                    <div className="text-xs text-gray-500">
+                      <span className={`px-2 py-0.5 rounded-full font-medium ${getStatusColor(doc.status)}`}>
+                        {getStatusLabel(doc.status)}
+                      </span>
+                    </div>
                   </div>
                 </motion.button>
               ))}
             </div>
           )}
         </div>
+        {/* Guard modal */}
+        <InfoModal
+          open={guardOpen}
+          onClose={() => setGuardOpen(false)}
+          variant="warning"
+          title="Action blocked"
+          message={guardMessage}
+        />
       </div>
     </MainLayout>
   );

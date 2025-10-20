@@ -290,6 +290,26 @@ class ApprovalController extends Controller
                             'created_at' => now(),
                             'updated_at' => now(),
                         ]);
+
+                        // Notify deans that a plan needs final approval (forwarded)
+                        try {
+                            // Get student full name and plan priority/category
+                            $student = DB::table('users')->select('first_name','last_name')->where('id', $studentId)->first();
+                            $planMeta = DB::table('activity_plans')->select('category')->where('id', $ra->request_id)->first();
+                            $studentName = $student ? trim(($student->first_name ?? '') . ' ' . ($student->last_name ?? '')) : 'Student';
+                            $priorityMap = [ 'minor' => 'low', 'normal' => 'normal', 'urgent' => 'urgent' ];
+                            $priority = isset($planMeta->category) ? ($priorityMap[$planMeta->category] ?? 'normal') : 'normal';
+                            // Broadcast to all dean users
+                            $this->notificationService->notifyNewRequest(
+                                'dean',
+                                $studentName,
+                                'activity_plan',
+                                $ra->request_id,
+                                $priority
+                            );
+                        } catch (\Throwable $e) {
+                            Log::warning('Failed to notify dean about forwarded activity plan: ' . $e->getMessage());
+                        }
                     }
 
                     // Notify student that admin assistant approved their activity plan (still needs dean approval)

@@ -5,6 +5,7 @@ import { Download, Maximize2, Check, X, ArrowLeft, Users } from "lucide-react";
 import axios from "axios";
 import { router } from "@inertiajs/react";
 import PDFPreviewModal from "@/components/PDFPreviewModal";
+import { toast } from 'react-toastify';
 
 interface Props {
   id: string;
@@ -37,7 +38,8 @@ export default function ActivityPlanApproval({ id }: Props) {
         withCredentials: true,
         headers: { 'X-Requested-With': 'XMLHttpRequest' }
       });
-      router.visit('/admin/requests');
+  toast.success('Forwarded to Dean for final approval.');
+  router.visit('/admin/requests');
     } catch (err) {
       console.error('Error approving activity plan:', err);
     } finally {
@@ -52,7 +54,8 @@ export default function ActivityPlanApproval({ id }: Props) {
         withCredentials: true,
         headers: { 'X-Requested-With': 'XMLHttpRequest' }
       });
-      router.visit('/admin/requests');
+  toast.info('Revision requested for this activity plan.');
+  router.visit('/admin/requests');
     } catch (err) {
       console.error('Error requesting revision:', err);
     } finally {

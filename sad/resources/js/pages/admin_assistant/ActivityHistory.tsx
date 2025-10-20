@@ -193,7 +193,7 @@ export default function ActivityHistory() {
       })
       .then((data) => {
         // Map API response to table format
-        const mapped = (data.requests || []).map((item: any) => {
+  const mapped = (data.requests || []).map((item: any) => {
           let status = "-";
           if (item.request_type === "equipment") {
             // Prioritize equipment_status, fallback to approval_status
@@ -241,6 +241,12 @@ export default function ActivityHistory() {
             }
             console.log("Normalized activity status:", status);
           }
+          // Compute clean category/purpose
+          const categoryPurpose = item.request_type === 'activity_plan'
+            ? (item.activity_category || '-')
+            : item.request_type === 'role_update'
+              ? (item.activity_category || '-')
+              : (item.equipment_purpose || '-');
           return {
             id: item.request_id || item.approval_id || item.id,
             student: item.student_name || "-",
@@ -250,13 +256,8 @@ export default function ActivityHistory() {
                 ? "Role Update"
                 : "Equipment",
             dateSubmitted: item.submitted_at ? item.submitted_at.slice(0, 10) : "-",
-            category:
-              item.request_type === "activity_plan"
-                ? item.activity_category || "-"
-                : item.request_type === "role_update"
-                  ? item.activity_category || "-" // activity_category holds requested_role for role_update
-                  : item.equipment_purpose || "-",
-            priority: item.priority || null,
+            category: categoryPurpose,
+            priority: (item.priority || null),
             status,
             approverRole: item.approver_role ? item.approver_role.replace('_', ' ').split(' ').map((word: string) => word.charAt(0).toUpperCase() + word.slice(1)).join(' ') : null,
             approverName: item.approver_name || null,
@@ -522,28 +523,28 @@ export default function ActivityHistory() {
                       <td className="py-3 px-6">{activity.type}</td>
                       <td className="py-3 px-6">{activity.dateSubmitted}</td>
                       <td className="py-3 px-6">
-                        {activity.type === "Role Update" && activity.category?.toLowerCase() === "student_officer" ? (
-                          <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-blue-100 text-blue-700 text-xs font-semibold whitespace-nowrap">
-                            Student Officer
-                          </span>
+                        {activity.type === "Role Update" && (activity.category || '').toLowerCase() === "student_officer" ? (
+                          <span className="text-gray-400">-</span>
                         ) : (
                           activity.category
                         )}
                       </td>
                       <td className="py-3 px-6">
                         {(() => {
-                          let p = (activity.category || '').toString();
-                          // Attempt to derive priority if available on mapped data
                           const raw = (activity.priority || '').toString().toLowerCase();
-                          const val = raw || (p.includes('High') ? 'high' : p.includes('Urgent') ? 'urgent' : p.includes('Normal') ? 'normal' : '');
+                          const val = raw === 'minor' ? 'low' : raw; // normalize minor->low if present
                           if (!val) return <span className="text-gray-400">-</span>;
+                          const pillBase = 'inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-semibold';
                           if (val === 'urgent' || val === 'high') {
-                            return <span className="px-2 py-1 rounded text-xs font-semibold bg-red-100 text-red-800">Urgent</span>;
-                          } else if (val === 'normal') {
-                            return <span className="px-2 py-1 rounded text-xs font-semibold bg-blue-100 text-blue-800">Normal</span>;
-                          } else {
-                            return <span className="px-2 py-1 rounded text-xs font-semibold bg-green-100 text-green-800">{val.charAt(0).toUpperCase() + val.slice(1)}</span>;
+                            return <span className={`${pillBase} bg-red-100 text-red-700`}>Urgent</span>;
                           }
+                          if (val === 'normal') {
+                            return <span className={`${pillBase} bg-blue-100 text-blue-700`}>Normal</span>;
+                          }
+                          if (val === 'low' || val === 'minor') {
+                            return <span className={`${pillBase} bg-gray-100 text-gray-700`}>Minor</span>;
+                          }
+                          return <span className={`${pillBase} bg-gray-100 text-gray-700`}>{val.charAt(0).toUpperCase() + val.slice(1)}</span>;
                         })()}
                       </td>
                       <td className="py-3 px-6">

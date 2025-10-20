@@ -193,7 +193,7 @@ export default function ActivityHistory() {
       })
       .then((data) => {
         // Map API response to table format
-        const mapped = (data.requests || []).map((item: any) => {
+  const mapped = (data.requests || []).map((item: any) => {
           let status = "-";
           if (item.request_type === "equipment") {
             const possibleStatuses = [
@@ -233,6 +233,11 @@ export default function ActivityHistory() {
                 .join(' ');
             }
           }
+          const categoryPurpose = item.request_type === 'activity_plan'
+            ? (item.activity_category || '-')
+            : item.request_type === 'role_update'
+              ? (item.activity_category || '-')
+              : (item.equipment_purpose || '-');
           return {
             id: item.request_id || item.approval_id || item.id,
             student: item.student_name || "-",
@@ -242,12 +247,7 @@ export default function ActivityHistory() {
                 ? "Role Update"
                 : "Equipment",
             dateSubmitted: item.submitted_at ? item.submitted_at.slice(0, 10) : "-",
-            category:
-              item.request_type === "activity_plan"
-                ? item.activity_category || "-"
-                : item.request_type === "role_update"
-                  ? item.activity_category || "-" // activity_category holds requested_role for role_update
-                  : item.equipment_purpose || "-",
+            category: categoryPurpose,
             status,
             approverRole: item.approver_role ? item.approver_role.replace('_', ' ').split(' ').map((word: string) => word.charAt(0).toUpperCase() + word.slice(1)).join(' ') : null,
             approverName: item.approver_name || null,

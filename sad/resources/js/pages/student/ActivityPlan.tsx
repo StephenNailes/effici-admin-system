@@ -1473,6 +1473,7 @@ const App: React.FC = () => {
   const page = usePage();
   // Expecting optional plan prop when editing/viewing a specific plan
   const plan: any = (page.props as any).plan ?? null;
+  const planStatus: string | null = plan?.status ?? null;
   const revisionRemarks: string | null = (page.props as any).revisionRemarks ?? null;
   const draftStorageKey = plan?.id ? `activity_plan_draft_${plan.id}` : 'activity_plan_draft_new';
   // PDF generation removed; drafts remain HTML-only
@@ -1545,6 +1546,14 @@ const App: React.FC = () => {
   const [showPreviewSaveFirst, setShowPreviewSaveFirst] = useState(false);
   const [showGenerateSaveFirst, setShowGenerateSaveFirst] = useState(false);
   const [showPdfSuccess, setShowPdfSuccess] = useState(false);
+  // Read-only & status guard modals
+  const isReadOnly = planStatus === 'pending' || planStatus === 'approved';
+  const [showStatusGuard, setShowStatusGuard] = useState<boolean>(false);
+  useEffect(() => {
+    if (planStatus === 'pending' || planStatus === 'approved') {
+      setShowStatusGuard(true);
+    }
+  }, [planStatus]);
   
   // TODO: Get these from backend/props based on user role and activity plan status
   const canSignAsPreparedBy = true; // Only the creator can sign
@@ -2780,18 +2789,20 @@ const App: React.FC = () => {
       <div ref={pageContainerRef} className="App">
     <GlobalStyles />
   {/* Header settings UI moved to toolbar modal */}
-  <Toolbar 
-    onZoomChange={setZoomScale} 
-    onStartSignature={(range)=>handleToolbarStartSignature(range)}
-    onSave={handleSaveDraft}
-    onPreview={handlePreviewPDF}
-    onGeneratePDF={handleGeneratePDF}
-    onOpenHeaderSettings={() => setIsHeaderSettingsOpen(true)}
-    onSubmit={() => {
-      // Show confirmation modal instead of submitting directly
-      setShowSubmissionModal(true);
-    }}
-  />
+  {!isReadOnly && (
+    <Toolbar 
+      onZoomChange={setZoomScale} 
+      onStartSignature={(range)=>handleToolbarStartSignature(range)}
+      onSave={handleSaveDraft}
+      onPreview={handlePreviewPDF}
+      onGeneratePDF={handleGeneratePDF}
+      onOpenHeaderSettings={() => setIsHeaderSettingsOpen(true)}
+      onSubmit={() => {
+        // Show confirmation modal instead of submitting directly
+        setShowSubmissionModal(true);
+      }}
+    />
+  )}
         <div className="pages-viewport">
           <div className="pages-scale-wrapper" style={{ transform: `scale(${zoomScale})` }}>
             {pages.map((pageHtml, index) => (
@@ -2815,7 +2826,9 @@ const App: React.FC = () => {
                   headerEmail={headerEmail}
                   headerSociety={headerSociety}
                 >
-                  {activePageIndex === index ? (
+                  {isReadOnly ? (
+                    <div className="static-content" dangerouslySetInnerHTML={{ __html: pageHtml }} />
+                  ) : activePageIndex === index ? (
                     <EditableContent id={`editable-content-page-${index}`} html={pageHtml} onContentChange={(newHtml) => handleContentChange(index, newHtml)} />
                   ) : (
                     <div className="static-content" onClick={() => setActivePageIndex(index)} dangerouslySetInnerHTML={{ __html: pageHtml }} />
@@ -2901,6 +2914,27 @@ const App: React.FC = () => {
         variant="success"
         title="PDF generated successfully!"
         message="Your PDF has been generated. You can download it from the opened tab."
+      />
+
+      {/* Status Guard Modal for pending/approved */}
+      <InfoModal
+        open={showStatusGuard}
+        onClose={() => setShowStatusGuard(false)}
+        variant="warning"
+        title={planStatus === 'pending' ? 'Editing Disabled' : 'Activity Plan Locked'}
+        message={
+          planStatus === 'pending'
+            ? (
+              <span>
+                The current activity plan is being reviewed by the admin. You cannot edit the file unless asked to revise.
+              </span>
+            )
+            : (
+              <span>
+                The activity plan has been approved. This activity is currently being implemented, therefore you cannot make any further changes to the file.
+              </span>
+            )
+        }
       />
 
       <UnsavedChangesModal

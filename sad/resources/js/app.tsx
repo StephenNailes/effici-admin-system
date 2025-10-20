@@ -9,6 +9,7 @@ import { ToastContainer } from 'react-toastify';
 import axios from 'axios';
 import { installAxiosCsrf } from './lib/csrf';
 import 'react-toastify/dist/ReactToastify.css';
+import { NotificationProvider } from './contexts/NotificationContext';
 const appName = import.meta.env.VITE_APP_NAME || 'EfficiAdmin';
 
 // Configure axios and CSRF protection globally 
@@ -20,22 +21,25 @@ createInertiaApp({
     setup({ el, App, props }) {
         const root = createRoot(el);
 
-                    root.render(<>
-                        <App {...props} />
-                        <ToastContainer
-                            position="top-right"
-                            autoClose={3000}
-                            hideProgressBar={false}
-                            newestOnTop={false}
-                            closeOnClick
-                            rtl={false}
-                            pauseOnFocusLoss
-                            draggable
-                            pauseOnHover
-                            theme="colored"
-                            aria-label="Notification"
-                        />
-                    </>);
+                    const isAuthenticated = Boolean((props as any)?.initialPage?.props?.auth?.user);
+                    root.render(
+                        <NotificationProvider isAuthenticated={isAuthenticated}>
+                            <App {...props} />
+                            <ToastContainer
+                                position="top-right"
+                                autoClose={3000}
+                                hideProgressBar={false}
+                                newestOnTop={false}
+                                closeOnClick
+                                rtl={false}
+                                pauseOnFocusLoss
+                                draggable
+                                pauseOnHover
+                                theme="colored"
+                                aria-label="Notification"
+                            />
+                        </NotificationProvider>
+                    );
     },
     progress: {
         color: '#4B5563',
