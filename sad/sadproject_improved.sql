@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Oct 16, 2025 at 08:20 PM
+-- Generation Time: Oct 20, 2025 at 06:40 PM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -30,11 +30,29 @@ SET time_zone = "+00:00";
 CREATE TABLE `activity_plans` (
   `id` bigint(20) UNSIGNED NOT NULL,
   `user_id` bigint(20) UNSIGNED NOT NULL,
-  `category` enum('minor','normal','urgent') NOT NULL DEFAULT 'normal',
+  `category` enum('low','medium','high') DEFAULT 'medium',
   `status` enum('draft','pending','under_revision','approved','completed') NOT NULL DEFAULT 'draft',
   `current_file_id` bigint(20) UNSIGNED DEFAULT NULL,
+  `pdf_path` varchar(500) DEFAULT NULL,
   `created_at` timestamp NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `activity_plan_dean_signatures`
+--
+
+CREATE TABLE `activity_plan_dean_signatures` (
+  `id` bigint(20) UNSIGNED NOT NULL,
+  `activity_plan_id` bigint(20) UNSIGNED NOT NULL,
+  `dean_id` bigint(20) UNSIGNED NOT NULL,
+  `signature_data` text NOT NULL,
+  `position_x` decimal(8,2) NOT NULL,
+  `position_y` decimal(8,2) NOT NULL,
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
@@ -50,26 +68,10 @@ CREATE TABLE `activity_plan_files` (
   `file_path` varchar(500) NOT NULL,
   `file_type` varchar(100) DEFAULT NULL,
   `file_size` bigint(20) UNSIGNED DEFAULT NULL,
+  `document_data` mediumtext DEFAULT NULL,
   `uploaded_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `created_at` timestamp NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
--- --------------------------------------------------------
-
---
--- Table structure for table `activity_plan_signatures`
---
-
-CREATE TABLE `activity_plan_signatures` (
-  `id` bigint(20) UNSIGNED NOT NULL,
-  `activity_plan_id` bigint(20) UNSIGNED NOT NULL,
-  `user_id` bigint(20) UNSIGNED NOT NULL,
-  `signer_role` enum('prepared_by','dean') NOT NULL COMMENT 'Role of the person signing',
-  `signature_data` text NOT NULL COMMENT 'Base64 encoded signature image',
-  `signed_at` timestamp NOT NULL DEFAULT current_timestamp(),
-  `created_at` timestamp NULL DEFAULT NULL,
-  `updated_at` timestamp NULL DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
@@ -106,10 +108,12 @@ CREATE TABLE `cache` (
 --
 
 INSERT INTO `cache` (`key`, `value`, `expiration`) VALUES
-('efficiadmin_cache_5c785c036466adea360111aa28563bfd556b5fba', 'i:1;', 1760624277),
-('efficiadmin_cache_5c785c036466adea360111aa28563bfd556b5fba:timer', 'i:1760624277;', 1760624277),
-('efficiadmin_cache_9a79be611e0267e1d943da0737c6c51be67865a0', 'i:1;', 1760189769),
-('efficiadmin_cache_9a79be611e0267e1d943da0737c6c51be67865a0:timer', 'i:1760189769;', 1760189769);
+('efficiadmin_cache_5c785c036466adea360111aa28563bfd556b5fba', 'i:2;', 1760975402),
+('efficiadmin_cache_5c785c036466adea360111aa28563bfd556b5fba:timer', 'i:1760975402;', 1760975402),
+('efficiadmin_cache_7224f997fc148baa0b7f81c1eda6fcc3fd003db0', 'i:5;', 1760978490),
+('efficiadmin_cache_7224f997fc148baa0b7f81c1eda6fcc3fd003db0:timer', 'i:1760978490;', 1760978490),
+('efficiadmin_cache_dbc0f004854457f59fb16ab863a3a1722cef553f', 'i:2;', 1760975409),
+('efficiadmin_cache_dbc0f004854457f59fb16ab863a3a1722cef553f:timer', 'i:1760975409;', 1760975409);
 
 -- --------------------------------------------------------
 
@@ -178,10 +182,10 @@ CREATE TABLE `equipment` (
 --
 
 INSERT INTO `equipment` (`id`, `category_id`, `name`, `description`, `is_consumable`, `total_quantity`, `is_active`, `created_at`, `updated_at`) VALUES
-(1, 2, 'TV', 'Smart TV for presentations', 0, 3, 1, '2025-08-27 06:28:35', '2025-09-23 10:59:25'),
-(2, 1, 'Speaker', 'Portable speakers', 0, 5, 1, '2025-08-27 06:28:35', '2025-10-08 22:16:14'),
-(3, 2, 'Projector', 'Full HD projector', 0, 2, 1, '2025-08-27 06:28:35', '2025-10-08 22:16:14'),
-(4, 3, 'HDMI Cable', '2-meter cable', 0, 10, 1, '2025-08-27 06:28:35', '2025-10-08 22:16:14');
+(1, 2, 'TV', 'Smart TV for presentations', 0, 3, 1, '2025-08-27 06:28:35', '2025-10-18 20:28:43'),
+(2, 1, 'Speaker', 'Portable speakers', 0, 5, 1, '2025-08-27 06:28:35', '2025-10-18 20:28:43'),
+(3, 2, 'Projector', 'Full HD projector', 0, 2, 1, '2025-08-27 06:28:35', '2025-10-18 20:28:43'),
+(4, 3, 'HDMI Cable', '2-meter cable', 0, 10, 1, '2025-08-27 06:28:35', '2025-10-18 20:28:43');
 
 -- --------------------------------------------------------
 
@@ -216,7 +220,7 @@ CREATE TABLE `equipment_requests` (
   `id` int(11) NOT NULL,
   `user_id` bigint(20) UNSIGNED NOT NULL,
   `activity_plan_id` bigint(20) UNSIGNED DEFAULT NULL,
-  `category` enum('minor','normal','urgent') NOT NULL DEFAULT 'normal',
+  `category` enum('low','medium','high') DEFAULT 'medium',
   `purpose` varchar(255) NOT NULL,
   `status` enum('pending','under_revision','approved','completed','denied','cancelled','checked_out','returned','overdue') NOT NULL DEFAULT 'pending',
   `start_datetime` datetime NOT NULL,
@@ -251,6 +255,10 @@ CREATE TABLE `events` (
   `user_id` bigint(20) UNSIGNED DEFAULT NULL,
   `title` varchar(255) NOT NULL,
   `date` date NOT NULL,
+  `start_date` date DEFAULT NULL,
+  `end_date` date DEFAULT NULL,
+  `start_time` time DEFAULT NULL,
+  `end_time` time DEFAULT NULL,
   `description` text DEFAULT NULL,
   `created_by` varchar(50) NOT NULL,
   `created_at` timestamp NULL DEFAULT current_timestamp(),
@@ -402,7 +410,16 @@ INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES
 (29, '2025_10_09_000000_create_email_verification_codes_table', 18),
 (30, '2025_10_10_000001_create_activity_plan_signatures_table', 19),
 (31, '2025_10_10_000003_update_activity_plans_for_document_only', 20),
-(32, '2025_10_10_030245_add_draft_status_to_activity_plans_table', 21);
+(32, '2025_10_10_030245_add_draft_status_to_activity_plans_table', 21),
+(33, '2025_10_17_000001_add_pdf_path_to_activity_plans_table', 22),
+(34, '2025_10_18_211016_add_start_end_datetime_to_events_and_announcements_tables', 23),
+(35, '2025_10_18_230000_drop_datetime_fields_from_announcements', 24),
+(36, '2025_10_19_000001_add_document_data_to_activity_plan_files_table', 25),
+(37, '2025_10_19_000200_alter_document_data_mediumtext', 26),
+(38, '2025_10_20_163020_create_activity_plan_dean_signatures_table', 27),
+(39, '2025_10_20_185153_drop_activity_plan_signatures_table', 28),
+(40, '2025_10_20_225726_add_indexes_to_notifications_table', 29),
+(41, '2025_10_21_000001_update_priority_values_to_low_medium_high', 30);
 
 -- --------------------------------------------------------
 
@@ -418,7 +435,7 @@ CREATE TABLE `notifications` (
   `message` text NOT NULL,
   `data` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL CHECK (json_valid(`data`)),
   `action_url` varchar(255) DEFAULT NULL,
-  `priority` enum('low','normal','high','urgent') NOT NULL DEFAULT 'normal',
+  `priority` enum('low','medium','high') DEFAULT 'medium',
   `read_at` timestamp NULL DEFAULT NULL,
   `created_at` timestamp NULL DEFAULT NULL,
   `updated_at` timestamp NULL DEFAULT NULL
@@ -467,7 +484,7 @@ CREATE TABLE `request_approvals` (
   `id` bigint(20) NOT NULL,
   `request_type` enum('equipment','activity_plan') NOT NULL,
   `request_id` bigint(20) NOT NULL,
-  `category` enum('minor','normal','urgent') NOT NULL DEFAULT 'normal',
+  `category` enum('low','medium','high') DEFAULT 'medium',
   `approver_role` enum('admin_assistant','dean') NOT NULL,
   `approver_id` bigint(20) UNSIGNED DEFAULT NULL,
   `status` enum('pending','approved','revision_requested') DEFAULT 'pending',
@@ -496,8 +513,8 @@ CREATE TABLE `role_current_holders` (
 --
 
 INSERT INTO `role_current_holders` (`role`, `user_id`, `switched_at`, `created_at`, `updated_at`) VALUES
-('dean', 88, '2025-09-29 20:38:11', '2025-09-29 20:38:11', '2025-09-29 20:38:11'),
-('admin_assistant', 87, '2025-09-29 20:38:11', '2025-09-29 20:38:11', '2025-09-29 20:38:11');
+('dean', 103, '2025-10-17 22:06:01', '2025-10-17 22:06:01', '2025-10-17 22:06:01'),
+('admin_assistant', 102, '2025-10-17 22:06:01', '2025-10-17 22:06:01', '2025-10-17 22:06:01');
 
 -- --------------------------------------------------------
 
@@ -544,8 +561,7 @@ CREATE TABLE `role_update_requests` (
 --
 
 INSERT INTO `role_update_requests` (`id`, `user_id`, `requested_role`, `officer_organization`, `officer_position`, `election_date`, `term_duration`, `reason`, `status`, `reviewed_by`, `reviewed_at`, `remarks`, `created_at`, `updated_at`) VALUES
-(4, 98, 'student_officer', 'cccs', 'mayor', '2025-03-10', '1_semester', 'test', 'approved', 87, '2025-10-09 11:36:20', NULL, '2025-10-09 11:34:23', '2025-10-09 11:36:20'),
-(5, 99, 'student_officer', 'SITES', 'mayor', '2025-03-13', '1_semester', 'test', 'approved', 87, '2025-10-11 13:22:24', NULL, '2025-10-11 13:21:42', '2025-10-11 13:22:24');
+(6, 101, 'student_officer', 'SITES', 'Mayor', '2025-04-24', '1_semester', 'test', 'approved', 102, '2025-10-18 20:26:53', NULL, '2025-10-18 20:21:41', '2025-10-18 20:26:53');
 
 -- --------------------------------------------------------
 
@@ -567,7 +583,8 @@ CREATE TABLE `sessions` (
 --
 
 INSERT INTO `sessions` (`id`, `user_id`, `ip_address`, `user_agent`, `payload`, `last_activity`) VALUES
-('LKHNCYHVJ4nx2bhMkUR7taHLVURnRfqamL8DiTAK', 98, '127.0.0.1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36', 'YTo0OntzOjY6Il90b2tlbiI7czo0MDoibXdSbFQ4UDRVNXZhNjlXTXR4dk9FZGZLNDRSa2VLQUkzd2llREpZeiI7czo5OiJfcHJldmlvdXMiO2E6MTp7czozOiJ1cmwiO3M6Mjc6Imh0dHA6Ly8xMjcuMC4wLjE6ODAwMC9sb2dpbiI7fXM6NjoiX2ZsYXNoIjthOjI6e3M6Mzoib2xkIjthOjA6e31zOjM6Im5ldyI7YTowOnt9fXM6NTA6ImxvZ2luX3dlYl81OWJhMzZhZGRjMmIyZjk0MDE1ODBmMDE0YzdmNThlYTRlMzA5ODlkIjtpOjk4O30=', 1760638770);
+('9JP8DNNx7fo3y46tS6f6iLkSh82K2u2AuXFogJvS', 106, '127.0.0.1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36', 'YTo0OntzOjY6Il90b2tlbiI7czo0MDoicVZnc0h2c3kxN2VwZUF5dXRSREhqMU02SXRLblh6TE4wd2cwQmxibCI7czo2OiJfZmxhc2giO2E6Mjp7czozOiJvbGQiO2E6MDp7fXM6MzoibmV3IjthOjA6e319czo1MDoibG9naW5fd2ViXzU5YmEzNmFkZGMyYjJmOTQwMTU4MGYwMTRjN2Y1OGVhNGUzMDk4OWQiO2k6MTA2O3M6OToiX3ByZXZpb3VzIjthOjE6e3M6MzoidXJsIjtzOjQyOiJodHRwOi8vMTI3LjAuMC4xOjgwMDAvc3R1ZGVudC9hY3Rpdml0eS1sb2ciO319', 1760978436),
+('QyczwVZc9Ye0KjF7dHbR12pfhdBcXtFhVEWYEklt', NULL, '127.0.0.1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36', 'YToyOntzOjY6Il90b2tlbiI7czo0MDoiMnZ5ZnJBU29UN1pOWnlEeTFYaGxIUklFOHRNbU9sUExpTGtENDNkaSI7czo2OiJfZmxhc2giO2E6Mjp7czozOiJvbGQiO2E6MDp7fXM6MzoibmV3IjthOjA6e319fQ==', 1760972970);
 
 -- --------------------------------------------------------
 
@@ -602,10 +619,10 @@ CREATE TABLE `users` (
 --
 
 INSERT INTO `users` (`id`, `first_name`, `middle_name`, `last_name`, `email`, `email_verified_at`, `password`, `remember_token`, `created_at`, `updated_at`, `role`, `profile_picture`, `school_id_number`, `date_of_birth`, `address`, `city`, `province`, `region`, `contact_number`) VALUES
-(87, 'Admin', NULL, 'Assistant', 'admin@example.com', '2025-09-29 20:38:11', '$2y$12$dZ.wm9sg3Kcar.M4KUaW/OZoktO/HXcOTrSbQO3I5/vJHJ8qbxLJu', NULL, '2025-09-29 20:38:11', '2025-09-29 21:20:43', 'admin_assistant', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL),
-(88, 'Dean', NULL, 'User', 'dean@example.com', '2025-09-29 20:38:11', '$2y$12$ID9Ra.wGREfIacZzx7DbZe4VBrdIJPuv31j4VWNwvs1q2d9kimdX6', NULL, '2025-09-29 20:38:11', '2025-09-29 20:38:11', 'dean', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL),
-(98, 'stephen craine', 'J', 'nailes', 'stephencraine24@gmail.com', '2025-10-09 07:29:54', '$2y$12$HeJWLT8/oO10.bYVjz4Ai.YE.B43Q8YlFKZCb49I8u6lmK3mxZtqu', NULL, '2025-10-09 07:27:48', '2025-10-10 08:53:35', 'student_officer', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL),
-(99, 'test', 'sdasa', 'Nailes', 'stephencraine2456@gmail.com', '2025-10-11 13:19:46', '$2y$12$g4AL.FUNt2zE4yczsH8zEuQvzpjEGR0u7EQdsVKCoMzGhwEib8XeO', NULL, '2025-10-11 13:19:04', '2025-10-11 13:22:24', 'student_officer', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL);
+(101, 'stephen craine', 'J', 'selian', 'stephencraine24@gmail.com', '2025-10-17 22:04:24', '$2y$12$uZK9FO2OTQONhPMpMxbzj.k5xDNwWYfTVvNiQP4yOcK0wto1RMmSa', NULL, '2025-10-17 22:03:43', '2025-10-18 20:26:53', 'student_officer', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL),
+(102, 'Admin', NULL, 'Assistant', 'admin@example.com', '2025-10-17 22:06:01', '$2y$12$/oL3mACZ5zpwZhXs58bDeO8liV0V.RGl9.SuicL87TiZ3XRHE7uAq', NULL, '2025-10-17 22:06:01', '2025-10-17 22:06:01', 'admin_assistant', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL),
+(103, 'Dean', NULL, 'User', 'dean@example.com', '2025-10-17 22:06:01', '$2y$12$h9iMmuHepEIhkEd0idDst.LliwnucjnbGY0WI8fggWLbH70r45RFW', NULL, '2025-10-17 22:06:01', '2025-10-17 22:06:01', 'dean', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL),
+(106, 'stephen craine', 'adsdsdd', 'asddsad', 'stephencraine2456@gmail.com', '2025-10-20 15:08:51', '$2y$12$DQv4C8Wk3L7YKaNonbJiC.buErRjSMl7bE2vWe4kCbVjLIh.rCHle', NULL, '2025-10-20 15:08:30', '2025-10-20 15:08:51', 'student', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL);
 
 --
 -- Indexes for dumped tables
@@ -622,6 +639,14 @@ ALTER TABLE `activity_plans`
   ADD KEY `activity_plans_current_file_id_foreign` (`current_file_id`);
 
 --
+-- Indexes for table `activity_plan_dean_signatures`
+--
+ALTER TABLE `activity_plan_dean_signatures`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `activity_plan_dean_signatures_activity_plan_id_foreign` (`activity_plan_id`),
+  ADD KEY `activity_plan_dean_signatures_dean_id_foreign` (`dean_id`);
+
+--
 -- Indexes for table `activity_plan_files`
 --
 ALTER TABLE `activity_plan_files`
@@ -629,15 +654,6 @@ ALTER TABLE `activity_plan_files`
   ADD KEY `fk_request_file` (`activity_plan_id`),
   ADD KEY `activity_request_files_activity_id_idx` (`activity_plan_id`),
   ADD KEY `activity_request_files_type_idx` (`file_type`);
-
---
--- Indexes for table `activity_plan_signatures`
---
-ALTER TABLE `activity_plan_signatures`
-  ADD PRIMARY KEY (`id`),
-  ADD UNIQUE KEY `activity_plan_signatures_activity_plan_id_signer_role_unique` (`activity_plan_id`,`signer_role`),
-  ADD KEY `activity_plan_signatures_activity_plan_id_signed_at_index` (`activity_plan_id`,`signed_at`),
-  ADD KEY `activity_plan_signatures_user_id_index` (`user_id`);
 
 --
 -- Indexes for table `announcements`
@@ -753,7 +769,11 @@ ALTER TABLE `notifications`
   ADD PRIMARY KEY (`id`),
   ADD KEY `notifications_user_id_read_at_index` (`user_id`,`read_at`),
   ADD KEY `notifications_user_id_created_at_index` (`user_id`,`created_at`),
-  ADD KEY `notifications_type_index` (`type`);
+  ADD KEY `notifications_type_index` (`type`),
+  ADD KEY `notifications_user_created_idx` (`user_id`,`created_at`),
+  ADD KEY `notifications_user_read_idx` (`user_id`,`read_at`),
+  ADD KEY `notifications_user_priority_read_idx` (`user_id`,`priority`,`read_at`),
+  ADD KEY `notifications_user_type_idx` (`user_id`,`type`);
 
 --
 -- Indexes for table `password_reset_tokens`
@@ -826,25 +846,25 @@ ALTER TABLE `users` ADD FULLTEXT KEY `ft_users_name` (`first_name`,`last_name`);
 -- AUTO_INCREMENT for table `activity_plans`
 --
 ALTER TABLE `activity_plans`
-  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=130;
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=185;
+
+--
+-- AUTO_INCREMENT for table `activity_plan_dean_signatures`
+--
+ALTER TABLE `activity_plan_dean_signatures`
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=43;
 
 --
 -- AUTO_INCREMENT for table `activity_plan_files`
 --
 ALTER TABLE `activity_plan_files`
-  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=871;
-
---
--- AUTO_INCREMENT for table `activity_plan_signatures`
---
-ALTER TABLE `activity_plan_signatures`
-  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT;
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=973;
 
 --
 -- AUTO_INCREMENT for table `announcements`
 --
 ALTER TABLE `announcements`
-  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=16;
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=23;
 
 --
 -- AUTO_INCREMENT for table `comments`
@@ -856,25 +876,25 @@ ALTER TABLE `comments`
 -- AUTO_INCREMENT for table `email_verification_codes`
 --
 ALTER TABLE `email_verification_codes`
-  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=8;
 
 --
 -- AUTO_INCREMENT for table `equipment_requests`
 --
 ALTER TABLE `equipment_requests`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=75;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=77;
 
 --
 -- AUTO_INCREMENT for table `equipment_request_items`
 --
 ALTER TABLE `equipment_request_items`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=107;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=112;
 
 --
 -- AUTO_INCREMENT for table `events`
 --
 ALTER TABLE `events`
-  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=36;
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=57;
 
 --
 -- AUTO_INCREMENT for table `failed_jobs`
@@ -898,31 +918,31 @@ ALTER TABLE `jobs`
 -- AUTO_INCREMENT for table `likes`
 --
 ALTER TABLE `likes`
-  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=14;
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=15;
 
 --
 -- AUTO_INCREMENT for table `migrations`
 --
 ALTER TABLE `migrations`
-  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=33;
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=42;
 
 --
 -- AUTO_INCREMENT for table `notifications`
 --
 ALTER TABLE `notifications`
-  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=156;
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=208;
 
 --
 -- AUTO_INCREMENT for table `post_images`
 --
 ALTER TABLE `post_images`
-  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=36;
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=40;
 
 --
 -- AUTO_INCREMENT for table `request_approvals`
 --
 ALTER TABLE `request_approvals`
-  MODIFY `id` bigint(20) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=98;
+  MODIFY `id` bigint(20) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=113;
 
 --
 -- AUTO_INCREMENT for table `role_handover_logs`
@@ -934,13 +954,13 @@ ALTER TABLE `role_handover_logs`
 -- AUTO_INCREMENT for table `role_update_requests`
 --
 ALTER TABLE `role_update_requests`
-  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=9;
 
 --
 -- AUTO_INCREMENT for table `users`
 --
 ALTER TABLE `users`
-  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=100;
+  MODIFY `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=107;
 
 --
 -- Constraints for dumped tables
@@ -954,18 +974,18 @@ ALTER TABLE `activity_plans`
   ADD CONSTRAINT `fk_activity_requests_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE;
 
 --
+-- Constraints for table `activity_plan_dean_signatures`
+--
+ALTER TABLE `activity_plan_dean_signatures`
+  ADD CONSTRAINT `activity_plan_dean_signatures_activity_plan_id_foreign` FOREIGN KEY (`activity_plan_id`) REFERENCES `activity_plans` (`id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `activity_plan_dean_signatures_dean_id_foreign` FOREIGN KEY (`dean_id`) REFERENCES `users` (`id`) ON DELETE CASCADE;
+
+--
 -- Constraints for table `activity_plan_files`
 --
 ALTER TABLE `activity_plan_files`
   ADD CONSTRAINT `fk_activity_plan_files_plan` FOREIGN KEY (`activity_plan_id`) REFERENCES `activity_plans` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
   ADD CONSTRAINT `fk_request_file` FOREIGN KEY (`activity_plan_id`) REFERENCES `activity_plans` (`id`) ON DELETE CASCADE;
-
---
--- Constraints for table `activity_plan_signatures`
---
-ALTER TABLE `activity_plan_signatures`
-  ADD CONSTRAINT `activity_plan_signatures_activity_plan_id_foreign` FOREIGN KEY (`activity_plan_id`) REFERENCES `activity_plans` (`id`) ON DELETE CASCADE,
-  ADD CONSTRAINT `activity_plan_signatures_user_id_foreign` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE;
 
 --
 -- Constraints for table `announcements`
