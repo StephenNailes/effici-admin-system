@@ -129,6 +129,8 @@ Route::middleware(['auth', 'verified'])->prefix('student')->group(function () {
             ->name('student.requests.activity-plan.store');
         Route::get('/requests/activity-plan/{id}', [ActivityPlanController::class, 'show'])
             ->name('student.requests.activity-plan.show');
+        Route::get('/requests/activity-plan/{id}/view-pdf', [ActivityPlanController::class, 'viewApprovedPdf'])
+            ->name('student.requests.activity-plan.view-pdf');
         Route::patch('/requests/activity-plan/{id}', [ActivityPlanController::class, 'update'])
             ->name('student.requests.activity-plan.update');
         Route::delete('/requests/activity-plan/{id}', [ActivityPlanController::class, 'destroy'])
@@ -153,14 +155,6 @@ Route::middleware(['auth', 'verified'])->prefix('student')->group(function () {
 
     // Generated documents for activity plan (PDF generation removed)
     // Draft and download routes removed
-
-    // Activity Plan Signatures
-    Route::post('/requests/activity-plan/{id}/signatures', [App\Http\Controllers\ActivityPlanSignatureController::class, 'store'])
-        ->name('student.requests.activity-plan.signatures.store');
-    Route::delete('/requests/activity-plan/{id}/signatures/{signatureId}', [App\Http\Controllers\ActivityPlanSignatureController::class, 'destroy'])
-        ->name('student.requests.activity-plan.signatures.destroy');
-    Route::get('/requests/activity-plan/{id}/signatures', [App\Http\Controllers\ActivityPlanSignatureController::class, 'index'])
-        ->name('student.requests.activity-plan.signatures.index');
 
     // Equipment Borrowing (page only)
     Route::get('/borrow-equipment', [EquipmentController::class, 'index'])
@@ -229,6 +223,10 @@ Route::middleware(['auth', 'verified', 'role:admin_assistant,dean'])->prefix('ap
     Route::post('/{id}/approve', [ApprovalController::class, 'approve'])->name('approvals.approve');
     Route::post('/{id}/revision', [ApprovalController::class, 'requestRevision'])->name('approvals.revision');
     Route::post('/batch-approve', [ApprovalController::class, 'batchApprove'])->name('approvals.batch-approve');
+    
+    // Dean signature routes
+    Route::post('/{id}/save-signatures', [ApprovalController::class, 'saveSignatures'])->middleware('role:dean')->name('approvals.save-signatures');
+    Route::get('/{id}/signatures', [ApprovalController::class, 'getSignatures'])->name('approvals.get-signatures');
 });
 
 // 🟩 Equipment Management API (admin only)

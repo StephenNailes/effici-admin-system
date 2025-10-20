@@ -256,6 +256,7 @@ export default function ActivityHistory() {
                 : item.request_type === "role_update"
                   ? item.activity_category || "-" // activity_category holds requested_role for role_update
                   : item.equipment_purpose || "-",
+            priority: item.priority || null,
             status,
             approverRole: item.approver_role ? item.approver_role.replace('_', ' ').split(' ').map((word: string) => word.charAt(0).toUpperCase() + word.slice(1)).join(' ') : null,
             approverName: item.approver_name || null,
@@ -465,6 +466,7 @@ export default function ActivityHistory() {
                   <th className="py-3 px-6">Type</th>
                   <th className="py-3 px-6">Date Submitted</th>
                   <th className="py-3 px-6">Category/Purpose</th>
+                  <th className="py-3 px-6">Priority</th>
                   <th className="py-3 px-6">Status</th>
                   <th className="py-3 px-6">Approved By</th>
                 </tr>
@@ -476,7 +478,7 @@ export default function ActivityHistory() {
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.4 }}
                   >
-                    <td colSpan={7} className="py-8 px-6 text-center text-gray-400">
+                    <td colSpan={8} className="py-8 px-6 text-center text-gray-400">
                       <motion.div
                         initial={{ scale: 0.95 }}
                         animate={{ scale: 1 }}
@@ -527,6 +529,22 @@ export default function ActivityHistory() {
                         ) : (
                           activity.category
                         )}
+                      </td>
+                      <td className="py-3 px-6">
+                        {(() => {
+                          let p = (activity.category || '').toString();
+                          // Attempt to derive priority if available on mapped data
+                          const raw = (activity.priority || '').toString().toLowerCase();
+                          const val = raw || (p.includes('High') ? 'high' : p.includes('Urgent') ? 'urgent' : p.includes('Normal') ? 'normal' : '');
+                          if (!val) return <span className="text-gray-400">-</span>;
+                          if (val === 'urgent' || val === 'high') {
+                            return <span className="px-2 py-1 rounded text-xs font-semibold bg-red-100 text-red-800">Urgent</span>;
+                          } else if (val === 'normal') {
+                            return <span className="px-2 py-1 rounded text-xs font-semibold bg-blue-100 text-blue-800">Normal</span>;
+                          } else {
+                            return <span className="px-2 py-1 rounded text-xs font-semibold bg-green-100 text-green-800">{val.charAt(0).toUpperCase() + val.slice(1)}</span>;
+                          }
+                        })()}
                       </td>
                       <td className="py-3 px-6">
                         {(() => {

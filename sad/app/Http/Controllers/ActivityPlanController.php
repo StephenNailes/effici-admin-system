@@ -259,8 +259,22 @@ class ActivityPlanController extends Controller
         // Explicitly set document_data from currentFile to ensure it's available
         $planData['document_data'] = $plan->currentFile?->document_data;
 
+        // If the plan is under revision, fetch the revision remarks
+        $revisionRemarks = null;
+        if ($plan->status === 'under_revision') {
+            $approval = RequestApproval::where('request_id', $plan->id)
+                ->where('request_type', 'activity_plan')
+                ->where('status', 'revision_requested')
+                ->first();
+            
+            if ($approval) {
+                $revisionRemarks = $approval->remarks;
+            }
+        }
+
         return inertia('student/ActivityPlan', [
             'plan' => $planData,
+            'revisionRemarks' => $revisionRemarks,
         ]);
     }
 
@@ -743,5 +757,54 @@ class ActivityPlanController extends Controller
                 'message' => 'Failed to save document: ' . $e->getMessage()
             ], 500);
         }
+    }
+
+    /**
+     * View the approved PDF with dean's signature (student view)
+     * PDF URL is only provided if the plan is approved by the dean
+     */
+    public function viewApprovedPdf($id)
+    {
+        if (Auth::user()?->role !== 'student_officer') {
+            abort(403, 'Only Student Officers can view activity plans.');
+        }
+
+        $plan = ActivityPlan::where('id', $id)
+            ->where('user_id', Auth::id())
+            ->firstOrFail();
+
+        // Build PDF URL ONLY if the plan is approved by the dean
+        // Check that dean approval exists and is approved
+        $pdfUrl = null;
+        if ($plan->status === 'approved' && !empty($plan->pdf_path)) {
+            // Verify dean has actually approved (not just admin assistant)
+            $deanApproved = DB::table('request_approvals')
+                ->where('request_type', 'activity_plan')
+                ->where('request_id', $plan->id)
+                ->where('approver_role', 'dean')
+                ->where('status', 'approved')
+                ->exists();
+            
+            if ($deanApproved) {
+                try {
+                    $pdfUrl = Storage::url($plan->pdf_path);
+                } catch (\Throwable $e) {
+                    Log::error("Failed to generate PDF URL for plan {$id}: " . $e->getMessage());
+                }
+            } else {
+                Log::warning("Activity plan {$id} has status 'approved' but dean has not approved yet");
+            }
+        }
+
+        return Inertia::render('student/ViewApprovedPdf', [
+            'plan' => [
+                'id' => $plan->id,
+                'status' => $plan->status,
+                'category' => $plan->category,
+                'created_at' => $plan->created_at,
+                'updated_at' => $plan->updated_at,
+                'pdf_url' => $pdfUrl, // null unless status is 'approved'
+            ],
+        ]);
     }
 }

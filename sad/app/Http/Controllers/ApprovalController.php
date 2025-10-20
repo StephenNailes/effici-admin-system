@@ -6,6 +6,10 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use App\Services\NotificationService;
 use Carbon\Carbon;
+use App\Models\ActivityPlanDeanSignature;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Log;
 
 class ApprovalController extends Controller
 {
@@ -157,7 +161,8 @@ class ApprovalController extends Controller
                 'ap.category as activity_category',
                 'er.purpose as equipment_purpose',
                 'er.status as equipment_status',
-                'ap.status as activity_status'
+                'ap.status as activity_status',
+                'ap.pdf_path as activity_pdf_path'
             )
             ->where('ra.id', $id)
             ->first();
@@ -173,6 +178,39 @@ class ApprovalController extends Controller
             $request->equipment_items = $equipmentItems;
         } else {
             $request->equipment_items = [];
+        }
+
+        // Enrich with organization and pdf URL for activity plans
+        if ($request && $request->request_type === 'activity_plan') {
+            // Build public URL for PDF if available
+            if (!empty($request->activity_pdf_path)) {
+                try {
+                    // Use the current pdf_path from activity_plans table (which will be the signed version after approval)
+                    $request->pdf_url = \Illuminate\Support\Facades\Storage::url($request->activity_pdf_path);
+                } catch (\Throwable $e) {
+                    $request->pdf_url = null;
+                }
+            } else {
+                $request->pdf_url = null;
+            }
+
+            // Attempt to read latest document_data to extract organization/headerSociety
+            try {
+                $docData = DB::table('activity_plan_files')
+                    ->where('activity_plan_id', $request->request_id)
+                    ->orderByDesc('id')
+                    ->value('document_data');
+                $org = null;
+                if ($docData) {
+                    $decoded = json_decode($docData, true);
+                    if (is_array($decoded) && isset($decoded['headerSociety']) && is_string($decoded['headerSociety'])) {
+                        $org = $decoded['headerSociety'];
+                    }
+                }
+                $request->organization = $org;
+            } catch (\Throwable $e) {
+                $request->organization = null;
+            }
         }
 
         return response()->json($request);
@@ -234,9 +272,10 @@ class ApprovalController extends Controller
                 }
             } else { // activity_plan
                 if ($role === 'admin_assistant') {
-                    // Admin assistant approves → ensure dean pending row exists
-                    DB::table('activity_plans')->where('id', $ra->request_id)->update(['status' => 'approved']);
-
+                    // Admin assistant approves → activity plan stays 'pending' until dean approves
+                    // Do NOT update activity_plans status here - it should remain 'pending'
+                    
+                    // Ensure dean pending approval row exists
                     $existsDean = DB::table('request_approvals')
                         ->where('request_type', 'activity_plan')
                         ->where('request_id', $ra->request_id)
@@ -266,6 +305,24 @@ class ApprovalController extends Controller
                 } elseif ($role === 'dean') {
                     // Dean approves → final
                     DB::table('activity_plans')->where('id', $ra->request_id)->update(['status' => 'approved']);
+
+                    // As a final guarantee, regenerate the signed PDF to ensure dean signatures are embedded
+                    try {
+                        $activityPlan = DB::table('activity_plans')->where('id', $ra->request_id)->first();
+                        if ($activityPlan && !empty($activityPlan->pdf_path)) {
+                            $pdfSignatureService = app(\App\Services\PdfSignatureService::class);
+                            $signedPdfPath = $pdfSignatureService->overlaySignatures($activityPlan->pdf_path, $ra->request_id);
+
+                            if ($signedPdfPath) {
+                                DB::table('activity_plans')->where('id', $ra->request_id)->update([
+                                    'pdf_path' => $signedPdfPath
+                                ]);
+                                Log::info("Activity plan {$ra->request_id} PDF regenerated with dean signatures on approval: {$signedPdfPath}");
+                            }
+                        }
+                    } catch (\Throwable $e) {
+                        Log::error("Failed to regenerate signed PDF on dean approval for plan {$ra->request_id}: " . $e->getMessage());
+                    }
 
                     // Notify student that dean approved their activity plan (final approval)
                     if ($studentId) {
@@ -581,6 +638,133 @@ class ApprovalController extends Controller
             'total_processed' => count($approvalIds),
             'successful_count' => count($results['successful']),
             'failed_count' => count($results['failed'])
+        ]);
+    }
+
+    /**
+     * Save dean signatures for an activity plan and embed them into the PDF immediately
+     */
+    public function saveSignatures(Request $request, $id)
+    {
+        $user = Auth::user();
+        if (!$user || $user->role !== 'dean') {
+            return response()->json(['error' => 'Unauthorized'], 403);
+        }
+
+        $request->validate([
+            'signatures' => 'required|array',
+            'signatures.*.imageData' => 'required|string',
+            'signatures.*.x' => 'required|numeric',
+            'signatures.*.y' => 'required|numeric',
+        ]);
+
+        // Get the approval record to find the activity plan
+        $approval = DB::table('request_approvals')
+            ->where('id', $id)
+            ->where('request_type', 'activity_plan')
+            ->where('approver_role', 'dean')
+            ->first();
+
+        if (!$approval) {
+            return response()->json(['error' => 'Approval not found'], 404);
+        }
+
+        $activityPlanId = $approval->request_id;
+
+        // Delete existing signatures for this activity plan
+        ActivityPlanDeanSignature::where('activity_plan_id', $activityPlanId)->delete();
+
+        // Save each signature to database
+        $savedSignatures = [];
+        foreach ($request->signatures as $sig) {
+            // Log incoming coordinates from frontend for debugging
+            Log::info("Received signature coordinates from frontend", [
+                'activity_plan_id' => $activityPlanId,
+                'x_px' => $sig['x'],
+                'y_px' => $sig['y']
+            ]);
+            
+            $signature = ActivityPlanDeanSignature::create([
+                'activity_plan_id' => $activityPlanId,
+                'dean_id' => $user->id,
+                'signature_data' => $sig['imageData'],
+                'position_x' => $sig['x'],
+                'position_y' => $sig['y'],
+            ]);
+
+            $savedSignatures[] = [
+                'id' => $signature->id,
+                'x' => $signature->position_x,
+                'y' => $signature->position_y,
+            ];
+        }
+
+        // IMMEDIATELY generate the signed PDF with embedded signatures
+        try {
+            $activityPlan = DB::table('activity_plans')->where('id', $activityPlanId)->first();
+            if ($activityPlan && !empty($activityPlan->pdf_path)) {
+                $pdfSignatureService = app(\App\Services\PdfSignatureService::class);
+                $signedPdfPath = $pdfSignatureService->overlaySignatures($activityPlan->pdf_path, $activityPlanId);
+                
+                if ($signedPdfPath && $signedPdfPath !== $activityPlan->pdf_path) {
+                    // Update the activity plan to use the signed PDF
+                    DB::table('activity_plans')->where('id', $activityPlanId)->update([
+                        'pdf_path' => $signedPdfPath
+                    ]);
+                    Log::info("Activity plan {$activityPlanId} PDF updated with dean signatures on save: {$signedPdfPath}");
+                } else {
+                    Log::warning("Failed to generate signed PDF for activity plan {$activityPlanId}");
+                }
+            }
+        } catch (\Exception $e) {
+            Log::error("Error generating signed PDF on save for activity plan {$activityPlanId}: " . $e->getMessage());
+            return response()->json([
+                'error' => 'Failed to embed signatures into PDF',
+                'message' => $e->getMessage()
+            ], 500);
+        }
+
+        return response()->json([
+            'message' => 'Signatures saved and embedded into PDF successfully!',
+            'signatures' => $savedSignatures,
+        ]);
+    }
+
+    /**
+     * Get dean signatures for an activity plan
+     */
+    public function getSignatures($id)
+    {
+        $user = Auth::user();
+        if (!$user || !in_array($user->role, ['dean', 'admin_assistant'], true)) {
+            return response()->json(['error' => 'Unauthorized'], 403);
+        }
+
+        // Get the approval record to find the activity plan
+        $approval = DB::table('request_approvals')
+            ->where('id', $id)
+            ->where('request_type', 'activity_plan')
+            ->first();
+
+        if (!$approval) {
+            return response()->json(['error' => 'Approval not found'], 404);
+        }
+
+        $activityPlanId = $approval->request_id;
+
+        $signatures = ActivityPlanDeanSignature::where('activity_plan_id', $activityPlanId)
+            ->get()
+            ->map(function($sig) {
+                return [
+                    'id' => 'sig-' . $sig->id,
+                    'imageData' => $sig->signature_data,
+                    'x' => $sig->position_x,
+                    'y' => $sig->position_y,
+                ];
+            });
+
+        return response()->json([
+            'signatures' => $signatures,
         ]);
     }
 }

@@ -42,6 +42,7 @@ import {
   Table as TableIcon,
   Settings,
   Send as SendIcon,
+  ArrowDown as ArrowDownIcon,
 } from "lucide-react";
 
 /*---------- Types ----------*/
@@ -137,7 +138,7 @@ const GlobalStyles = () => (
       max-height: 297mm;
       margin: 20px auto; 
       box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08); /* subtle shadow on screen */
-  border: 1px solid #374151; /* Tailwind gray-700 for even stronger visibility */
+  border: 1px solid #d1d5db; /* Tailwind gray-300 for softer outline */
       box-sizing: border-box; 
       display: flex; 
       flex-direction: column;
@@ -1472,6 +1473,7 @@ const App: React.FC = () => {
   const page = usePage();
   // Expecting optional plan prop when editing/viewing a specific plan
   const plan: any = (page.props as any).plan ?? null;
+  const revisionRemarks: string | null = (page.props as any).revisionRemarks ?? null;
   const draftStorageKey = plan?.id ? `activity_plan_draft_${plan.id}` : 'activity_plan_draft_new';
   // PDF generation removed; drafts remain HTML-only
   // CSRF priming to avoid 419 on POST
@@ -1583,6 +1585,9 @@ const App: React.FC = () => {
     { pages, members, signatories, signatures, headerEmail, headerSociety },
     1500
   );
+  // Throttle autosave: minimum interval in ms
+  const AUTOSAVE_MIN_INTERVAL = 4000;
+  const lastAutosaveAtRef = useRef<number>(0);
 
   // --- Utility: detect template-only vs meaningful content ---
   const stripPlaceholders = useCallback((html?: string) => {
@@ -1708,14 +1713,17 @@ const App: React.FC = () => {
         if (Array.isArray(loaded.signatures)) setSignatures(loaded.signatures);
         if (typeof loaded.headerEmail === 'string') setHeaderEmail(loaded.headerEmail);
         if (typeof loaded.headerSociety === 'string') setHeaderSociety(loaded.headerSociety);
-        try { setLastSavedSnapshot(JSON.stringify({
-          pages: loaded.pages,
-          members: loaded.members,
-          signatories: loaded.signatories,
-          signatures: loaded.signatures,
-          headerEmail: loaded.headerEmail,
-          headerSociety: loaded.headerSociety,
-        })); } catch {}
+        try {
+          const snapshot = JSON.stringify({
+            pages: loaded.pages,
+            members: loaded.members,
+            signatories: loaded.signatories,
+            signatures: loaded.signatures,
+            headerEmail: loaded.headerEmail,
+            headerSociety: loaded.headerSociety,
+          });
+          setLastSavedSnapshot(snapshot);
+        } catch {}
       } else {
         console.log('No data to load - using defaults');
       }
@@ -1838,6 +1846,31 @@ const App: React.FC = () => {
   const handleConfirmSubmission = () => {
     // Close modal and proceed with submission
     setShowSubmissionModal(false);
+    
+    // Submit the activity plan to the backend
+    // Allow this intentional navigation to bypass Unsaved Changes guard
+    allowNextNavRef.current = true;
+    router.post(
+      `/student/requests/activity-plan/${plan.id}/submit`,
+      {},
+      {
+        preserveScroll: true,
+        onSuccess: () => {
+          // Redirect to the correct Activity Plan list route after successful submission
+          // Also bypass guard for this follow-up navigation
+          allowNextNavRef.current = true;
+          router.visit('/student/requests/activity-plan', {
+            onSuccess: () => {
+              // Success toast will be shown by FlashToaster from the backend flash message
+            }
+          });
+        },
+        onError: (errors) => {
+          console.error('Submission failed:', errors);
+          // Error toast will be shown by FlashToaster from the backend flash message
+        }
+      }
+    );
   };
 
   // Helper function to capture complete document HTML for PDF generation
@@ -2099,6 +2132,9 @@ const App: React.FC = () => {
           console.error('Failed to save draft to localStorage:', e);
         }
         
+        // Allow the next navigation (this is a save operation, not accidental navigation)
+        allowNextNavRef.current = true;
+        
         router.post('/student/requests/activity-plan/create-draft', {
           category: 'normal'
         }, {
@@ -2113,6 +2149,8 @@ const App: React.FC = () => {
             console.error('Failed to create draft:', errors);
             alert('Failed to save draft. Please try again.');
             setIsSaving(false);
+            // Reset the flag if save failed
+            allowNextNavRef.current = false;
           }
         });
         return;
@@ -2163,7 +2201,18 @@ const App: React.FC = () => {
         setLastSaved(new Date());
         setHasUnsavedChanges(false);
 
-  try { setLastSavedSnapshot(JSON.stringify(draftData)); } catch {}
+        // Keep snapshot consistent (exclude timestamp) so autosave comparator won't re-trigger immediately
+        try {
+          const snapshot = JSON.stringify({
+            pages,
+            members,
+            signatories,
+            signatures,
+            headerEmail,
+            headerSociety,
+          });
+          setLastSavedSnapshot(snapshot);
+        } catch {}
 
         // If the server returned updated document_data, hydrate immediately to avoid flicker/stale placeholders
         if (response.data.document_data) {
@@ -2182,8 +2231,10 @@ const App: React.FC = () => {
           }
         }
 
-        // Still issue a minimal reload for plan prop to keep props consistent
-        router.reload({ only: ['plan'] });
+  // Still issue a minimal reload for plan prop to keep props consistent
+  // Allow this intentional navigation so the Unsaved Changes modal does not appear
+  allowNextNavRef.current = true;
+  router.reload({ only: ['plan'] });
       } else {
         throw new Error(response.data.message || 'Failed to save document');
       }
@@ -2221,7 +2272,18 @@ const App: React.FC = () => {
         localStorage.setItem(draftStorageKey, JSON.stringify(draftData));
         setLastSaved(new Date());
         setHasUnsavedChanges(false);
-        try { setLastSavedSnapshot(JSON.stringify(draftData)); } catch {}
+        // Keep snapshot consistent with comparator (exclude timestamp)
+        try {
+          const snapshot = JSON.stringify({
+            pages,
+            members,
+            signatories,
+            signatures,
+            headerEmail,
+            headerSociety,
+          });
+          setLastSavedSnapshot(snapshot);
+        } catch {}
         if (response.data.document_data) {
           try {
             const serverData = typeof response.data.document_data === 'string' ? JSON.parse(response.data.document_data) : response.data.document_data;
@@ -2328,10 +2390,14 @@ const App: React.FC = () => {
     });
     // Only autosave if something really changed since last save
     if (lastSavedSnapshot === currentSnapshot) return;
+    // Throttle to avoid save storms while typing rapidly
+    const now = Date.now();
+    if (now - lastAutosaveAtRef.current < AUTOSAVE_MIN_INTERVAL) return;
     // Only autosave when we detect meaningful content or meta changes (members/signatories/header)
     const hasMeaningful = Array.isArray(debouncedPayload.pages) && debouncedPayload.pages.some((p) => hasMeaningfulUserText(p));
     const metaChanged = true; // members/signatories/header are part of snapshot comparison above
     if (hasMeaningful || metaChanged) {
+      lastAutosaveAtRef.current = now;
       handleAutoSave();
     }
   }, [debouncedPayload, plan?.id, isDataLoaded, isSaving, lastSavedSnapshot, hasMeaningfulUserText, handleAutoSave]);
@@ -2370,17 +2436,27 @@ const App: React.FC = () => {
     tempContainer.innerHTML = fullHtml;
     const allNodes = Array.from(tempContainer.childNodes);
 
+    // Create a scoped measurement container so the same CSS applies
+    const apScopeWrapper = document.createElement('div');
+    apScopeWrapper.className = 'ap-scope';
     const measureElement = document.createElement('div');
-    document.body.appendChild(measureElement);
+    apScopeWrapper.appendChild(measureElement);
+    document.body.appendChild(apScopeWrapper);
+    // Use the actual rendered content width from the hidden measurement page
+    const refMainText = document.querySelector('#measure-page-2 .main-text') as HTMLElement | null;
+    const measuredWidthPx = refMainText?.clientWidth ?? 0;
+    Object.assign(apScopeWrapper.style, { position: 'absolute', left: '-9999px', visibility: 'hidden' });
     Object.assign(measureElement.style, {
-      position: 'absolute', left: '-9999px', visibility: 'hidden',
-      fontFamily: '"Times New Roman", Times, serif', fontSize: '12pt', lineHeight: '1.5',
-      width: 'calc(210mm - 19mm - 130px - 1.5rem)', 
+      fontFamily: '"Times New Roman", Times, serif',
+      fontSize: '12pt',
+      lineHeight: '1.5',
+      width: measuredWidthPx > 0 ? `${measuredWidthPx}px` : 'calc(210mm - 19mm - 130px - 1.5rem)',
     });
     
     const newPages: string[] = [];
     let currentPageNodes: ChildNode[] = [];
-    const HEIGHT_BUFFER = 5; 
+  // Extra buffer to account for rounding/line-wrapping differences
+  const HEIGHT_BUFFER = 12; 
 
     for (const node of allNodes) {
       currentPageNodes.push(node);
@@ -2398,11 +2474,30 @@ const App: React.FC = () => {
     // Treat tables, lists, and any element containing a table as atomic (do not split)
     const containsTable = isElement && !!(overflowingNode as HTMLElement).querySelector?.('table');
     const isAtomicBlock = tagName === 'table' || tagName === 'ul' || tagName === 'ol' || containsTable;
-        const isSplittable = isElement && !isAtomicBlock && (overflowingNode as any).textContent && (overflowingNode as any).textContent.includes(' ');
+  // Allow splitting typical block elements; if text has no spaces, we'll chunk it manually
+  const isSplittable = isElement && !isAtomicBlock && !!(overflowingNode as any).textContent;
 
         if (isSplittable) {
           const elementNode = overflowingNode as HTMLElement;
-          const contentParts = elementNode.innerHTML.split(/(<[^>]*>|\s+|[^\s<]+)/g).filter(Boolean);
+          // Tokenize HTML into tags, whitespace, and text runs
+          const rawParts = elementNode.innerHTML.split(/(<[^>]*>|\s+|[^\s<]+)/g).filter(Boolean);
+          // Chunk overly long text runs to enable mid-token breaking (for text without spaces)
+          const CHUNK_SIZE = 30;
+          const contentParts: string[] = [];
+          for (const part of rawParts) {
+            if (part.startsWith('<') || /\s+/.test(part)) {
+              contentParts.push(part);
+            } else {
+              // Text run without tags; chunk if too long
+              if (part.length > CHUNK_SIZE) {
+                for (let i = 0; i < part.length; i += CHUNK_SIZE) {
+                  contentParts.push(part.slice(i, i + CHUNK_SIZE));
+                }
+              } else {
+                contentParts.push(part);
+              }
+            }
+          }
           let low = 0, high = contentParts.length, bestFitIndex = 0;
           
           while (low <= high) {
@@ -2463,7 +2558,7 @@ const App: React.FC = () => {
         }
     }
     
-    document.body.removeChild(measureElement);
+    document.body.removeChild(apScopeWrapper);
     if (JSON.stringify(newPages) !== JSON.stringify(currentPages)) {
       setPages(newPages);
     }
@@ -2567,6 +2662,21 @@ const App: React.FC = () => {
     }
   }, [activePageIndex]);
 
+  // Jump-to-last-page handler for 4-page documents
+  const handleJumpToLast = () => {
+    const wrapper = pageContainerRef.current?.querySelector('.pages-scale-wrapper') as HTMLElement | null;
+    if (!wrapper) return;
+    const lastPageIndex = pages.length - 1;
+    const lastPageEl = wrapper.querySelectorAll('.page')[lastPageIndex] as HTMLElement | undefined | null;
+    if (!lastPageEl) return;
+    // Account for sticky toolbar height so the page isn't hidden underneath
+    const toolbar = document.querySelector('.formatting-toolbar') as HTMLElement | null;
+    const offset = (toolbar?.getBoundingClientRect().height || 0) + 24; // small padding
+    const y = window.scrollY + lastPageEl.getBoundingClientRect().top - offset;
+    window.scrollTo({ top: Math.max(0, y), behavior: 'smooth' });
+    setActivePageIndex(lastPageIndex);
+  };
+
 
   return (
     <MainLayout>
@@ -2592,6 +2702,39 @@ const App: React.FC = () => {
           Back to Activity Requests
         </button>
       </div>
+
+      {/* Revision Banner - show when plan is under revision */}
+      {revisionRemarks && (
+        <div className="no-print mx-6 mt-4 mb-6 bg-yellow-50 border-l-4 border-yellow-500 rounded-md p-4 shadow-sm">
+          <div className="flex items-start gap-3">
+            <svg 
+              className="w-6 h-6 text-yellow-600 flex-shrink-0 mt-0.5" 
+              fill="none" 
+              viewBox="0 0 24 24" 
+              stroke="currentColor"
+            >
+              <path 
+                strokeLinecap="round" 
+                strokeLinejoin="round" 
+                strokeWidth={2} 
+                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" 
+              />
+            </svg>
+            <div className="flex-1">
+              <h3 className="text-sm font-semibold text-yellow-900 mb-1">
+                Revision Requested
+              </h3>
+              <p className="text-sm text-yellow-800">
+                {revisionRemarks}
+              </p>
+              <p className="text-xs text-yellow-700 mt-2">
+                Please address the comments above and resubmit your activity plan.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+      
       {/* Hidden measurement pages (no-print) */}
       <div className="no-print" style={{ position: 'absolute', left: '-9999px', visibility: 'hidden', pointerEvents: 'none' }}>
         <div id="measure-page-1">
@@ -2774,6 +2917,16 @@ const App: React.FC = () => {
           if (go) go();
         }}
       />
+      {/* Floating jump-to-last button for exactly 4-page docs */}
+      {pages.length === 4 && (
+        <button
+          aria-label="Jump to last page"
+          onClick={handleJumpToLast}
+          className="fixed bottom-6 right-6 z-50 w-12 h-12 rounded-full bg-white border border-gray-200 shadow-lg flex items-center justify-center hover:bg-gray-50 transition-colors"
+        >
+          <ArrowDownIcon className="w-5 h-5 text-gray-700" />
+        </button>
+      )}
       </div>
     </MainLayout>
   );

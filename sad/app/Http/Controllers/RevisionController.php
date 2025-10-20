@@ -129,6 +129,13 @@ class RevisionController extends Controller
             return redirect()->route('student.revision')->with('error', 'Revision request not found.');
         }
 
+        // For activity plans, redirect to the ActivityPlan editor instead of RevisionEdit
+        if ($requestType === 'activity_plan') {
+            return redirect()->route('student.activity-plan.show', ['id' => $id])
+                ->with('info', 'Please address the revision comments and resubmit your activity plan.');
+        }
+
+        // For equipment requests, use the RevisionEdit page
         return Inertia::render('student/RevisionEdit', [
             'revision' => $revision,
             'requestType' => $requestType

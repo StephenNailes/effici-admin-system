@@ -2,7 +2,7 @@ import React from 'react';
 import MainLayout from '@/layouts/mainlayout';
 import { router, usePage } from '@inertiajs/react';
 import { motion } from 'framer-motion';
-import { FileText, Clock, CheckCircle2, Pencil, ChevronLeft, ChevronRight } from 'lucide-react';
+import { FileText, Clock, CheckCircle2, Pencil, ChevronLeft, ChevronRight, Eye, Edit } from 'lucide-react';
 
 interface PlanSummary {
   id: number;
@@ -60,6 +60,36 @@ export default function ActivityRequests() {
     router.get('/student/requests/activity-plan/new');
   };
 
+  const handleViewPdf = (planId: number) => {
+    router.get(`/student/requests/activity-plan/${planId}/view-pdf`);
+  };
+
+  const handleEdit = (planId: number) => {
+    router.get(`/student/requests/activity-plan/${planId}`);
+  };
+
+  const getStatusColor = (status: string) => {
+    const colors: Record<string, string> = {
+      pending: 'text-orange-600 bg-orange-50',
+      approved: 'text-green-600 bg-green-50',
+      under_revision: 'text-rose-600 bg-rose-50',
+      completed: 'text-blue-600 bg-blue-50',
+      draft: 'text-gray-600 bg-gray-50',
+    };
+    return colors[status] || colors.draft;
+  };
+
+  const getStatusLabel = (status: string) => {
+    const labels: Record<string, string> = {
+      pending: 'Pending',
+      approved: 'Approved',
+      under_revision: 'Under Revision',
+      completed: 'Completed',
+      draft: 'Draft',
+    };
+    return labels[status] || status;
+  };
+
   return (
     <MainLayout>
       <div className="p-6 font-poppins min-h-screen text-black bg-white">
@@ -100,16 +130,64 @@ export default function ActivityRequests() {
           ) : (
             <ul className="divide-y divide-gray-100">
               {submitted.map((s) => (
-                <li key={s.id} className="py-3 flex items-center justify-between">
-                  <button
-                    onClick={() => router.get(`/student/requests/activity-plan/${s.id}`)}
-                    className="text-left"
-                  >
+                <li key={s.id} className="py-3 flex items-center justify-between gap-4">
+                  <div className="flex-1 min-w-0">
                     <div className="text-sm font-medium text-black">Activity Plan #{s.id}</div>
-                    <div className="text-xs text-black">{s.status}</div>
-                  </button>
-                  <div className="text-xs text-black">
-                    {s.updated_at ? new Date(s.updated_at).toLocaleString() : ''}
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className={`text-xs px-2 py-1 rounded-full font-medium ${getStatusColor(s.status)}`}>
+                        {getStatusLabel(s.status)}
+                      </span>
+                      <span className="text-xs text-gray-500">
+                        {s.updated_at ? new Date(s.updated_at).toLocaleString() : ''}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {/* Show View button ONLY for approved plans (with dean signature embedded) */}
+                    {s.status === 'approved' && (
+                      <motion.button
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        onClick={() => handleViewPdf(s.id)}
+                        className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-green-50 text-green-700 hover:bg-green-100 transition-colors text-sm font-medium"
+                        title="View Approved PDF with Dean's Signature"
+                      >
+                        <Eye className="w-4 h-4" />
+                        View
+                      </motion.button>
+                    )}
+                    {/* Show Edit button for draft and under_revision */}
+                    {(s.status === 'draft' || s.status === 'under_revision') && (
+                      <motion.button
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        onClick={() => handleEdit(s.id)}
+                        className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 transition-colors text-sm font-medium"
+                        title="Edit Document"
+                      >
+                        <Edit className="w-4 h-4" />
+                        Edit
+                      </motion.button>
+                    )}
+                    {/* For pending status: no action (approval in progress) */}
+                    {s.status === 'pending' && (
+                      <div className="text-xs text-gray-500 italic px-3 py-1.5">
+                        Awaiting approval...
+                      </div>
+                    )}
+                    {/* For completed: show View button */}
+                    {s.status === 'completed' && (
+                      <motion.button
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        onClick={() => handleViewPdf(s.id)}
+                        className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 transition-colors text-sm font-medium"
+                        title="View Completed Activity Plan"
+                      >
+                        <Eye className="w-4 h-4" />
+                        View
+                      </motion.button>
+                    )}
                   </div>
                 </li>
               ))}
