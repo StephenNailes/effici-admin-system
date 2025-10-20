@@ -87,14 +87,14 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     // Admin Dashboard
     Route::get('/admin/dashboard', fn () => Inertia::render('AdminDashboard', [
-        'events' => Event::all(),
-        'announcements' => Announcement::all(),
+        'events' => Event::orderByDesc('id')->take(2)->get(),
+        'announcements' => Announcement::orderByDesc('id')->take(2)->get(),
     ]))->name('admin.dashboard');
 
     // Dean Dashboard
     Route::get('/dean/dashboard', fn () => Inertia::render('DeanDashboard', [
-        'events' => Event::all(),
-        'announcements' => Announcement::all(),
+        'events' => Event::orderByDesc('id')->take(2)->get(),
+        'announcements' => Announcement::orderByDesc('id')->take(2)->get(),
     ]))->name('dean.dashboard');
 
     // Profile page

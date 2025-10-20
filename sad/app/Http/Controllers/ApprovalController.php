@@ -297,8 +297,8 @@ class ApprovalController extends Controller
                             $student = DB::table('users')->select('first_name','last_name')->where('id', $studentId)->first();
                             $planMeta = DB::table('activity_plans')->select('category')->where('id', $ra->request_id)->first();
                             $studentName = $student ? trim(($student->first_name ?? '') . ' ' . ($student->last_name ?? '')) : 'Student';
-                            $priorityMap = [ 'minor' => 'low', 'normal' => 'normal', 'urgent' => 'urgent' ];
-                            $priority = isset($planMeta->category) ? ($priorityMap[$planMeta->category] ?? 'normal') : 'normal';
+                            // Priority is already 'low', 'medium', or 'high' in the database
+                            $priority = isset($planMeta->category) ? $planMeta->category : 'medium';
                             // Broadcast to all dean users
                             $this->notificationService->notifyNewRequest(
                                 'dean',

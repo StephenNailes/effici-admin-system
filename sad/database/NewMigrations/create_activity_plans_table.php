@@ -13,7 +13,7 @@ class CreateActivityPlansTable extends Migration
             $table->foreignId('user_id')->constrained('users')->cascadeOnDelete();
             $table->string('activity_name');
             $table->text('activity_purpose');
-            $table->enum('category', ['minor','normal','urgent'])->default('normal');
+            $table->enum('category', ['low','medium','high'])->default('medium');
             $table->enum('status', ['pending','under_revision','approved','completed'])->default('pending');
             $table->dateTime('start_datetime');
             $table->dateTime('end_datetime');

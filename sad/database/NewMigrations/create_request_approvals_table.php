@@ -12,7 +12,7 @@ class CreateRequestApprovalsTable extends Migration
             $table->bigIncrements('id');
             $table->enum('request_type', ['equipment','activity_plan']);
             $table->unsignedBigInteger('request_id');
-            $table->enum('category', ['minor','normal','urgent'])->default('normal');
+            $table->enum('category', ['low','medium','high'])->default('medium');
             $table->enum('approver_role', ['admin_assistant','dean']);
             $table->unsignedBigInteger('approver_id')->nullable();
             $table->enum('status', ['pending','approved','revision_requested'])->default('pending');

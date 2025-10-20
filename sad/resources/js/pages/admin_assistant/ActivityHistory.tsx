@@ -531,18 +531,17 @@ export default function ActivityHistory() {
                       </td>
                       <td className="py-3 px-6">
                         {(() => {
-                          const raw = (activity.priority || '').toString().toLowerCase();
-                          const val = raw === 'minor' ? 'low' : raw; // normalize minor->low if present
+                          const val = (activity.priority || '').toString().toLowerCase();
                           if (!val) return <span className="text-gray-400">-</span>;
                           const pillBase = 'inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-semibold';
-                          if (val === 'urgent' || val === 'high') {
-                            return <span className={`${pillBase} bg-red-100 text-red-700`}>Urgent</span>;
+                          if (val === 'high') {
+                            return <span className={`${pillBase} bg-red-100 text-red-700`}>High</span>;
                           }
-                          if (val === 'normal') {
-                            return <span className={`${pillBase} bg-blue-100 text-blue-700`}>Normal</span>;
+                          if (val === 'medium') {
+                            return <span className={`${pillBase} bg-blue-100 text-blue-700`}>Medium</span>;
                           }
-                          if (val === 'low' || val === 'minor') {
-                            return <span className={`${pillBase} bg-gray-100 text-gray-700`}>Minor</span>;
+                          if (val === 'low') {
+                            return <span className={`${pillBase} bg-gray-100 text-gray-700`}>Low</span>;
                           }
                           return <span className={`${pillBase} bg-gray-100 text-gray-700`}>{val.charAt(0).toUpperCase() + val.slice(1)}</span>;
                         })()}

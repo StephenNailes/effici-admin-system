@@ -149,7 +149,7 @@ class RevisionController extends Controller
         
         $validated = request()->validate([
             // Activity plan now only has category
-            'category' => 'nullable|in:minor,normal,urgent',
+            'category' => 'nullable|in:low,medium,high',
             // Equipment fields
             'purpose' => 'nullable|string',
             'equipment_category' => 'nullable|string',
@@ -166,7 +166,7 @@ class RevisionController extends Controller
                     ->where('id', $id)
                     ->where('user_id', $userId)
                     ->update([
-                        'category' => $validated['category'] ?? 'normal',
+                        'category' => $validated['category'] ?? 'medium',
                         'status' => 'pending',
                         'updated_at' => now(),
                     ]);

@@ -48,13 +48,13 @@ class ActivityPlanController extends Controller
         }
         
         $validated = $request->validate([
-            'category' => 'sometimes|in:minor,normal,urgent',
+            'category' => 'sometimes|in:low,medium,high',
         ]);
 
         // Create plan without approvals or notifications (just a draft container)
         $plan = ActivityPlan::create([
             'user_id' => Auth::id(),
-            'category' => $validated['category'] ?? 'normal',
+            'category' => $validated['category'] ?? 'medium',
             'status' => 'draft', // Draft status - no approvals yet
         ]);
 
@@ -102,12 +102,8 @@ class ActivityPlanController extends Controller
         });
 
         // Send notification to admin assistants
-        $priorityMap = [
-            'minor' => 'low',
-            'normal' => 'normal',
-            'urgent' => 'urgent'
-        ];
-        $priority = $priorityMap[$plan->category] ?? 'normal';
+        // Priority is already 'low', 'medium', or 'high' from the category
+        $priority = $plan->category; // Already in correct format
         $studentName = $user->first_name . ' ' . $user->last_name;
 
         $this->notificationService->notifyNewRequest(
@@ -128,7 +124,7 @@ class ActivityPlanController extends Controller
         }
         $validated = $request->validate([
             // Document-centric: only metadata we still track
-            'category' => 'required|in:minor,normal,urgent',
+            'category' => 'required|in:low,medium,high',
         ]);
 
         $plan = null;
@@ -156,13 +152,8 @@ class ActivityPlanController extends Controller
 
         // Create notification for admin assistants about new activity plan request
         if ($plan) {
-            // Map category to notification priority
-            $priorityMap = [
-                'minor' => 'low',
-                'normal' => 'normal', 
-                'urgent' => 'urgent'
-            ];
-            $priority = $priorityMap[$validated['category']] ?? 'normal';
+            // Priority is already 'low', 'medium', or 'high' from the category
+            $priority = $validated['category'];
             $studentName = $user->first_name . ' ' . $user->last_name;
             
             $this->notificationService->notifyNewRequest(
@@ -284,7 +275,7 @@ class ActivityPlanController extends Controller
             abort(403);
         }
         $validated = $request->validate([
-            'category' => 'required|in:minor,normal,urgent',
+            'category' => 'required|in:low,medium,high',
         ]);
 
         $plan = ActivityPlan::where('id', $id)

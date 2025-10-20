@@ -138,19 +138,19 @@ class NotificationService
         // Humanize the request type for messages
         $humanType = str_replace('_', ' ', (string) $requestType);
         switch ($priority) {
-            case 'urgent':
-                $title = $requestType === 'activity_plan' ? '🚨 URGENT: Activity Plan Request' : '🚨 URGENT: Equipment Request';
-                $message = "URGENT REQUEST: {$studentName} submitted a {$humanType} request requiring immediate attention";
-                break;
             case 'high':
-                $title = $requestType === 'activity_plan' ? '⚡ HIGH: Activity Plan Request' : '⚡ HIGH: Equipment Request';
-                $message = "HIGH PRIORITY: {$studentName} submitted a {$humanType} request";
+                $title = $requestType === 'activity_plan' ? '🚨 HIGH: Activity Plan Request' : '🚨 HIGH: Equipment Request';
+                $message = "HIGH PRIORITY: {$studentName} submitted a {$humanType} request requiring immediate attention";
+                break;
+            case 'medium':
+                $title = $requestType === 'activity_plan' ? 'New Activity Plan Request' : 'New Equipment Request';
+                $message = "{$studentName} submitted a new {$humanType} request for review";
                 break;
             case 'low':
                 $title = $requestType === 'activity_plan' ? 'Activity Plan Request' : 'Equipment Request';
                 $message = "{$studentName} submitted a {$humanType} request (low priority)";
                 break;
-            default: // normal
+            default: // medium as fallback
                 $title = $requestType === 'activity_plan' ? 'New Activity Plan Request' : 'New Equipment Request';
                 $message = "{$studentName} submitted a new {$humanType} request for review";
                 break;
@@ -313,8 +313,8 @@ class NotificationService
         $data = [];
         foreach ($paginator->items() as $notification) {
             $createdAt = $notification->created_at;
-            $priorityRaw = is_string($notification->priority) ? strtolower(trim($notification->priority)) : ($notification->priority ?? 'normal');
-            $priority = in_array($priorityRaw, ['low', 'normal', 'high', 'urgent']) ? $priorityRaw : 'normal';
+            $priorityRaw = is_string($notification->priority) ? strtolower(trim($notification->priority)) : ($notification->priority ?? 'medium');
+            $priority = in_array($priorityRaw, ['low', 'medium', 'high']) ? $priorityRaw : 'medium';
             $data[] = [
                 'id' => $notification->id,
                 'type' => $notification->type,

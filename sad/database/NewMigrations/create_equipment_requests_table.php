@@ -13,7 +13,7 @@ class CreateEquipmentRequestsTable extends Migration
             $table->increments('id');
             $table->foreignId('user_id')->constrained('users')->cascadeOnDelete()->cascadeOnUpdate();
             $table->unsignedBigInteger('activity_plan_id')->nullable();
-            $table->enum('category', ['minor','normal','urgent'])->default('normal');
+            $table->enum('category', ['low','medium','high'])->default('medium');
             $table->string('purpose', 255);
             $table->enum('status', ['pending','under_revision','approved','completed','denied','cancelled','checked_out','returned','overdue'])->default('pending');
             $table->dateTime('start_datetime');

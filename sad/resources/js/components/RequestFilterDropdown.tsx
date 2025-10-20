@@ -19,10 +19,9 @@ const statusOptions = [
 ];
 
 const priorityOptions = [
-  { label: 'All Priorities', value: '' },
-  { label: 'Urgent', value: 'urgent' },
-  { label: 'Normal', value: 'normal' },
-  { label: 'Minor', value: 'minor' },
+  { label: 'High', value: 'high' },
+  { label: 'Medium', value: 'medium' },
+  { label: 'Low', value: 'low' },
 ];
 
 export const RequestFilterDropdown: React.FC<RequestFilterDropdownProps> = ({

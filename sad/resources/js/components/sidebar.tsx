@@ -121,9 +121,9 @@ export default function Sidebar() {
     if (role === 'admin_assistant' || role === 'dean') {
       badgeCount = notifications.filter(n => !n.is_read).length;
     } else {
-      // For other users (students), only include urgent/high priority notifications
+      // For other users (students), only include high priority notifications
       badgeCount = notifications.filter(n => 
-        (n.priority === 'urgent' || n.priority === 'high') && !n.is_read
+        n.priority === 'high' && !n.is_read
       ).length;
       
       // For students, also include new events and announcements

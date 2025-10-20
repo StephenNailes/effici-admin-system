@@ -127,9 +127,8 @@ function DashboardCalendar() {
 }
 
 export default function AdminDashboard({ events = [], announcements = [] }: AdminDashboardProps) {
-  const filteredAnnouncements = announcements.filter(
-    (a) => a.created_by === 'admin_assistant' || a.created_by === 'dean'
-  );
+  // Backend provides limited, ordered lists already
+  const filteredAnnouncements = announcements;
 
   return (
     <MainLayout>
@@ -186,7 +185,7 @@ export default function AdminDashboard({ events = [], announcements = [] }: Admi
               </div>
               <div className="space-y-3 text-sm">
                 {events.length > 0 ? (
-                  events.slice(0, 2).map((event, index) => (
+                  events.map((event, index) => (
                     <motion.div
                       key={index}
                       initial={{ opacity: 0, x: -20 }}
@@ -225,7 +224,7 @@ export default function AdminDashboard({ events = [], announcements = [] }: Admi
               </div>
               <div className="space-y-4 text-sm">
                 {filteredAnnouncements.length > 0 ? (
-                  filteredAnnouncements.slice(0, 2).map((a, index) => (
+                  filteredAnnouncements.map((a, index) => (
                     <motion.div
                       key={index}
                       initial={{ opacity: 0, x: 20 }}

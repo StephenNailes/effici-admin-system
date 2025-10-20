@@ -14,7 +14,7 @@ interface RequestData {
   activity_category?: string;
   request_type: 'activity_plan';
   submitted_at: string;
-  priority: 'minor' | 'normal' | 'urgent';
+  priority: 'low' | 'medium' | 'high';
   approval_status: 'pending' | 'approved' | 'revision_requested';
 }
 
@@ -174,11 +174,11 @@ export default function Request() {
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
-      case 'urgent':
+      case 'high':
         return 'text-red-600';
-      case 'normal':
+      case 'medium':
         return 'text-yellow-600';
-      case 'minor':
+      case 'low':
         return 'text-green-600';
       default:
         return 'text-gray-600';
@@ -200,12 +200,12 @@ export default function Request() {
 
   const getDisplayPriority = (priority: string) => {
     switch (priority) {
-      case 'urgent':
-        return 'Urgent';
-      case 'normal':
-        return 'Normal';
-      case 'minor':
-        return 'Minor';
+      case 'high':
+        return 'High';
+      case 'medium':
+        return 'Medium';
+      case 'low':
+        return 'Low';
       default:
         return priority;
     }

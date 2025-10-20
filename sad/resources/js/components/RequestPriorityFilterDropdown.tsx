@@ -28,11 +28,11 @@ export const RequestPriorityFilterDropdown: React.FC<Props> = ({ priority, onCha
     return () => document.removeEventListener('mousedown', handler);
   }, [open]);
 
-  const options = [
+  const priorityOptions = [
     { label: 'All Priorities', value: '' },
-    { label: 'Urgent', value: 'urgent' },
-    { label: 'Normal', value: 'normal' },
-    { label: 'Minor', value: 'minor' }
+    { label: 'High', value: 'high' },
+    { label: 'Medium', value: 'medium' },
+    { label: 'Low', value: 'low' }
   ];
 
   return (
@@ -58,7 +58,7 @@ export const RequestPriorityFilterDropdown: React.FC<Props> = ({ priority, onCha
         >
           <ul className="py-1 text-sm max-h-[320px] overflow-auto">
             <li className="px-3 pt-2 pb-1 text-[10px] tracking-wider font-semibold text-red-600 uppercase">Priority</li>
-            {options.map(o => {
+            {priorityOptions.map(o => {
               const active = priority === o.value;
               return (
                 <button

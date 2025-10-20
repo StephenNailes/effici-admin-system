@@ -44,11 +44,11 @@ export default function EquipmentModal({
   const priorityLabel: string = request.priority || "—";
   const priorityLower = (request.priority || "").toLowerCase();
   const priorityColor: string =
-    priorityLower === "urgent"
+    priorityLower === "high"
       ? "bg-red-100 text-red-700"
-      : priorityLower === "normal"
+      : priorityLower === "medium"
       ? "bg-yellow-100 text-yellow-800"
-      : priorityLower === "minor"
+      : priorityLower === "low"
       ? "bg-green-100 text-green-700"
       : "bg-gray-100 text-gray-700";
 

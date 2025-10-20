@@ -319,7 +319,7 @@ class EquipmentRequestController extends Controller
                 'items' => 'required|array|min:1',
                 'items.*.equipment_id' => 'required|exists:equipment,id',
                 'items.*.quantity' => 'required|integer|min:1',
-                'category' => 'required|string|in:minor,normal,urgent',
+                'category' => 'required|string|in:low,medium,high',
                 'activity_plan_id' => 'nullable|exists:activity_plans,id',
             ]);
 
@@ -408,13 +408,8 @@ class EquipmentRequestController extends Controller
 
         // Create notification for admin assistants about new equipment request
         if ($equipmentRequest) {
-            // Map category to notification priority
-            $priorityMap = [
-                'minor' => 'low',
-                'normal' => 'normal',
-                'urgent' => 'urgent'
-            ];
-            $priority = $priorityMap[$validated['category']] ?? 'normal';
+            // Priority is already 'low', 'medium', or 'high' from the category
+            $priority = $validated['category'];
             $studentName = $user->first_name . ' ' . $user->last_name;
             
             $this->notificationService->notifyNewRequest(

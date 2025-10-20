@@ -192,7 +192,7 @@ export default function BorrowEquipment() {
     start_datetime: string;
     end_datetime: string;
     items: { equipment_id: number; quantity: number }[];
-    category: "minor" | "normal" | "urgent";
+    category: "low" | "medium" | "high";
     _token?: string;
   }>({
     activity_plan_id: undefined,
@@ -200,7 +200,7 @@ export default function BorrowEquipment() {
     start_datetime: "",
     end_datetime: "",
     items: [{ equipment_id: equipmentList[0]?.id ?? 0, quantity: 1 }],
-    category: "normal", // <-- Default value
+    category: "medium", // <-- Default value
   });
 
   // Functions to handle multiple equipment items
@@ -469,14 +469,14 @@ export default function BorrowEquipment() {
             {/* Category Selector */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-semibold mb-2 text-gray-700">Request Category</label>
-                <MinimalSelect<"minor" | "normal" | "urgent">
+                <label className="block text-sm font-semibold mb-2 text-gray-700">Priority Level</label>
+                <MinimalSelect<"low" | "medium" | "high">
                   value={data.category}
                   onChange={(val) => setData("category", val)}
                   options={[
-                    { value: "minor", label: "Minor" },
-                    { value: "normal", label: "Normal" },
-                    { value: "urgent", label: "Urgent" },
+                    { value: "low", label: "Low" },
+                    { value: "medium", label: "Medium" },
+                    { value: "high", label: "High" },
                   ]}
                   className="w-full"
                 />

@@ -9,7 +9,7 @@ interface NotificationData {
   message: string;
   data: any;
   action_url?: string;
-  priority: 'low' | 'normal' | 'high' | 'urgent';
+  priority: 'low' | 'medium' | 'high';
   is_read: boolean;
   time_ago: string;
   created_at: string;

@@ -10,9 +10,10 @@ class StudentDashboardController extends Controller
 {
     public function __invoke(): Response
     {
+        // Show the most recent public events and announcements regardless of creator role
         return Inertia::render('StudentDashboard', [
-            'events' => Event::whereIn('created_by', ['admin_assistant', 'dean'])->get(),
-            'announcements' => Announcement::whereIn('created_by', ['admin_assistant', 'dean'])->get(),
+            'events' => Event::orderByDesc('id')->take(2)->get(),
+            'announcements' => Announcement::orderByDesc('id')->take(2)->get(),
         ]);
     }
 }

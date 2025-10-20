@@ -21,7 +21,7 @@ type RequestItem = {
   student_name: string;
   request_type: string; // 'equipment' | 'activity' | 'activity_plan'
   title?: string;
-  priority?: string; // 'urgent' | 'normal' | 'minor' | string
+  priority?: string; // 'high' | 'medium' | 'low' | string
   approval_status: string; // 'pending' | 'approved' | 'revision_requested' | 'under_revision' | string
   submitted_at: string; // ISO date string
   equipment_items?: Array<{
@@ -268,11 +268,11 @@ export default function Request() {
 
   const getPriorityColor = (priority: string) => {
     switch (priority?.toLowerCase()) {
-      case "urgent":
+      case "high":
         return "text-red-600";
-      case "normal":
+      case "medium":
         return "text-yellow-600";
-      case "minor":
+      case "low":
         return "text-green-600";
       default:
         return "text-gray-600";

@@ -11,7 +11,7 @@ interface ActivityRevision {
   id: number
   activity_name: string
   activity_purpose: string
-  category: 'minor' | 'normal' | 'urgent'
+  category: 'low' | 'medium' | 'high'
   start_datetime: string
   end_datetime: string
   objectives?: string
@@ -82,7 +82,7 @@ export default function RevisionEdit({ revision, requestType }: RevisionEditProp
       return {
         activity_name: activityRevision.activity_name || '',
         activity_purpose: activityRevision.activity_purpose || '',
-        category: activityRevision.category || 'normal',
+        category: activityRevision.category || 'medium',
         start_datetime: activityRevision.start_datetime || '',
         end_datetime: activityRevision.end_datetime || '',
         objectives: activityRevision.objectives || '',
@@ -238,9 +238,9 @@ export default function RevisionEdit({ revision, requestType }: RevisionEditProp
                       }
                       className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-400 outline-none"
                     >
-                      <option value="minor">Minor</option>
-                      <option value="normal">Normal</option>
-                      <option value="urgent">Urgent</option>
+                      <option value="low">Low</option>
+                      <option value="medium">Medium</option>
+                      <option value="high">High</option>
                     </select>
                   </div>
                 </div>

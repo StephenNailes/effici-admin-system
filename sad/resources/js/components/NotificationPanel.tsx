@@ -14,7 +14,7 @@ interface NotificationData {
   message: string;
   data: any;
   action_url?: string;
-  priority: 'low' | 'normal' | 'high' | 'urgent';
+  priority: 'low' | 'medium' | 'high';
   is_read: boolean;
   time_ago: string;
   created_at: string;
@@ -76,10 +76,10 @@ export default function NotificationPanel({ className = '', onOpen, isOpen: exte
     }
   }, [isOpen]);
 
-  // Filter urgent and high priority notifications for urgent section
-  const urgentNotifications = notifications.filter(n => (n.priority === 'urgent' || n.priority === 'high') && !n.is_read);
+  // Filter high priority notifications for urgent section
+  const urgentNotifications = notifications.filter(n => n.priority === 'high' && !n.is_read);
   // Include notifications with unknown/null priority as regular so they remain visible
-  const regularNotifications = notifications.filter(n => !(n.priority === 'urgent' || n.priority === 'high') || n.is_read);
+  const regularNotifications = notifications.filter(n => n.priority !== 'high' || n.is_read);
 
   const handleMarkAllAsRead = async () => {
     try {
@@ -112,13 +112,13 @@ export default function NotificationPanel({ className = '', onOpen, isOpen: exte
 
   const getPriorityIcon = (priority: string) => {
     switch (priority) {
-      case 'urgent':
-        return <FaExclamationTriangle className="w-4 h-4 text-red-600" />;
       case 'high':
-        return <FaExclamationTriangle className="w-4 h-4 text-orange-500" />;
+        return <FaExclamationTriangle className="w-4 h-4 text-red-600" />;
+      case 'medium':
+        return <FaBell className="w-4 h-4 text-blue-500" />;
       case 'low':
         return <FaBell className="w-4 h-4 text-gray-500" />;
-      default: // normal
+      default: // medium as fallback
         return <FaBell className="w-4 h-4 text-blue-500" />;
     }
   };
@@ -132,8 +132,8 @@ export default function NotificationPanel({ className = '', onOpen, isOpen: exte
       return <FaCheck className="w-4 h-4 text-green-600" />;
     }
     // Warnings/deadlines/overdue
-    if (type.includes('warning') || type.includes('deadline') || type.includes('overdue') || n.priority === 'urgent' || n.priority === 'high') {
-      return <FaExclamationTriangle className={`w-4 h-4 ${n.priority === 'urgent' ? 'text-red-600' : 'text-orange-600'}`} />;
+    if (type.includes('warning') || type.includes('deadline') || type.includes('overdue') || n.priority === 'high') {
+      return <FaExclamationTriangle className="w-4 h-4 text-red-600" />;
     }
     // Default informational
     return <FaBell className="w-4 h-4 text-gray-600" />;
@@ -142,10 +142,10 @@ export default function NotificationPanel({ className = '', onOpen, isOpen: exte
   // Use colored left border to denote category, and background only when unread
   const getPriorityBorder = (priority: string) => {
     switch (priority) {
-      case 'urgent':
-        return 'border-l-4 border-red-600';
       case 'high':
-        return 'border-l-4 border-orange-600';
+        return 'border-l-4 border-red-600';
+      case 'medium':
+        return 'border-l-4 border-blue-600';
       case 'low':
         return 'border-l-4 border-gray-400';
       default:
@@ -155,10 +155,10 @@ export default function NotificationPanel({ className = '', onOpen, isOpen: exte
 
   const getUnreadBg = (priority: string) => {
     switch (priority) {
-      case 'urgent':
-        return 'bg-red-50';
       case 'high':
-        return 'bg-orange-50';
+        return 'bg-red-50';
+      case 'medium':
+        return 'bg-blue-50';
       case 'low':
         return 'bg-gray-50';
       default:
@@ -167,8 +167,7 @@ export default function NotificationPanel({ className = '', onOpen, isOpen: exte
   };
 
   const getPriorityTag = (priority: string) => {
-    if (priority === 'urgent') return <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full uppercase bg-red-600 text-white">URGENT</span>;
-    if (priority === 'high') return <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full uppercase bg-orange-600 text-white">HIGH</span>;
+    if (priority === 'high') return <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full uppercase bg-red-600 text-white">HIGH</span>;
     return null;
   };
 
