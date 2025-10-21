@@ -15,6 +15,17 @@ class NotificationService
      */
     public function create(array $data): Notification
     {
+        // Normalize priority to valid enum values: low, medium, high
+        $priority = $data['priority'] ?? 'medium';
+        // Map 'normal' to 'medium' for backwards compatibility
+        if ($priority === 'normal') {
+            $priority = 'medium';
+        }
+        // Ensure only valid enum values
+        if (!in_array($priority, ['low', 'medium', 'high'], true)) {
+            $priority = 'medium';
+        }
+        
         $notification = Notification::create([
             'user_id' => $data['user_id'],
             'type' => $data['type'],
@@ -22,7 +33,7 @@ class NotificationService
             'message' => $data['message'],
             'data' => $data['data'] ?? null,
             'action_url' => $data['action_url'] ?? null,
-            'priority' => $data['priority'] ?? 'normal'
+            'priority' => $priority
         ]);
         // Invalidate caches for this user so new notifications appear immediately
         $this->clearUserNotificationCache((int)$data['user_id']);
@@ -48,7 +59,7 @@ class NotificationService
                 if ($approverRole === 'admin_assistant') {
                     $title = '✅ Activity Plan - Initial Approval';
                     $message = 'Your activity plan has been approved by the Admin Assistant and is now forwarded to the Dean for final approval.';
-                    $priority = 'normal';
+                    $priority = 'medium';
                 } elseif ($approverRole === 'dean') {
                     $title = '🎉 Activity Plan - Final Approval';
                     $message = 'Congratulations! The Dean has given final approval to your activity plan. You can now proceed with organizing your event.';
@@ -118,14 +129,14 @@ class NotificationService
                 'commenter_name' => $commenterName
             ],
             'action_url' => $actionUrl,
-            'priority' => 'normal'
+            'priority' => 'medium'
         ]);
     }
 
     /**
      * Notify admin/dean about new request submission
      */
-    public function notifyNewRequest($approverRole, $studentName, $requestType, $requestId, $priority = 'normal')
+    public function notifyNewRequest($approverRole, $studentName, $requestType, $requestId, $priority = 'medium')
     {
         // Get all users with the approver role
         $approvers = User::where('role', $approverRole)->get();
@@ -133,6 +144,11 @@ class NotificationService
         $actionUrl = $approverRole === 'dean' && $requestType === 'activity_plan'
             ? "/dean/activity-plan-approval/{$requestId}"
             : "/admin/requests";
+
+        // Normalize priority to valid enum values
+        if (!in_array($priority, ['low', 'medium', 'high'], true)) {
+            $priority = 'medium';
+        }
 
         // Generate appropriate title and message based on priority
         // Humanize the request type for messages
@@ -210,7 +226,7 @@ class NotificationService
                     'student_name' => $studentName
                 ],
                 'action_url' => $actionUrl,
-                'priority' => 'normal'
+                'priority' => 'medium'
             ]);
         }
     }
@@ -228,12 +244,12 @@ class NotificationService
             $notificationTitle = '📅 New Event Posted';
             $message = "A new event '{$title}' has been scheduled. Check it out to see the details and mark your calendar!";
             $actionUrl = '/events';
-            $priority = 'normal';
+            $priority = 'medium';
         } else {
             $notificationTitle = '📢 New Announcement';
             $message = "Important announcement '{$title}' has been posted. Click to read the full details.";
             $actionUrl = '/announcements';
-            $priority = 'normal';
+            $priority = 'medium';
         }
 
         // Add extra priority for Dean announcements
@@ -424,7 +440,7 @@ class NotificationService
                     'requested_role' => 'student_officer',
                 ],
                 'action_url' => "/admin/role-requests",
-                'priority' => 'normal',
+                'priority' => 'medium',
             ]);
         }
     }
@@ -449,7 +465,7 @@ class NotificationService
                 'status' => $status,
             ],
             'action_url' => '/profile',
-            'priority' => $status === 'approved' ? 'high' : 'normal',
+            'priority' => $status === 'approved' ? 'high' : 'medium',
         ]);
     }
 }

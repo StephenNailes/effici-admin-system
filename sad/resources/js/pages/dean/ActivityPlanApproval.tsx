@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import MainLayout from "@/layouts/mainlayout";
 import { Download, Maximize2, Check, X, ArrowLeft, Users, PenTool, Save, Trash2, Move } from "lucide-react";
@@ -41,6 +41,22 @@ export default function ActivityPlanApproval({ id }: Props) {
     const el = document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement | null;
     return el?.content || '';
   };
+
+  // Memoize the PDF URL to prevent iframe reloads during signature dragging
+  const pdfUrl = useMemo(() => {
+    if (!activityPlan?.pdf_url) return null;
+    
+    const base = activityPlan.pdf_url.split('?')[0];
+    const unsigned = base.replace(/_signed\.pdf$/i, '.pdf');
+    const url = isSignatureMode ? unsigned : base;
+    
+    // Use a stable cache buster that only changes when activityPlan.pdf_url changes
+    const cacheBuster = `t=${activityPlan.pdf_url}`;
+    const existingQs = activityPlan.pdf_url.includes('?') ? activityPlan.pdf_url.split('?')[1] : '';
+    const qs = existingQs ? `${existingQs}&${cacheBuster}` : cacheBuster;
+    
+    return `${url}?${qs}#page=2&view=Fit&toolbar=0&navpanes=0&zoom=100`;
+  }, [activityPlan?.pdf_url, isSignatureMode]);
 
   useEffect(() => {
     axios
@@ -244,13 +260,21 @@ export default function ActivityPlanApproval({ id }: Props) {
         panTimerRef.current = null;
       }
       setIsPanMode(false);
-      // After backend embeds signatures, refresh the PDF URL to break cache
-      // Append a cache-busting query param so iframe reloads the updated PDF
-      setActivityPlan((prev: any) => prev ? {
-        ...prev,
-        pdf_url: prev.pdf_url ? `${prev.pdf_url.split('?')[0]}?t=${Date.now()}` : prev.pdf_url
-      } : prev);
-      alert('Signatures saved and permanently embedded into the PDF!\n\nThe preview has been refreshed. You can now approve the request.');
+      
+      // Refetch the activity plan to get the updated PDF URL pointing to the signed PDF
+      try {
+        const refreshResponse = await axios.get(`/api/approvals/${id}`);
+        setActivityPlan(refreshResponse.data);
+        alert('Signatures saved and permanently embedded into the PDF!\n\nThe preview has been refreshed. You can now approve the request.');
+      } catch (refreshErr) {
+        console.error('Error refreshing activity plan:', refreshErr);
+        // Fallback: just add cache buster if refresh fails
+        setActivityPlan((prev: any) => prev ? {
+          ...prev,
+          pdf_url: prev.pdf_url ? `${prev.pdf_url.split('?')[0]}?t=${Date.now()}` : prev.pdf_url
+        } : prev);
+        alert('Signatures saved! Please refresh the page to see the updated PDF.');
+      }
     } catch (error) {
       console.error('Error saving signatures:', error);
       alert('Failed to save and embed signatures into PDF. Please try again.');
@@ -400,16 +424,8 @@ export default function ActivityPlanApproval({ id }: Props) {
                       {/* A4 page container: max width ~794px at 96dpi with A4 aspect ratio */}
                       <div ref={pageRef} className="relative bg-white shadow-xl border rounded-sm overflow-hidden w-[794px] min-w-[794px] max-w-[794px] aspect-[210/297]">
                         <iframe
-                          // When in signature mode, always show the ORIGINAL (unsigned) PDF to avoid seeing already-stamped signatures behind the overlay
-                          // Show LAST PAGE (page=999 will show last page in most PDF viewers) where approval signatures are
-                          src={`${(() => {
-                            const base = activityPlan.pdf_url.split('?')[0];
-                            const unsigned = base.replace(/_signed\.pdf$/i, '.pdf');
-                            const url = isSignatureMode ? unsigned : base;
-                            // keep any cache buster when not in signature mode
-                            const qs = isSignatureMode ? '' : (activityPlan.pdf_url.includes('?') ? `?${activityPlan.pdf_url.split('?')[1]}` : '');
-                            return `${url}${qs}`;
-                          })()}#page=2&view=Fit&toolbar=0&navpanes=0&zoom=100`}
+                          key={pdfUrl}
+                          src={pdfUrl || undefined}
                           className="absolute inset-0 w-full h-full border-0"
                           title="Activity Plan Last Page (Approval Signatures)"
                           style={{ pointerEvents: isSignatureMode && !isPanMode ? 'none' : 'auto' }}

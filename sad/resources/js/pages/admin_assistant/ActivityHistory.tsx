@@ -466,7 +466,6 @@ export default function ActivityHistory() {
                   <th className="py-3 px-6">Student</th>
                   <th className="py-3 px-6">Type</th>
                   <th className="py-3 px-6">Date Submitted</th>
-                  <th className="py-3 px-6">Category/Purpose</th>
                   <th className="py-3 px-6">Priority</th>
                   <th className="py-3 px-6">Status</th>
                   <th className="py-3 px-6">Approved By</th>
@@ -479,7 +478,7 @@ export default function ActivityHistory() {
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.4 }}
                   >
-                    <td colSpan={8} className="py-8 px-6 text-center text-gray-400">
+                    <td colSpan={7} className="py-8 px-6 text-center text-gray-400">
                       <motion.div
                         initial={{ scale: 0.95 }}
                         animate={{ scale: 1 }}
@@ -522,13 +521,6 @@ export default function ActivityHistory() {
                       <td className="py-3 px-6">{activity.student}</td>
                       <td className="py-3 px-6">{activity.type}</td>
                       <td className="py-3 px-6">{activity.dateSubmitted}</td>
-                      <td className="py-3 px-6">
-                        {activity.type === "Role Update" && (activity.category || '').toLowerCase() === "student_officer" ? (
-                          <span className="text-gray-400">-</span>
-                        ) : (
-                          activity.category
-                        )}
-                      </td>
                       <td className="py-3 px-6">
                         {(() => {
                           const val = (activity.priority || '').toString().toLowerCase();

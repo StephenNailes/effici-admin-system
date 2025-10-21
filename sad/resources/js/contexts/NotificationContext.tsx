@@ -41,12 +41,46 @@ interface NotificationProviderProps {
   isAuthenticated?: boolean; // passed from app shell so we only fetch once user is logged in
 }
 
-export const NotificationProvider: React.FC<NotificationProviderProps> = ({ children, isAuthenticated = false }) => {
+export const NotificationProvider: React.FC<NotificationProviderProps> = ({ children, isAuthenticated: initialAuth = false }) => {
   const [notifications, setNotifications] = useState<NotificationData[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(false);
   const [lastFetch, setLastFetch] = useState<number>(0);
   const [fetchedAt, setFetchedAt] = useState<number | null>(null);
+  const [isAuthenticated, setIsAuthenticated] = useState(initialAuth);
+
+  // Update authentication state when it changes from props or Inertia page
+  useEffect(() => {
+    setIsAuthenticated(initialAuth);
+  }, [initialAuth]);
+
+  // Also check Inertia page props for auth state changes
+  useEffect(() => {
+    const checkAuth = () => {
+      try {
+        const anyRouter: any = router as any;
+        const currentPage = anyRouter?.page;
+        const authed = Boolean(currentPage?.props?.auth?.user);
+        if (authed !== isAuthenticated) {
+          console.log('🔐 Auth state changed:', { from: isAuthenticated, to: authed });
+          setIsAuthenticated(authed);
+        }
+      } catch (e) {
+        // no-op
+      }
+    };
+
+    checkAuth(); // Check immediately
+    
+    const anyRouter: any = router as any;
+    anyRouter?.on?.('navigate', checkAuth);
+    anyRouter?.on?.('finish', checkAuth);
+    
+    return () => {
+      anyRouter?.off?.('navigate', checkAuth);
+      anyRouter?.off?.('finish', checkAuth);
+    };
+  }, [isAuthenticated]);
 
   // Debounced fetch function - only fetch if 3 seconds have passed since last fetch
   const fetchNotifications = useCallback(async (force: boolean = false) => {
@@ -138,6 +172,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
   useEffect(() => {
     // If we already know we're authenticated, fetch once
     if (isAuthenticated && !fetchedAt) {
+      console.log('🔔 Auto-fetching notifications on mount (authenticated)');
       fetchNotifications();
     }
 
@@ -148,6 +183,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
         const currentPage = anyRouter?.page;
         const authed = Boolean(currentPage?.props?.auth?.user);
         if (authed && !fetchedAt) {
+          console.log('🔔 Auto-fetching notifications after Inertia navigation (authenticated)');
           fetchNotifications();
         }
       } catch (e) {
@@ -165,7 +201,20 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
       window.removeEventListener('inertia:finish', domFinish);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAuthenticated, fetchedAt, fetchNotifications]);
+  }, [isAuthenticated, fetchedAt]);
+
+  // Additional effect: Fetch notifications periodically (every 30 seconds) when user is authenticated
+  useEffect(() => {
+    if (!isAuthenticated) return;
+
+    // Set up interval to refresh notifications every 30 seconds
+    const intervalId = setInterval(() => {
+      console.log('🔄 Periodic notification refresh (30s interval)');
+      fetchNotifications(false); // Use debounced fetch
+    }, 30000);
+
+    return () => clearInterval(intervalId);
+  }, [isAuthenticated, fetchNotifications]);
 
   const value: NotificationContextType = {
     notifications,

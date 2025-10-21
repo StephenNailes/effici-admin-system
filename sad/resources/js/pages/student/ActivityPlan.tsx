@@ -2145,7 +2145,7 @@ const App: React.FC = () => {
         allowNextNavRef.current = true;
         
         router.post('/student/requests/activity-plan/create-draft', {
-          category: 'normal'
+          category: 'medium'
         }, {
           preserveState: false,
           preserveScroll: false,
