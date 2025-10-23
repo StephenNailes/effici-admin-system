@@ -7,9 +7,11 @@ import InfoModal from '@/components/InfoModal';
 
 interface PlanSummary {
   id: number;
+  plan_name?: string;
   status: 'draft' | 'pending' | 'under_revision' | 'approved' | 'completed';
   created_at?: string;
   updated_at?: string;
+  category?: 'low' | 'medium' | 'high';
   file_url?: string | null;
 }
 
@@ -21,7 +23,7 @@ type DashboardProps = {
     needsRevision: number;
   };
   recent: PlanSummary[];
-  submitted: Pick<PlanSummary, 'id' | 'status' | 'created_at' | 'updated_at'>[];
+  submitted: Pick<PlanSummary, 'id' | 'plan_name' | 'status' | 'created_at' | 'updated_at' | 'category'>[];
   submittedPagination: {
     current_page: number;
     last_page: number;
@@ -135,7 +137,9 @@ export default function ActivityRequests() {
               {submitted.map((s) => (
                 <li key={s.id} className="py-3 flex items-center justify-between gap-4">
                   <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium text-black">Activity Plan #{s.id}</div>
+                    <div className="text-sm font-medium text-black">
+                      {s.plan_name || `Activity Plan #${s.id}`}
+                    </div>
                     <div className="flex items-center gap-2 mt-1">
                       <span className={`text-xs px-2 py-1 rounded-full font-medium ${getStatusColor(s.status)}`}>
                         {getStatusLabel(s.status)}
@@ -276,7 +280,9 @@ export default function ActivityRequests() {
                     <FileText className="w-8 h-8" />
                   </div>
                   <div className="mt-2">
-                    <div className="text-sm font-medium text-gray-800 truncate">{`Document #${doc.id}`}</div>
+                    <div className="text-sm font-medium text-gray-800 truncate">
+                      {doc.plan_name || `Document #${doc.id}`}
+                    </div>
                     <div className="text-xs text-gray-500">
                       <span className={`px-2 py-0.5 rounded-full font-medium ${getStatusColor(doc.status)}`}>
                         {getStatusLabel(doc.status)}

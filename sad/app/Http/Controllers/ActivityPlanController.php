@@ -71,13 +71,28 @@ class ActivityPlanController extends Controller
             abort(403, 'Only Student Officers can submit activity plans.');
         }
 
+        $validated = $request->validate([
+            'plan_name' => 'nullable|string|max:255',
+            'category' => 'nullable|in:low,medium,high',
+        ]);
+
         $plan = ActivityPlan::where('id', $id)
             ->where('user_id', Auth::id())
             ->firstOrFail();
 
         $user = Auth::user();
 
-        DB::transaction(function () use ($plan, $user) {
+        DB::transaction(function () use ($plan, $user, $validated) {
+            // Update plan with submitted data if provided
+            $updateData = ['status' => 'pending'];
+            if (isset($validated['plan_name'])) {
+                $updateData['plan_name'] = $validated['plan_name'];
+            }
+            if (isset($validated['category'])) {
+                $updateData['category'] = $validated['category'];
+            }
+            $plan->update($updateData);
+
             // Create approval record if it doesn't exist
             $existingApproval = RequestApproval::where('request_type', 'activity_plan')
                 ->where('request_id', $plan->id)
@@ -96,9 +111,6 @@ class ActivityPlanController extends Controller
                     ]
                 ]);
             }
-
-            // Update plan status to pending
-            $plan->update(['status' => 'pending']);
         });
 
         // Send notification to admin assistants
@@ -184,15 +196,17 @@ class ActivityPlanController extends Controller
             ->with(['currentFile:id,activity_plan_id,file_path'])
             ->latest('updated_at')
             ->take(5)
-            ->get(['id','status','created_at','updated_at']);
+            ->get(['id','plan_name','status','created_at','updated_at','category']);
         // Shape data for the dashboard (include a public URL to current HTML file if available)
         $recent = $plans->map(function ($p) {
             $fileUrl = $p->currentFile ? asset('storage/' . ltrim($p->currentFile->file_path, '/')) : null;
             return [
                 'id' => $p->id,
+                'plan_name' => $p->plan_name,
                 'status' => $p->status,
                 'created_at' => $p->created_at,
                 'updated_at' => $p->updated_at,
+                'category' => $p->category,
                 'file_url' => $fileUrl,
             ];
         });
@@ -208,14 +222,16 @@ class ActivityPlanController extends Controller
         $submittedPaginated = (clone $base)
             ->where('status', '!=', 'draft')
             ->latest('updated_at')
-            ->paginate(5, ['id','status','created_at','updated_at'], 'submitted_page', $submittedPage);
+            ->paginate(5, ['id','plan_name','status','created_at','updated_at','category'], 'submitted_page', $submittedPage);
 
         $submitted = collect($submittedPaginated->items())->map(function ($p) {
             return [
                 'id' => $p->id,
+                'plan_name' => $p->plan_name,
                 'status' => $p->status,
                 'created_at' => $p->created_at,
                 'updated_at' => $p->updated_at,
+                'category' => $p->category,
             ];
         });
 
@@ -790,6 +806,7 @@ class ActivityPlanController extends Controller
         return Inertia::render('student/ViewApprovedPdf', [
             'plan' => [
                 'id' => $plan->id,
+                'plan_name' => $plan->plan_name,
                 'status' => $plan->status,
                 'category' => $plan->category,
                 'created_at' => $plan->created_at,

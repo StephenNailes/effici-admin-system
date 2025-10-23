@@ -45,7 +45,7 @@ const PDFPreviewModal: React.FC<PDFPreviewModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-white/20 backdrop-blur-md">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
       {/* Modal Container */}
       <div className="relative w-full h-full max-w-4xl max-h-[90vh] mx-4 my-4 bg-white rounded-lg shadow-2xl flex flex-col">
         

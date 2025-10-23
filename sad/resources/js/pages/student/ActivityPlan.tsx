@@ -1495,7 +1495,7 @@ const App: React.FC = () => {
     ensureCsrf().finally(() => setCsrfReady(true));
   }, [ensureCsrf]);
   const getInitialContent = () => `
-    <div style="text-align: left;" class="text-sm font-semibold ap-date">SEPTEMBER 22, 2025</div><br>
+    <div style="text-align: left;" class="text-sm font-semibold ap-date">SET DATE IN THIS AREA </div><br>
     <h2 style="text-align: center;" class="text-2xl font-bold mb-4">ACTIVITY PLAN</h2>
     <h3 class="font-bold text-lg mb-2">I. NAME OF THE ACTIVITY:</h3><p class="ml-4">&lt;content&gt;</p><br>
     <h3 class="font-bold text-lg mb-2">II. RATIONALE:</h3><p class="ml-4 text-justify">&lt;content&gt;</p><br>
@@ -1514,12 +1514,8 @@ const App: React.FC = () => {
   const [members, setMembers] = useState<Member[]>([]);
   const [signatories, setSignatories] = useState<SignatoriesMap>({
       "Prepared by:": [],
-      "Noted by:": [
-        { name: "MRS. ANAFLOR E. SACOPAYO, MBA", position: "Director of Student Affairs and Discipline" },
-      ],
-      "Approved by:": [
-        { name: "DR. AVEENIR B. DAYAGANON", position: "Vice President for Academics" },
-      ]
+      "Noted by:": [ { name: "MR. CEASAR IAN P. BENABLO, MIT", position: "Dean, College of Computer Studies" } ],
+      "Approved by:": []
   });
   const [signatoriesHeight, setSignatoriesHeight] = useState<number>(0);
   const [showSignatureCanvas, setShowSignatureCanvas] = useState(false);
@@ -1641,11 +1637,9 @@ const App: React.FC = () => {
         setSignatories({
           "Prepared by:": [],
           "Noted by:": [
-            { name: "MRS. ANAFLOR E. SACOPAYO, MBA", position: "Director of Student Affairs and Discipline" },
+            { name: "MR. CEASAR IAN P. BENABLO, MIT", position: "Dean, College of Computer Studies" },
           ],
-          "Approved by:": [
-            { name: "DR. AVEENIR B. DAYAGANON", position: "Vice President for Academics" },
-          ]
+          "Approved by:": []
         });
         setSignatures([]);
         setHeaderEmail('sites@uic.edu.ph');
@@ -1852,7 +1846,7 @@ const App: React.FC = () => {
     setShowSubmissionModal(false);
   };
 
-  const handleConfirmSubmission = () => {
+  const handleConfirmSubmission = (data?: { planName: string; priority: 'low' | 'medium' | 'high' }) => {
     // Close modal and proceed with submission
     setShowSubmissionModal(false);
     
@@ -1861,7 +1855,11 @@ const App: React.FC = () => {
     allowNextNavRef.current = true;
     router.post(
       `/student/requests/activity-plan/${plan.id}/submit`,
-      {},
+      {
+        // Best-effort pass-through: backend may ignore these if unsupported
+        plan_name: data?.planName,
+        category: data?.priority,
+      },
       {
         preserveScroll: true,
         onSuccess: () => {

@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import Modal from '@/components/Modal';
 import { AlertTriangle, X } from 'lucide-react';
 
@@ -9,23 +9,6 @@ export interface UnsavedChangesModalProps {
 }
 
 export default function UnsavedChangesModal({ open, onCancel, onExit }: UnsavedChangesModalProps) {
-	useEffect(() => {
-		if (!open) return;
-		// Find the modal backdrop element created by Modal.tsx and override its blur
-		const backdrop = document.querySelector('.backdrop-blur-sm') as HTMLElement | null;
-		if (!backdrop) return;
-		// Save original values
-		const prevBackdropFilter = backdrop.style.backdropFilter;
-		const prevBackground = backdrop.style.backgroundColor;
-		// Remove blur and set a slightly darker overlay
-		backdrop.style.backdropFilter = 'none';
-		backdrop.style.backgroundColor = 'rgba(0,0,0,0.28)';
-
-		return () => {
-			backdrop.style.backdropFilter = prevBackdropFilter;
-			backdrop.style.backgroundColor = prevBackground;
-		};
-	}, [open]);
 
 	return (
 		<Modal open={open} onClose={onCancel}>

@@ -71,11 +71,11 @@ export default function Modal({ open, onClose, children }: ModalProps) {
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
         >
-          {/* Enhanced backdrop with blur effect across the entire page */}
+          {/* Backdrop: slightly dark overlay, no blur for clarity and consistency */}
           <div
-            className="absolute inset-0 bg-black/20 backdrop-blur-sm"
-            onMouseDown={safeClose}
-          />
+              className="absolute inset-0 bg-black/40"
+              onMouseDown={safeClose}
+            />
 
           {/* Modal content container */}
           <motion.div

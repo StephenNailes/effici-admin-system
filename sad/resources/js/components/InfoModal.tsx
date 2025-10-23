@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import Modal from '@/components/Modal';
 import { CheckCircle2, Info, AlertTriangle, X } from 'lucide-react';
 
@@ -23,19 +23,6 @@ export default function InfoModal({
   onPrimary,
   variant = 'info',
 }: InfoModalProps) {
-  useEffect(() => {
-    if (!open) return;
-    const backdrop = document.querySelector('.backdrop-blur-sm') as HTMLElement | null;
-    if (!backdrop) return;
-    const prevBackdropFilter = backdrop.style.backdropFilter;
-    const prevBackground = backdrop.style.backgroundColor;
-    backdrop.style.backdropFilter = 'none';
-    backdrop.style.backgroundColor = 'rgba(0,0,0,0.28)';
-    return () => {
-      backdrop.style.backdropFilter = prevBackdropFilter;
-      backdrop.style.backgroundColor = prevBackground;
-    };
-  }, [open]);
   const handlePrimary = () => {
     onPrimary?.();
     onClose();

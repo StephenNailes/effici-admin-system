@@ -13,6 +13,7 @@ class ActivityPlan extends Model
 
     protected $fillable = [
         'user_id',
+        'plan_name',
         'category',
         'status',
         'current_file_id',

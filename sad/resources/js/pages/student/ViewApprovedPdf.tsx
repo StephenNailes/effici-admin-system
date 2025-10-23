@@ -6,6 +6,7 @@ import { router } from '@inertiajs/react';
 
 interface Plan {
   id: number;
+  plan_name?: string;
   status: string;
   category: string;
   created_at: string;
@@ -82,7 +83,7 @@ export default function ViewApprovedPdf({ plan }: Props) {
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-3xl font-bold text-red-600 tracking-tight mb-2">
-                Activity Plan #{plan.id}
+                {plan.plan_name || `Activity Plan #${plan.id}`}
               </h1>
               <div className="flex items-center gap-3">
                 {getStatusBadge(plan.status)}
@@ -143,7 +144,7 @@ export default function ViewApprovedPdf({ plan }: Props) {
               <div className="flex items-center gap-3">
                 <FileText className="w-5 h-5 text-red-600" />
                 <h2 className="text-lg font-semibold text-gray-900">
-                  {plan.status === 'approved' ? 'Dean-Approved Document' : 'Activity Plan Status'}
+                  {plan.status === 'approved' ? 'Approved Document' : 'Activity Plan Status'}
                 </h2>
               </div>
               <div className="flex items-center gap-2">
