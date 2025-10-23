@@ -87,9 +87,9 @@ export default function Login() {
           )}
 
           <form onSubmit={handleLogin} className="space-y-7">
-            {/* Username */}
+            {/* Username or Email */}
             <div>
-              <label htmlFor="username" className="block text-base font-semibold mb-2">Username</label>
+              <label htmlFor="username" className="block text-base font-semibold mb-2">Username or Email</label>
               <input
                 id="username"
                 type="text"
@@ -97,7 +97,7 @@ export default function Login() {
                 autoFocus
                 autoComplete="username"
                 className="w-full px-5 py-3 rounded-lg border border-gray-300 bg-white text-black placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-red-400 text-lg"
-                placeholder="Enter your username"
+                placeholder="Enter your username or email"
                 value={data.username}
                 onChange={(e) => setData('username', e.target.value)}
               />
@@ -164,11 +164,7 @@ export default function Login() {
               )}
             </motion.button>
 
-            {/* Link to Register */}
-            <div className="text-center text-sm text-gray-700 mt-3">
-              Don't have an account?{' '}
-              <a href="/register" className="text-red-500 font-semibold hover:underline">Register</a>
-            </div>
+            {/* Registration removed by request: no link to account creation */}
           </form>
         </motion.div>
 
