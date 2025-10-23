@@ -7,8 +7,6 @@ use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
 // use Illuminate\Support\Facades\URL; // No longer needed after removing email preview routes
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
-use App\Http\Controllers\Auth\RegisteredUserController;
-use App\Http\Controllers\Auth\EmailVerificationController;
 
 use App\Http\Controllers\StudentDashboardController;
 use App\Http\Controllers\ActivityPlanController;
@@ -46,13 +44,10 @@ Route::get('/', function () {
     return redirect()->route('login');
 })->name('home');
 
-// 🟩 Auth Routes
+// 🟩 Auth Routes (UIC API-based)
 Route::middleware('guest')->group(function () {
     Route::get('/login', [AuthenticatedSessionController::class, 'create'])->name('login');
     Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:10,1');
-    // Registration routes
-    Route::get('/register', [RegisteredUserController::class, 'create'])->name('register');
-    Route::post('/register', [RegisteredUserController::class, 'store'])->middleware('throttle:6,1');
 });
 
 Route::post('/logout', [AuthenticatedSessionController::class, 'destroy'])
@@ -73,15 +68,8 @@ Route::post('/admin/invitations/resend', [InvitationController::class, 'resend']
     ->middleware(['auth', 'verified'])
     ->name('invitations.resend');
 
-// ✅ Email Verification (6-digit code) Routes
-Route::middleware('auth')->group(function () {
-    Route::get('/email/verify', [EmailVerificationController::class, 'notice'])->name('verification.notice');
-    Route::post('/email/verification-notification', [EmailVerificationController::class, 'send'])->middleware('throttle:10,1')->name('verification.send');
-    Route::post('/email/verify', [EmailVerificationController::class, 'verify'])->middleware('throttle:20,1')->name('verification.verify');
-});
-
 // 🟩 Role-based Dashboards
-Route::middleware(['auth', 'verified'])->group(function () {
+Route::middleware(['auth'])->group(function () {
 
     // Student Dashboard
     Route::get('/student/dashboard', StudentDashboardController::class)->name('student.dashboard');

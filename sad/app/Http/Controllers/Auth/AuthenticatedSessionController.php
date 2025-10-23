@@ -5,7 +5,6 @@ namespace App\Http\Controllers\Auth;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\LoginRequest;
 use App\Models\User;
-use Illuminate\Auth\Notifications\VerifyEmail;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -36,15 +35,6 @@ class AuthenticatedSessionController extends Controller
 
         /** @var User $user */
         $user = Auth::user();
-
-        // ✅ Check if email is verified
-        if (is_null($user->email_verified_at)) {
-            // Send email verification notification automatically
-            $user->notify(new VerifyEmail);
-            
-            // Redirect to email verification page
-            return redirect()->route('verification.notice');
-        }
 
         // ✅ Redirect based on user role
         switch ($user->role) {
