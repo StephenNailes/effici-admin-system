@@ -1,51 +1,35 @@
 import { useState, useEffect } from 'react'
 import { toast } from 'react-toastify'
-import { router } from '@inertiajs/react'
+import { useForm } from '@inertiajs/react'
 import { FiEye, FiEyeOff, FiLogIn } from 'react-icons/fi'
 import { motion } from 'framer-motion'
-import { getCsrfToken, getXsrfCookieToken, csrfFetch, refreshCsrfToken } from '@/lib/csrf'
+
+type LoginForm = {
+  username: string;
+  password: string;
+  remember: boolean;
+};
 
 export default function Login() {
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [remember, setRemember] = useState(false)
+  const { data, setData, post, processing, errors, reset } = useForm<LoginForm>({
+    username: '',
+    password: '',
+    remember: false,
+  })
+
   const [showPassword, setShowPassword] = useState(false)
-  const [error, setError] = useState('')
 
   const togglePasswordVisibility = () => setShowPassword(!showPassword)
 
-  const handleLogin = async (e: React.FormEvent) => {
+  const handleLogin = (e: React.FormEvent) => {
     e.preventDefault()
-    setError('')
-    // Ensure we send fresh CSRF tokens via header and body
-    // Actively refresh CSRF to avoid stale meta/cookie after logout
-    await refreshCsrfToken()
-    const csrfToken = getCsrfToken()
-    const xsrfToken = getXsrfCookieToken()
-    router.post('/login', { email, password, remember, _token: csrfToken }, {
-      headers: {
-        'X-CSRF-TOKEN': csrfToken,
-        ...(xsrfToken ? { 'X-XSRF-TOKEN': xsrfToken } : {}),
-        'X-Requested-With': 'XMLHttpRequest',
-      },
-      onError: (errors: any) => {
-        if (errors.password) {
-          setError(errors.password)
-        } else if (errors.email) {
-          setError(errors.email)
-        } else {
-          setError('Login failed. Please check your credentials.')
-        }
-      },
-      preserveState: true, // Keep form state on error
-      preserveScroll: true, // Keep scroll position on error
+    post(route('login'), {
+      onFinish: () => reset('password'),
     })
   }
 
     // Example: Show logout success toast (call this after logout)
     useEffect(() => {
-      // Proactively ensure CSRF meta/cookie exist on first load of login page
-      refreshCsrfToken().catch(() => {/* noop */})
       const urlParams = new URLSearchParams(window.location.search)
       if (urlParams.get('logout') === 'success') {
         toast.success('Logout successful!', {
@@ -59,13 +43,6 @@ export default function Login() {
         window.history.replaceState({}, '', newUrl)
       }
     }, [])
-
-  useEffect(() => {
-    if (error) {
-      const timer = setTimeout(() => setError(''), 3000)
-      return () => clearTimeout(timer)
-    }
-  }, [error])
 
   return (
     <div className="relative min-h-screen flex items-center justify-center bg-gray-950 text-white [font-family:'Poppins',sans-serif]">
@@ -90,28 +67,39 @@ export default function Login() {
           <h2 className="text-4xl font-extrabold text-center text-gray-800 mb-8 tracking-tight">Login</h2>
 
           {/* Error Message */}
-          {error && (
+          {errors.username && (
             <motion.div
               initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
               className="mb-5 text-center text-base text-red-600 bg-red-100 rounded-lg px-4 py-3 border border-red-300 shadow"
             >
-              {error}
+              {errors.username}
+            </motion.div>
+          )}
+          {errors.password && (
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="mb-5 text-center text-base text-red-600 bg-red-100 rounded-lg px-4 py-3 border border-red-300 shadow"
+            >
+              {errors.password}
             </motion.div>
           )}
 
           <form onSubmit={handleLogin} className="space-y-7">
-            {/* Email */}
+            {/* Username */}
             <div>
-              <label htmlFor="email" className="block text-base font-semibold mb-2">Email</label>
+              <label htmlFor="username" className="block text-base font-semibold mb-2">Username</label>
               <input
-                id="email"
-                type="email"
+                id="username"
+                type="text"
                 required
+                autoFocus
+                autoComplete="username"
                 className="w-full px-5 py-3 rounded-lg border border-gray-300 bg-white text-black placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-red-400 text-lg"
-                placeholder="Enter your email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                placeholder="Enter your username"
+                value={data.username}
+                onChange={(e) => setData('username', e.target.value)}
               />
             </div>
 
@@ -123,10 +111,11 @@ export default function Login() {
                   id="password"
                   type={showPassword ? 'text' : 'password'}
                   required
+                  autoComplete="current-password"
                   className="w-full px-5 py-3 pr-12 rounded-lg border border-gray-300 bg-white text-black placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-red-400 text-lg"
                   placeholder="Enter your password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  value={data.password}
+                  onChange={(e) => setData('password', e.target.value)}
                 />
                 <button
                   type="button"
@@ -145,8 +134,8 @@ export default function Login() {
                 <input
                   id="remember"
                   type="checkbox"
-                  checked={remember}
-                  onChange={(e) => setRemember(e.target.checked)}
+                  checked={data.remember}
+                  onChange={(e) => setData('remember', e.target.checked)}
                   className="accent-red-600 scale-110"
                 />
                 Remember me
@@ -159,10 +148,20 @@ export default function Login() {
               whileHover={{ scale: 1.04 }}
               whileTap={{ scale: 0.98 }}
               type="submit"
-              className="w-full py-3 rounded-lg bg-red-500 text-white font-bold text-lg hover:bg-red-600 transition duration-150 shadow flex items-center justify-center gap-2"
+              disabled={processing}
+              className="w-full py-3 rounded-lg bg-red-500 text-white font-bold text-lg hover:bg-red-600 transition duration-150 shadow flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <FiLogIn className="text-xl" />
-              Login
+              {processing ? (
+                <>
+                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                  Logging in...
+                </>
+              ) : (
+                <>
+                  <FiLogIn className="text-xl" />
+                  Login
+                </>
+              )}
             </motion.button>
 
             {/* Link to Register */}

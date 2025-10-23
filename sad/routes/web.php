@@ -24,6 +24,7 @@ use App\Http\Controllers\AnnouncementController;
 use App\Http\Controllers\CalendarController;
 use App\Http\Controllers\HandoverController;
 use App\Http\Controllers\InvitationController;
+use App\Http\Controllers\AuthController;
 
 use App\Models\Event;
 use App\Models\Announcement;
@@ -48,7 +49,7 @@ Route::get('/', function () {
 // 🟩 Auth Routes
 Route::middleware('guest')->group(function () {
     Route::get('/login', [AuthenticatedSessionController::class, 'create'])->name('login');
-    Route::post('/login', [AuthenticatedSessionController::class, 'store'])->middleware('throttle:10,1');
+    Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:10,1');
     // Registration routes
     Route::get('/register', [RegisteredUserController::class, 'create'])->name('register');
     Route::post('/register', [RegisteredUserController::class, 'store'])->middleware('throttle:6,1');
