@@ -469,7 +469,35 @@ export default function BorrowEquipment() {
             {/* Category Selector */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-semibold mb-2 text-gray-700">Priority Level</label>
+                <div className="flex items-center gap-2 mb-2">
+                  <label className="block text-sm font-semibold text-gray-700">Priority Level</label>
+                  {/* Info icon with tooltip (equipment-focused) */}
+                  <div className="relative group">
+                    <button
+                      type="button"
+                      aria-label="Priority information"
+                      className="text-red-500 hover:text-red-600 focus:outline-none focus:ring-2 focus:ring-red-200 rounded-full"
+                    >
+                      <FaInfoCircle className="w-4 h-4" />
+                    </button>
+                    {/* Tooltip */}
+                    <div
+                      role="tooltip"
+                      className="pointer-events-none absolute left-0 mt-2 w-72 max-w-xs rounded-lg border border-red-100 bg-white p-3 text-xs text-gray-700 shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition-opacity duration-150 z-30"
+                    >
+                      <p className="font-semibold text-gray-900 mb-1">How priority affects equipment requests</p>
+                      <ul className="list-disc pl-4 space-y-1">
+                        <li><span className="font-medium">High</span>: Urgent, time-sensitive activities (e.g., sanctioned events). Reviewed first when possible.</li>
+                        <li><span className="font-medium">Medium</span>: Standard requests. Default option.</li>
+                        <li><span className="font-medium">Low</span>: Flexible timing; staff may schedule around peak usage.</li>
+                      </ul>
+                      <p className="mt-2 text-[11px] text-gray-500">Note: Priority does not override availability or approval requirements for equipment.</p>
+                      {/* Tooltip caret */}
+                      <span className="absolute -top-1 left-3 h-2 w-2 rotate-45 bg-white border-l border-t border-red-100"></span>
+                    </div>
+                  </div>
+                </div>
+
                 <MinimalSelect<"low" | "medium" | "high">
                   value={data.category}
                   onChange={(val) => setData("category", val)}
