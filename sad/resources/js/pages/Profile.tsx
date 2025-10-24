@@ -33,21 +33,14 @@ export default function Profile() {
   const csrfToken = (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement | null)?.content || '';
 
   // Form states 
-  const [editingEmail, setEditingEmail] = useState(false);
-  const [editingPassword, setEditingPassword] = useState(false);
   const [editingProfilePicture, setEditingProfilePicture] = useState(false);
   const [showProfileDropdown, setShowProfileDropdown] = useState(false);
-  const [email, setEmail] = useState(user.email || '');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
   const [firstName, setFirstName] = useState(user.first_name || '');
   const [middleName, setMiddleName] = useState(user.middle_name || '');
   const [lastName, setLastName] = useState(user.last_name || '');
   const [profilePicture, setProfilePicture] = useState<string | null>(user.profile_picture || null);
   const [profilePicturePreview, setProfilePicturePreview] = useState<string | null>(null);
   const [profilePictureFile, setProfilePictureFile] = useState<File | null>(null);
-  const [emailError, setEmailError] = useState('');
-  const [passwordError, setPasswordError] = useState('');
   const [profilePictureError, setProfilePictureError] = useState('');
   
   // Pending request modal state
@@ -58,14 +51,6 @@ export default function Profile() {
   const renderNotSet = (_label: string) => (
     <span className="text-gray-400 italic">Not set</span>
   );
-  
-  // Handover navigation state
-  const [handoverLoading, setHandoverLoading] = useState(false);
-
-  // Helper functions
-  const isHandoverEligible = () => {
-    return user.role === 'admin_assistant' || user.role === 'dean';
-  };
 
   // Check for pending role request and navigate accordingly
   const handleVerifyOfficerStatusClick = async () => {
@@ -104,75 +89,6 @@ export default function Profile() {
   }, [showProfileDropdown]);
 
   // Handlers
-  const handleEmailSave = async () => {
-    setEmailError('');
-    if (!email || !/^[\w-.]+@([\w-]+\.)+[\w-]{2,4}$/.test(email)) {
-      setEmailError('Please enter a valid email address.');
-      return;
-    }
-    await refreshCsrfToken();
-    const freshToken = getCsrfToken();
-    const xsrf = getXsrfCookieToken();
-
-    router.put('/profile/update-email', {
-      email: email,
-      _token: freshToken,
-    }, {
-      headers: {
-        'X-CSRF-TOKEN': freshToken,
-        ...(xsrf ? { 'X-XSRF-TOKEN': xsrf } : {}),
-        'X-Requested-With': 'XMLHttpRequest',
-      },
-      onSuccess: () => {
-        setEditingEmail(false);
-        // Flash message will be handled by FlashToaster component
-      },
-      onError: (errors) => {
-        const errorMessage = errors.email || 'Failed to update email.';
-        setEmailError(errorMessage);
-      }
-    });
-  };
-
-  const handlePasswordSave = async () => {
-    setPasswordError('');
-    if (!password || password.length < 6) {
-      const errorMessage = 'Password must be at least 6 characters.';
-      setPasswordError(errorMessage);
-      return;
-    }
-    if (password !== confirmPassword) {
-      const errorMessage = 'Passwords do not match.';
-      setPasswordError(errorMessage);
-      return;
-    }
-    await refreshCsrfToken();
-    const freshToken = getCsrfToken();
-    const xsrf = getXsrfCookieToken();
-
-    router.put('/profile/update-password', {
-      password: password,
-      password_confirmation: confirmPassword,
-      _token: freshToken,
-    }, {
-      headers: {
-        'X-CSRF-TOKEN': freshToken,
-        ...(xsrf ? { 'X-XSRF-TOKEN': xsrf } : {}),
-        'X-Requested-With': 'XMLHttpRequest',
-      },
-      onSuccess: () => {
-        setEditingPassword(false);
-        setPassword('');
-        setConfirmPassword('');
-        // Flash message will be handled by FlashToaster component
-      },
-      onError: (errors) => {
-        const errorMessage = errors.password || 'Failed to update password.';
-        setPasswordError(errorMessage);
-      }
-    });
-  };
-
   const handleProfilePictureChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     setProfilePictureError('');
@@ -282,15 +198,6 @@ export default function Profile() {
         const errorMessage = e.profile_picture || e.message || 'Failed to remove profile picture.';
         setProfilePictureError(errorMessage);
       },
-    });
-  };
-
-  // Handover handler: navigate to dedicated page
-  const navigateToHandoverPage = () => {
-    if (!isHandoverEligible()) return;
-    setHandoverLoading(true);
-    router.visit('/admin/handover/register', {
-      onFinish: () => setHandoverLoading(false),
     });
   };
 
@@ -458,84 +365,18 @@ export default function Profile() {
 
                   
 
-                  {/* Email Row - Only editable for admin_assistant and dean */}
+                  
+
+                  {/* Email Row - Read-only */}
                   <div className="flex items-start gap-4">
                     <Mail className="text-[#e6232a]/80 w-5 h-5 flex-shrink-0 mt-1" />
                     <div className="flex flex-col flex-grow">
                       <span className="font-semibold text-gray-700 text-sm mb-1">Email</span>
-                      {!editingEmail || user.role === 'student' ? (
-                        <div className="flex items-center gap-3">
-                          <span className="text-gray-900">{email}</span>
-                          {user.role !== 'student' && (
-                            <button
-                              className="text-xs text-[#e6232a] hover:text-[#d01e24] hover:underline transition-colors flex items-center gap-1"
-                              onClick={() => setEditingEmail(true)}
-                            >
-                              <Pencil className="w-3 h-3" /> Change
-                            </button>
-                          )}
-                        </div>
-                      ) : (
-                        <motion.form
-                          initial={{ opacity: 0, x: 10 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          exit={{ opacity: 0, x: 10 }}
-                          className="flex items-center gap-2"
-                          onSubmit={e => { e.preventDefault(); handleEmailSave(); }}
-                        >
-                          <input
-                            type="email"
-                            className="border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900 bg-gray-50 focus:bg-white focus:border-[#e6232a] focus:ring-2 focus:ring-[#e6232a]/20 transition-colors"
-                            value={email}
-                            onChange={e => setEmail(e.target.value)}
-                          />
-                          <button
-                            type="submit"
-                            className="bg-[#e6232a] hover:bg-[#d01e24] text-white px-3 py-2 rounded-lg flex items-center gap-1 text-sm transition-colors"
-                          >
-                            <Save className="w-3 h-3" /> Save
-                          </button>
-                          <button
-                            type="button"
-                            className="text-gray-500 hover:text-gray-700 transition-colors"
-                            onClick={() => { setEditingEmail(false); setEmail(user.email || ''); setEmailError(''); }}
-                          >
-                            <X className="w-4 h-4" />
-                          </button>
-                        </motion.form>
-                      )}
-                      {emailError && <div className="text-red-500 text-xs mt-1">{emailError}</div>}
+                      <span className="text-gray-900">{user.email}</span>
                     </div>
                   </div>
-
-                  {/* Role Handover Section - Only for admin_assistant and dean */}
-                  {isHandoverEligible() && (
-                    <div className="flex items-start gap-4 pt-4 border-t border-gray-100">
-                      <ArrowRightLeft className="text-[#e6232a]/80 w-5 h-5 flex-shrink-0 mt-1" />
-                      <div className="flex flex-col flex-grow">
-                        <span className="font-semibold text-gray-900 text-sm">Role Management</span>
-                        <span className="text-gray-900 text-sm mt-1">
-                          Current {user.role === 'admin_assistant' ? 'Admin Assistant' : 'Dean'}
-                        </span>
-                        <motion.button
-                          whileHover={{ scale: 1.02 }}
-                          whileTap={{ scale: 0.98 }}
-                          className="mt-2 bg-[#e6232a] hover:bg-[#d01e24] text-white px-3 py-2 rounded-lg inline-flex items-center gap-2 text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed w-fit"
-                          onClick={navigateToHandoverPage}
-                          disabled={handoverLoading}
-                        >
-                          <UserCheck className="w-4 h-4" />
-                          {handoverLoading ? 'Loading...' : `Hand Over ${user.role === 'admin_assistant' ? 'Admin Assistant' : 'Dean'} Role`}
-                        </motion.button>
-                        <p className="text-xs text-gray-500 mt-2">
-                          Transfer your {user.role === 'admin_assistant' ? 'admin assistant' : 'dean'} responsibilities to a newly registered user
-                        </p>
-                      </div>
-                    </div>
-                  )}
-                </div>
+                </div>                </div>
               </div>
-            </div>
 
             {/* Card 2: Other Information */}
             <div className="bg-white rounded-xl shadow-lg border border-gray-100 p-8">
@@ -544,66 +385,6 @@ export default function Profile() {
               </h2>
               
               <div className="space-y-6">
-                {/* Password */}
-                <div className="flex items-center gap-4">
-                  <KeyRound className="text-[#e6232a]/80 w-5 h-5 flex-shrink-0" />
-                  <div className="flex flex-col flex-grow">
-                    <span className="font-semibold text-gray-700 text-sm">Password</span>
-                    {!editingPassword ? (
-                      <div className="flex items-center gap-3">
-                        <span className="text-gray-900">••••••••</span>
-                        <button
-                          className="text-xs text-[#e6232a] hover:text-[#d01e24] hover:underline transition-colors flex items-center gap-1"
-                          onClick={() => setEditingPassword(true)}
-                        >
-                          <Pencil className="w-3 h-3" /> Reset Password
-                        </button>
-                      </div>
-                    ) : (
-                      <motion.form
-                        initial={{ opacity: 0, x: 10 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        exit={{ opacity: 0, x: 10 }}
-                        className="flex flex-col gap-3"
-                        onSubmit={e => { e.preventDefault(); handlePasswordSave(); }}
-                      >
-                        <div className="flex flex-col sm:flex-row gap-2">
-                          <input
-                            type="password"
-                            className="border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900 bg-gray-50 focus:bg-white focus:border-[#e6232a] focus:ring-2 focus:ring-[#e6232a]/20 transition-colors"
-                            placeholder="New password"
-                            value={password}
-                            onChange={e => setPassword(e.target.value)}
-                          />
-                          <input
-                            type="password"
-                            className="border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900 bg-gray-50 focus:bg-white focus:border-[#e6232a] focus:ring-2 focus:ring-[#e6232a]/20 transition-colors"
-                            placeholder="Confirm password"
-                            value={confirmPassword}
-                            onChange={e => setConfirmPassword(e.target.value)}
-                          />
-                          <div className="flex gap-2">
-                            <button
-                              type="submit"
-                              className="bg-[#e6232a] hover:bg-[#d01e24] text-white px-3 py-2 rounded-lg flex items-center gap-1 text-sm transition-colors"
-                            >
-                              <Save className="w-3 h-3" /> Save
-                            </button>
-                            <button
-                              type="button"
-                              className="text-gray-500 hover:text-gray-700 transition-colors"
-                              onClick={() => { setEditingPassword(false); setPassword(''); setConfirmPassword(''); setPasswordError(''); }}
-                            >
-                              <X className="w-4 h-4" />
-                            </button>
-                          </div>
-                        </div>
-                        {passwordError && <div className="text-red-500 text-xs">{passwordError}</div>}
-                      </motion.form>
-                    )}
-                  </div>
-                </div>
-
                 {/* Address Information */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                   {/* Address */}

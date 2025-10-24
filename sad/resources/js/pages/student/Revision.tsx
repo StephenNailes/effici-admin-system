@@ -1,6 +1,6 @@
 import MainLayout from '@/layouts/mainlayout'
 import { motion } from 'framer-motion'
-import { Link } from '@inertiajs/react'
+import { Link, router } from '@inertiajs/react'
 import { ArrowLeft, ArrowRight } from "lucide-react"
 import { FaSearch, FaFilter } from "react-icons/fa"
 import { useState } from 'react'
@@ -198,18 +198,21 @@ export default function Revision({ revisions = [] }: RevisionProps) {
                         {getStatusBadge(req.status || 'Revision')}
                       </td>
                       <td className="w-1/6 px-8 py-4 align-middle text-center">
-                        <motion.div
+                        <motion.button
+                          type="button"
                           whileHover={{ scale: 1.08 }}
                           whileTap={{ scale: 0.95 }}
-                          className="inline-block"
+                          className="inline-block bg-red-500 text-white px-4 py-2 rounded-xl text-sm shadow transition hover:bg-red-600"
+                          onClick={() => {
+                            if (req.request_type === 'activity_plan') {
+                              router.get(`/student/requests/activity-plan/${req.id}`)
+                            } else {
+                              router.get(route('student.revision.edit', { id: req.id, type: req.request_type }))
+                            }
+                          }}
                         >
-                          <Link
-                            href={route('student.revision.edit', { id: req.id, type: req.request_type })}
-                            className="bg-red-500 text-white px-4 py-2 rounded-xl text-sm shadow transition hover:bg-red-600"
-                          >
-                            Revise
-                          </Link>
-                        </motion.div>
+                          Revise
+                        </motion.button>
                       </td>
                     </motion.tr>
                   ))}

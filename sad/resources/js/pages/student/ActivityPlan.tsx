@@ -11,6 +11,7 @@ import PDFPreviewModal from "@/components/PDFPreviewModal";
 import HeaderSettingsModal from "@/components/HeaderSettingsModal";
 import InfoModal from "@/components/InfoModal";
 import UnsavedChangesModal from "@/components/UnsavedChangesModal";
+import GeneratePdfConfirmModal from "@/components/GeneratePdfConfirmModal";
 // Local type definitions (no external template export/generation)
 export type Member = { name: string; role: string };
 export type Signatory = { name: string; position: string };
@@ -562,8 +563,9 @@ type ToolbarProps = {
   onGeneratePDF?: () => void;
   onSave?: () => void;
   onOpenHeaderSettings?: () => void;
+  saveTooltip?: string;
 };
-const Toolbar: React.FC<ToolbarProps> = ({ onZoomChange, onStartSignature, onSubmit, onPreview, onGeneratePDF, onSave, onOpenHeaderSettings }) => {
+const Toolbar: React.FC<ToolbarProps> = ({ onZoomChange, onStartSignature, onSubmit, onPreview, onGeneratePDF, onSave, onOpenHeaderSettings, saveTooltip }) => {
   const exec = (command: string, value?: string) => document.execCommand(command, false, value ?? "");
   const [zoom, setZoom] = useState<number>(1);
   const [font, setFont] = useState<string>("Times New Roman");
@@ -774,12 +776,16 @@ const Toolbar: React.FC<ToolbarProps> = ({ onZoomChange, onStartSignature, onSub
       
       {/* Document Actions */}
       <div className="group">
-        <button className="btn" aria-label="Save Draft" title="Save Draft" onClick={() => onSave?.()}><SaveIcon size={18} /></button>
+        {onSave && (
+          <button className="btn" aria-label={saveTooltip ?? "Save Draft"} title={saveTooltip ?? "Save Draft"} onClick={() => onSave?.()}><SaveIcon size={18} /></button>
+        )}
         <button className="btn" aria-label="Preview PDF" title="Preview PDF" onClick={() => onPreview?.()}><EyeIcon size={18} /></button>
         <button className="btn" aria-label="Generate PDF" title="Generate PDF" onClick={() => onGeneratePDF?.()}><FileTextIcon size={18} /></button>
-        <button className="btn" title="Submit for Approval" aria-label="Submit for Approval" onClick={() => onSubmit?.()}>
-          <SendIcon size={18} />
-        </button>
+        {onSubmit && (
+          <button className="btn" title="Submit for Approval" aria-label="Submit for Approval" onClick={() => onSubmit?.()}>
+            <SendIcon size={18} />
+          </button>
+        )}
         <button className="btn" aria-label="Header settings" title="Header settings" onClick={() => onOpenHeaderSettings?.()}>
           <Settings size={18} />
         </button>
@@ -1541,15 +1547,18 @@ const App: React.FC = () => {
   const [pdfFilename, setPdfFilename] = useState<string | null>(null);
   const [showPreviewSaveFirst, setShowPreviewSaveFirst] = useState(false);
   const [showGenerateSaveFirst, setShowGenerateSaveFirst] = useState(false);
+  const [showGeneratePdfConfirm, setShowGeneratePdfConfirm] = useState(false);
   const [showPdfSuccess, setShowPdfSuccess] = useState(false);
   // Read-only & status guard modals
   const isReadOnly = planStatus === 'pending' || planStatus === 'approved';
+  const isUnderRevision = planStatus === 'under_revision';
   const [showStatusGuard, setShowStatusGuard] = useState<boolean>(false);
   useEffect(() => {
     if (planStatus === 'pending' || planStatus === 'approved') {
       setShowStatusGuard(true);
     }
   }, [planStatus]);
+  const [showRevisionSubmitWarning, setShowRevisionSubmitWarning] = useState<boolean>(false);
   
   // TODO: Get these from backend/props based on user role and activity plan status
   const canSignAsPreparedBy = true; // Only the creator can sign
@@ -2025,16 +2034,18 @@ const App: React.FC = () => {
   };
 
   // Handle PDF Generation
-  const handleGeneratePDF = async () => {
+  // Open confirm modal for PDF Generation
+  const openGeneratePDFConfirm = () => {
     if (!plan?.id) {
       setShowGenerateSaveFirst(true);
       return;
     }
+    setShowGeneratePdfConfirm(true);
+  };
 
-    if (!confirm('Generate final PDF for this activity plan?')) {
-      return;
-    }
-
+  // Perform PDF Generation after confirmation
+  const handleGeneratePDF = async () => {
+    setShowGeneratePdfConfirm(false);
     setPdfGenerating(true);
 
     try {
@@ -2199,10 +2210,15 @@ const App: React.FC = () => {
       if (response.data.success) {
         // Also store in localStorage as backup
         localStorage.setItem(draftStorageKey, JSON.stringify(draftData));
-
-        // Show toast only the first time the user successfully saves
-        if (!lastSaved) {
-          toast.success('Draft saved');
+        // Show toast notification
+        if (isUnderRevision) {
+          // Under revision: explicitly inform that changes were saved without status change
+          toast.success('Changes saved');
+        } else {
+          // For drafts: keep existing behavior (first explicit save only)
+          if (!lastSaved) {
+            toast.success('Draft saved');
+          }
         }
 
         setLastSaved(new Date());
@@ -2792,12 +2808,17 @@ const App: React.FC = () => {
       onZoomChange={setZoomScale} 
       onStartSignature={(range)=>handleToolbarStartSignature(range)}
       onSave={handleSaveDraft}
+      saveTooltip={isUnderRevision ? 'Save Changes' : 'Save Draft'}
       onPreview={handlePreviewPDF}
-      onGeneratePDF={handleGeneratePDF}
+  onGeneratePDF={openGeneratePDFConfirm}
       onOpenHeaderSettings={() => setIsHeaderSettingsOpen(true)}
       onSubmit={() => {
-        // Show confirmation modal instead of submitting directly
-        setShowSubmissionModal(true);
+        // Under revision: show warning modal; otherwise show full submission modal
+        if (isUnderRevision) {
+          setShowRevisionSubmitWarning(true);
+        } else {
+          setShowSubmissionModal(true);
+        }
       }}
     />
   )}
@@ -2912,6 +2933,29 @@ const App: React.FC = () => {
         variant="success"
         title="PDF generated successfully!"
         message="Your PDF has been generated. You can download it from the opened tab."
+      />
+
+      {/* Generate PDF confirmation modal */}
+      <GeneratePdfConfirmModal
+        open={showGeneratePdfConfirm}
+        processing={pdfGenerating}
+        onCancel={() => setShowGeneratePdfConfirm(false)}
+        onConfirm={handleGeneratePDF}
+      />
+
+      {/* Under-revision resubmission warning */}
+      <InfoModal
+        open={showRevisionSubmitWarning}
+        onClose={() => setShowRevisionSubmitWarning(false)}
+        variant="warning"
+        title="Confirm resubmission of the Activity Plan"
+        message={
+          <span>
+            After submission, no edits can be made unless the plan is sent back for revision.
+          </span>
+        }
+        primaryLabel="Submit"
+        onPrimary={() => handleConfirmSubmission()}
       />
 
       {/* Status Guard Modal for pending/approved */}

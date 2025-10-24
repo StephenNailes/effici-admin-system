@@ -268,10 +268,10 @@ export default function Sidebar() {
   return (
     <>
       <aside
-        className="w-64 h-screen text-white flex flex-col justify-between shadow-2xl font-[Poppins] overflow-y-auto fixed left-0 top-0 transition-all duration-300 bg-[#d71f27]"
+        className="w-64 h-screen text-white flex flex-col justify-between shadow-2xl font-[Poppins] overflow-y-auto fixed left-0 top-0 transition-all duration-300 bg-[#bb352e]"
         role="navigation"
         aria-label="Sidebar"
-      >
+      >   
         {/* Header */}
         <div>
           <div className="flex items-center justify-center gap-3 px-6 py-7">
@@ -323,7 +323,7 @@ export default function Sidebar() {
                               setRequestToggled(true);
                             }}
                             aria-expanded={requestOpen}
-                            className={`relative flex items-center justify-between w-full gap-3 px-5 py-3 rounded-lg transition-all duration-200 ease-in-out font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/90 focus-visible:ring-offset-2 focus-visible:ring-offset-[#d71f27]
+                            className={`relative flex items-center justify-between w-full gap-3 px-5 py-3 rounded-lg transition-all duration-200 ease-in-out font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/90 focus-visible:ring-offset-2 focus-visible:ring-offset-[#bb352e]
                               ${hasActiveChild ? 'font-semibold' : 'hover:bg-white/10 hover:shadow-sm'}
                             `}
                           >
@@ -362,7 +362,7 @@ export default function Sidebar() {
                                         preserveState={false}
                                         aria-current={childActive ? 'page' : undefined}
                                         onClick={(e) => handleNavigation(e, child)}
-                                        className={`relative flex items-center px-4 py-2 rounded-lg text-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/90 focus-visible:ring-offset-2 focus-visible:ring-offset-[#d71f27]
+                                        className={`relative flex items-center px-4 py-2 rounded-lg text-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/90 focus-visible:ring-offset-2 focus-visible:ring-offset-[#bb352e]
                                           ${childActive ? 'font-semibold' : 'hover:bg-white/10'}
                                           ${isLocked ? 'opacity-60' : ''}
                                         `}
@@ -393,7 +393,7 @@ export default function Sidebar() {
                                       preserveState={false}
                                       aria-current={childActive ? 'page' : undefined}
                                       onClick={(e) => handleNavigation(e, child)}
-                                      className={`relative flex items-center px-4 py-2 rounded-lg text-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/90 focus-visible:ring-offset-2 focus-visible:ring-offset-[#d71f27]
+                                      className={`relative flex items-center px-4 py-2 rounded-lg text-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/90 focus-visible:ring-offset-2 focus-visible:ring-offset-[#bb352e]
                                         ${childActive ? 'font-semibold' : 'hover:bg-white/10'}
                                         ${isLocked ? 'opacity-60' : ''}
                                       `}
@@ -418,7 +418,7 @@ export default function Sidebar() {
                           href={item.href!}
                           preserveState={false}
                           aria-current={isActiveItem(item) ? 'page' : undefined}
-                          className={`relative flex items-center justify-between px-5 py-3 rounded-lg transition-all duration-200 ease-in-out font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/90 focus-visible:ring-offset-2 focus-visible:ring-offset-[#d71f27]
+                          className={`relative flex items-center justify-between px-5 py-3 rounded-lg transition-all duration-200 ease-in-out font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/90 focus-visible:ring-offset-2 focus-visible:ring-offset-[#bb352e]
                             ${isActiveItem(item) ? 'font-semibold' : 'hover:bg-white/10 hover:shadow-sm'}
                           `}
                         >
@@ -429,7 +429,7 @@ export default function Sidebar() {
                           {(() => {
                             const badgeCount = getMenuItemBadge(item.href!);
                             return badgeCount > 0 ? (
-                              <span className="ml-3 inline-flex items-center justify-center rounded-full bg-white/90 text-[#d71f27] text-xs font-bold h-5 min-w-[20px] px-2">
+                              <span className="ml-3 inline-flex items-center justify-center rounded-full bg-white/90 text-[#bb352e] text-xs font-bold h-5 min-w-[20px] px-2">
                                 {badgeCount}
                               </span>
                             ) : null;
@@ -452,7 +452,7 @@ export default function Sidebar() {
           >
             <div className="flex items-center gap-3">
               <div className="relative">
-                <div className="w-11 h-11 rounded-full border-2 border-[#e6232a] overflow-hidden bg-[#e6232a] flex items-center justify-center">
+                <div className="w-11 h-11 rounded-full border-2 border-[#bb352e] overflow-hidden bg-[#bb352e] flex items-center justify-center">
                   {((!user.profile_picture && !user.profile_picture_url) || profileImgErrored) ? (
                     <span className="text-white font-semibold select-none" aria-label="User initials">
                       {getInitials()}
@@ -468,7 +468,7 @@ export default function Sidebar() {
                 </div>
                 {/* Notification Badge - Outside the profile circle */}
                 {notificationBadgeCount > 0 && (
-                  <div className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full w-6 h-6 flex items-center justify-center font-bold border-2 border-white shadow-lg z-10">
+                  <div className="absolute -top-2 -right-2 bg-[#bb352e] text-white text-xs rounded-full w-6 h-6 flex items-center justify-center font-bold border-2 border-white shadow-lg z-10">
                     {notificationBadgeCount > 9 ? '9+' : notificationBadgeCount}
                   </div>
                 )}
@@ -528,14 +528,14 @@ export default function Sidebar() {
                 </div>
                 <hr className="border-t border-gray-200 my-1" />
                 <button
-                  className="flex w-full items-center gap-2 px-5 py-3 hover:bg-red-50 transition"
+                  className="flex w-full items-center gap-2 px-5 py-3 hover:bg-[#bb352e]/10 transition"
                   onClick={() => {
                     setShowConfirm(true);
                     setDropdownOpen(false);
                   }}
                 >
-                  <FaSignOutAlt className="text-sm text-red-500" />
-                  <span className="text-red-500 font-semibold">Logout</span>
+                  <FaSignOutAlt className="text-sm text-[#bb352e]" />
+                  <span className="text-[#bb352e] font-semibold">Logout</span>
                 </button>
               </motion.div>
             )}
@@ -566,7 +566,7 @@ export default function Sidebar() {
                 Cancel
               </button>
               <button
-                className="px-5 py-2 text-base rounded bg-red-500 text-white hover:bg-red-600 transition font-semibold"
+                className="px-5 py-2 text-base rounded bg-[#bb352e] text-white hover:bg-[#bb352e]/90 transition font-semibold"
                 onClick={handleLogout}
               >
                 Logout

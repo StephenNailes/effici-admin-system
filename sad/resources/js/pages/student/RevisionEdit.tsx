@@ -52,6 +52,12 @@ interface RevisionEditProps {
 }
 
 export default function RevisionEdit({ revision, requestType }: RevisionEditProps) {
+  // If this is an activity plan revision, redirect to the main editor immediately
+  useEffect(() => {
+    if (requestType === 'activity_plan' && revision?.id) {
+      router.get(`/student/requests/activity-plan/${revision.id}`)
+    }
+  }, [requestType, revision?.id])
   const [availableEquipment, setAvailableEquipment] = useState<any[]>([])
   const [isLoadingAvailableEquipment, setIsLoadingAvailableEquipment] = useState(false)
   const [availableEquipmentError, setAvailableEquipmentError] = useState<string | null>(null)
@@ -209,160 +215,10 @@ export default function RevisionEdit({ revision, requestType }: RevisionEditProp
         >
           <form onSubmit={handleSubmit} className="space-y-6">
             {requestType === 'activity_plan' ? (
-              // Activity Plan Form
-              <>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      Activity Name *
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      value={(formData as any).activity_name}
-                      onChange={(e) =>
-                        setFormData({ ...formData, activity_name: e.target.value } as any)
-                      }
-                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-400 outline-none"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      Category *
-                    </label>
-                    <select
-                      required
-                      value={(formData as any).category}
-                      onChange={(e) =>
-                        setFormData({ ...formData, category: e.target.value } as any)
-                      }
-                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-400 outline-none"
-                    >
-                      <option value="low">Low</option>
-                      <option value="medium">Medium</option>
-                      <option value="high">High</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Activity Purpose *
-                  </label>
-                  <textarea
-                    required
-                    rows={4}
-                    value={(formData as any).activity_purpose}
-                    onChange={(e) =>
-                      setFormData({ ...formData, activity_purpose: e.target.value } as any)
-                    }
-                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-400 outline-none"
-                  />
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      Start Date & Time *
-                    </label>
-                    <input
-                      type="datetime-local"
-                      required
-                      value={(formData as any).start_datetime}
-                      onChange={(e) =>
-                        setFormData({ ...formData, start_datetime: e.target.value } as any)
-                      }
-                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-400 outline-none"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      End Date & Time *
-                    </label>
-                    <input
-                      type="datetime-local"
-                      required
-                      value={(formData as any).end_datetime}
-                      onChange={(e) =>
-                        setFormData({ ...formData, end_datetime: e.target.value } as any)
-                      }
-                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-400 outline-none"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      Objectives
-                    </label>
-                    <textarea
-                      rows={3}
-                      value={(formData as any).objectives}
-                      onChange={(e) =>
-                        setFormData({ ...formData, objectives: e.target.value } as any)
-                      }
-                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-400 outline-none"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      Activity Location
-                    </label>
-                    <input
-                      type="text"
-                      value={(formData as any).activity_location}
-                      onChange={(e) =>
-                        setFormData({ ...formData, activity_location: e.target.value } as any)
-                      }
-                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-400 outline-none"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      Participants
-                    </label>
-                    <textarea
-                      rows={3}
-                      value={(formData as any).participants}
-                      onChange={(e) =>
-                        setFormData({ ...formData, participants: e.target.value } as any)
-                      }
-                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-400 outline-none"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      Methodology
-                    </label>
-                    <textarea
-                      rows={3}
-                      value={(formData as any).methodology}
-                      onChange={(e) =>
-                        setFormData({ ...formData, methodology: e.target.value } as any)
-                      }
-                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-400 outline-none"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Expected Outcome
-                  </label>
-                  <textarea
-                    rows={3}
-                    value={(formData as any).expected_outcome}
-                    onChange={(e) =>
-                      setFormData({ ...formData, expected_outcome: e.target.value } as any)
-                    }
-                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-400 outline-none"
-                  />
-                </div>
-              </>
+              // Activity Plan revisions are edited in the Activity Plan editor; show a friendly notice in case of direct access.
+              <div className="text-center text-gray-600">
+                Redirecting you to the Activity Plan editor...
+              </div>
             ) : (
               // Equipment Request Form
               <>

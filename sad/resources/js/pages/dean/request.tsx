@@ -11,6 +11,7 @@ import { csrfFetch } from '@/lib/csrf';
 interface RequestData {
   approval_id: number;
   student_name: string;
+  activity_title?: string;
   activity_category?: string;
   request_type: 'activity_plan';
   submitted_at: string;
@@ -140,7 +141,8 @@ export default function Request() {
     }
     
     const matchesSearch = request.student_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      request.activity_category?.toLowerCase().includes(searchTerm.toLowerCase());
+      request.activity_category?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      request.activity_title?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesPriority = !priorityFilter || request.priority === priorityFilter;
     return matchesSearch && matchesPriority;
   });
@@ -182,6 +184,20 @@ export default function Request() {
         return 'text-green-600';
       default:
         return 'text-gray-600';
+    }
+  };
+
+  // Pill badge classes for priority
+  const getPriorityBadgeColor = (priority: string) => {
+    switch (priority?.toLowerCase()) {
+      case 'high':
+        return 'bg-red-100 text-red-700';
+      case 'medium':
+        return 'bg-yellow-100 text-yellow-700';
+      case 'low':
+        return 'bg-green-100 text-green-700';
+      default:
+        return 'bg-gray-100 text-gray-700';
     }
   };
 
@@ -325,8 +341,14 @@ export default function Request() {
                       className="rounded border-gray-300 text-red-600 focus:ring-red-500"
                     />
                   </th>
-                  {['Submitted by','Activity Plan','Date & Time','Priority','Status','Actions'].map(h => (
-                    <th key={h} className="px-6 py-3 text-[11px] font-semibold tracking-wider text-black uppercase whitespace-nowrap">{h}</th>
+                  {['Submitted by','Activity Plan Title','Date & Time','Priority','Status','Actions'].map(h => (
+                    <th
+                      key={h}
+                      className={`${h === 'Activity Plan Title' ? 'pl-2 pr-4' : 'px-6'} py-3 text-[11px] font-semibold tracking-wider text-black uppercase whitespace-nowrap`}
+                      style={h === 'Activity Plan Title' ? { minWidth: '240px' } : undefined}
+                    >
+                      {h}
+                    </th>
                   ))}
                 </tr>
               </thead>
@@ -353,7 +375,7 @@ export default function Request() {
                       />
                     </td>
                     <td className="px-6 py-4 text-sm font-medium text-gray-900 whitespace-nowrap">{request.student_name || 'Unknown Student'}</td>
-                    <td className="px-6 py-4 text-sm text-gray-700 whitespace-nowrap">{request.activity_category || 'Activity Plan'}</td>
+                    <td className="pl-2 pr-4 py-4 text-sm text-gray-700 whitespace-nowrap">{request.activity_title || request.activity_category || 'Activity Plan'}</td>
                     <td className="px-6 py-4 text-sm text-gray-900 whitespace-nowrap">
                       {request.submitted_at ? (
                         <div className="flex flex-col">
@@ -362,8 +384,10 @@ export default function Request() {
                         </div>
                       ) : 'N/A'}
                     </td>
-                    <td className={`px-6 py-4 text-sm font-semibold whitespace-nowrap ${getPriorityColor(request.priority)}`}>
-                      {getDisplayPriority(request.priority)}
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`px-2 inline-flex items-center gap-1 text-xs leading-5 font-semibold rounded-full ${getPriorityBadgeColor(request.priority)}`}>
+                        {getDisplayPriority(request.priority)}
+                      </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className={`px-2 inline-flex items-center gap-1 text-xs leading-5 font-semibold rounded-full ${getStatusBadgeColor(request.approval_status)}`}>

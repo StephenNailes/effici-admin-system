@@ -10,33 +10,32 @@ import { csrfFetch } from "@/lib/csrf";
 const FilterModal = ({
   isOpen,
   onClose,
-  typeFilter,
+  priorityFilter,
   statusFilter,
   onApply,
 }: {
   isOpen: boolean;
   onClose: () => void;
-  typeFilter: string;
+  priorityFilter: string;
   statusFilter: string;
-  onApply: (type: string, status: string) => void;
+  onApply: (priority: string, status: string) => void;
 }) => {
-  const [tempTypeFilter, setTempTypeFilter] = useState(typeFilter);
+  const [tempPriorityFilter, setTempPriorityFilter] = useState(priorityFilter);
   const [tempStatusFilter, setTempStatusFilter] = useState(statusFilter);
 
-  const typeOptions = ["All Types", "Activity Plan", "Equipment", "Role Update"];
+  const priorityOptions = ["All Priorities", "Low", "Medium", "High"];
   const statusOptions = [
-    "All Status", "Pending", "Approved", "Completed", 
-    "Under Revision", "Checked Out", 
-    "Returned", "Overdue"
+    "All Status", "Pending", "Approved",
+    "Under Revision"
   ];
 
   const handleApply = () => {
-    onApply(tempTypeFilter, tempStatusFilter);
+    onApply(tempPriorityFilter, tempStatusFilter);
     onClose();
   };
 
   const handleReset = () => {
-    setTempTypeFilter("All Types");
+    setTempPriorityFilter("All Priorities");
     setTempStatusFilter("All Status");
   };
 
@@ -126,10 +125,10 @@ const FilterModal = ({
               <div className="p-6 max-h-[50vh] overflow-y-auto">
                 <div className="space-y-6">
                   <FilterSection
-                    title="Request Type"
-                    options={typeOptions}
-                    selected={tempTypeFilter}
-                    onSelect={setTempTypeFilter}
+                    title="Priority Level"
+                    options={priorityOptions}
+                    selected={tempPriorityFilter}
+                    onSelect={setTempPriorityFilter}
                   />
                   <FilterSection
                     title="Status"
@@ -192,62 +191,34 @@ export default function ActivityHistory() {
         return res.json();
       })
       .then((data) => {
-        // Map API response to table format
-  const mapped = (data.requests || []).map((item: any) => {
+        // Map API response to table format and filter out role updates for dean
+        const mapped = (data.requests || [])
+          .filter((item: any) => item.request_type !== "role_update") // Exclude role updates
+          .map((item: any) => {
           let status = "-";
-          if (item.request_type === "equipment") {
-            const possibleStatuses = [
-              item.equipment_status,
-              item.final_status,
-              item.status,
-              item.approval_status
-            ];
-            status = possibleStatuses.find(s => s && typeof s === "string" && s.trim() !== "") || "-";
-            
-            if (status === "under_revision") {
-              status = "Under Revision";
-            } else if (status === "checked_out" || status === "checkedout") {
-              status = "Checked Out";
-            } else if (status !== "-") {
-              status = status.replace(/_/g, " ").toLowerCase()
-                .split(' ')
-                .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-                .join(' ');
-            }
-          } else {
-            const possibleStatuses = [
-              item.activity_status,
-              item.status,
-              item.approval_status
-            ];
-            status = possibleStatuses.find(s => s && typeof s === "string" && s.trim() !== "") || "-";
-            
-            if (status === "under_revision") {
-              status = "Under Revision";
-            } else if (status === "checked_out" || status === "checkedout") {
-              status = "Checked Out";
-            } else if (status !== "-") {
-              status = status.replace(/_/g, " ").toLowerCase()
-                .split(' ')
-                .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-                .join(' ');
-            }
+          const possibleStatuses = [
+            item.activity_status,
+            item.status,
+            item.approval_status
+          ];
+          status = possibleStatuses.find(s => s && typeof s === "string" && s.trim() !== "") || "-";
+          
+          if (status === "under_revision") {
+            status = "Under Revision";
+          } else if (status !== "-") {
+            status = status.replace(/_/g, " ").toLowerCase()
+              .split(' ')
+              .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+              .join(' ');
           }
-          const categoryPurpose = item.request_type === 'activity_plan'
-            ? (item.activity_category || '-')
-            : item.request_type === 'role_update'
-              ? (item.activity_category || '-')
-              : (item.equipment_purpose || '-');
+
           return {
             id: item.request_id || item.approval_id || item.id,
             student: item.student_name || "-",
-            type: item.request_type === "activity_plan" 
-              ? "Activity Plan" 
-              : item.request_type === "role_update"
-                ? "Role Update"
-                : "Equipment",
+            type: "Activity Plan",
+            priority: item.priority || "-",
             dateSubmitted: item.submitted_at ? item.submitted_at.slice(0, 10) : "-",
-            category: categoryPurpose,
+            category: item.activity_category || '-',
             status,
             approverRole: item.approver_role ? item.approver_role.replace('_', ' ').split(' ').map((word: string) => word.charAt(0).toUpperCase() + word.slice(1)).join(' ') : null,
             approverName: item.approver_name || null,
@@ -262,21 +233,21 @@ export default function ActivityHistory() {
       .finally(() => setLoading(false));
   }, []);
 
-  const [typeFilter, setTypeFilter] = useState("All Types");
+  const [priorityFilter, setPriorityFilter] = useState("All Priorities");
   const [statusFilter, setStatusFilter] = useState("All Status");
   const [searchTerm, setSearchTerm] = useState("");
   const [dateFilter, setDateFilter] = useState<Date | null>(null);
   const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
 
   // Function to handle applying filters from modal
-  const handleApplyFilters = (type: string, status: string) => {
-    setTypeFilter(type);
+  const handleApplyFilters = (priority: string, status: string) => {
+    setPriorityFilter(priority);
     setStatusFilter(status);
   };
 
   // Count active filters
   const activeFiltersCount = 
-    (typeFilter !== "All Types" ? 1 : 0) + 
+    (priorityFilter !== "All Priorities" ? 1 : 0) + 
     (statusFilter !== "All Status" ? 1 : 0);
 
   // DatePicker Component
@@ -308,7 +279,7 @@ export default function ActivityHistory() {
 
   // Filter logic
   const filteredActivities = activities.filter((activity) => {
-    const matchesType = typeFilter === "All Types" || activity.type === typeFilter;
+    const matchesPriority = priorityFilter === "All Priorities" || activity.priority === priorityFilter;
     const matchesStatus =
       statusFilter === "All Status" ||
       activity.status?.toLowerCase() === statusFilter.toLowerCase();
@@ -317,7 +288,7 @@ export default function ActivityHistory() {
       activity.student || "",
       String(activity.id || ""),
       activity.category || "",
-      activity.type || ""
+      activity.priority || ""
     ].some(field => 
       field.toLowerCase().includes(searchTerm.toLowerCase())
     );
@@ -327,7 +298,7 @@ export default function ActivityHistory() {
       const selectedDate = dateFilter.toISOString().slice(0, 10);
       matchesDate = activity.dateSubmitted === selectedDate;
     }
-    return matchesType && matchesStatus && matchesSearch && matchesDate;
+    return matchesPriority && matchesStatus && matchesSearch && matchesDate;
   });
 
   return (
@@ -351,7 +322,7 @@ export default function ActivityHistory() {
               {/* Filter Button */}
               <div className="flex flex-col gap-2">
                 <label className="text-xs font-semibold text-gray-600 uppercase tracking-wide">
-                  Type & Status
+                  Priority & Status
                 </label>
                 <button
                   onClick={() => setIsFilterModalOpen(true)}
@@ -407,7 +378,7 @@ export default function ActivityHistory() {
                     type="text"
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    placeholder="Search by student, ID, category, or type..."
+                    placeholder="Search by student, ID, category, or priority..."
                     className="w-full pl-11 pr-4 h-[44px] rounded-lg border border-gray-300 text-black 
                                hover:border-gray-400 hover:bg-gray-100
                                focus:ring-2 focus:ring-red-200 focus:border-red-300 focus:outline-none 
@@ -419,13 +390,13 @@ export default function ActivityHistory() {
             </div>
 
             {/* Clear Filters Button */}
-            {(typeFilter !== "All Types" || statusFilter !== "All Status" || dateFilter || searchTerm) && (
+            {(priorityFilter !== "All Priorities" || statusFilter !== "All Status" || dateFilter || searchTerm) && (
               <motion.button
                 initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ duration: 0.2 }}
                 onClick={() => {
-                  setTypeFilter("All Types");
+                  setPriorityFilter("All Priorities");
                   setStatusFilter("All Status");
                   setDateFilter(null);
                   setSearchTerm("");
@@ -452,7 +423,7 @@ export default function ActivityHistory() {
                 <tr>
                   <th className="py-3 px-6">Request ID</th>
                   <th className="py-3 px-6">Student</th>
-                  <th className="py-3 px-6">Type</th>
+                  <th className="py-3 px-6">Priority</th>
                   <th className="py-3 px-6">Date Submitted</th>
                   <th className="py-3 px-6">Status</th>
                   <th className="py-3 px-6">Approved By</th>
@@ -506,7 +477,36 @@ export default function ActivityHistory() {
                     <tr key={activity.id} className="hover:bg-red-50 transition">
                       <td className="py-3 px-6 font-semibold">{activity.id}</td>
                       <td className="py-3 px-6">{activity.student}</td>
-                      <td className="py-3 px-6">{activity.type}</td>
+                      <td className="py-3 px-6">
+                        {(() => {
+                          const priority = activity.priority?.toLowerCase();
+                          if (priority === "high") {
+                            return (
+                              <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-red-100 text-red-700 text-xs font-semibold">
+                                High
+                              </span>
+                            );
+                          } else if (priority === "medium") {
+                            return (
+                              <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-yellow-100 text-yellow-700 text-xs font-semibold">
+                                Medium
+                              </span>
+                            );
+                          } else if (priority === "low") {
+                            return (
+                              <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-green-100 text-green-700 text-xs font-semibold">
+                                Low
+                              </span>
+                            );
+                          } else {
+                            return (
+                              <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-gray-100 text-gray-700 text-xs font-semibold">
+                                {activity.priority || "-"}
+                              </span>
+                            );
+                          }
+                        })()}
+                      </td>
                       <td className="py-3 px-6">{activity.dateSubmitted}</td>
                       <td className="py-3 px-6">
                         {(() => {
@@ -626,7 +626,7 @@ export default function ActivityHistory() {
       <FilterModal
         isOpen={isFilterModalOpen}
         onClose={() => setIsFilterModalOpen(false)}
-        typeFilter={typeFilter}
+        priorityFilter={priorityFilter}
         statusFilter={statusFilter}
         onApply={handleApplyFilters}
       />

@@ -485,7 +485,7 @@ export default function Request() {
               <div className="overflow-x-auto">
                 <table className="min-w-full border-collapse text-sm">
                   <thead>
-                    <tr className="bg-gradient-to-r from-red-50 to-red-100 text-left border-b border-gray-200">
+                    <tr className="bg-gray-50 text-left border-b border-gray-200">
                       <th className="p-2 font-semibold text-gray-700">Equipment</th>
                       <th className="p-2 font-semibold text-gray-700">Description</th>
                       <th className="p-2 font-semibold text-gray-700">Category</th>

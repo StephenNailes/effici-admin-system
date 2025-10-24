@@ -20,8 +20,6 @@ use App\Http\Controllers\RevisionController;
 use App\Http\Controllers\EventController;
 use App\Http\Controllers\AnnouncementController;
 use App\Http\Controllers\CalendarController;
-use App\Http\Controllers\HandoverController;
-use App\Http\Controllers\InvitationController;
 use App\Http\Controllers\AuthController;
 
 use App\Models\Event;
@@ -35,9 +33,6 @@ Route::get('/', function () {
             'student', 'student_officer' => redirect()->route('student.dashboard'),
             'admin_assistant' => redirect()->route('admin.dashboard'),
             'dean' => redirect()->route('dean.dashboard'),
-            'inactive_admin_assistant', 'inactive_dean' => redirect()->route('login')->withErrors([
-                'role' => 'Your administrative access has been revoked. Please contact the current administrator for assistance.',
-            ]),
             default => redirect()->route('login'),
         };
     }
@@ -48,27 +43,42 @@ Route::get('/', function () {
 Route::middleware('guest')->group(function () {
     Route::get('/login', [AuthenticatedSessionController::class, 'create'])->name('login');
     Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:10,1');
+    
+    // 🔧 Temporary quick login routes for testing (REMOVE IN PRODUCTION)
+    Route::get('/dev-login/admin', function () {
+        $user = \App\Models\User::where('email', 'admin@example.com')->first();
+        if ($user) {
+            // Ensure correct role for testing
+            if ($user->role !== 'admin_assistant') {
+                $user->role = 'admin_assistant';
+                $user->save();
+            }
+            Auth::login($user);
+            return redirect()->route('admin.dashboard');
+        }
+        return redirect()->route('login')->withErrors(['email' => 'Admin account not found']);
+    })->name('dev.login.admin');
+    
+    Route::get('/dev-login/dean', function () {
+        $user = \App\Models\User::where('email', 'dean@example.com')->first();
+        if ($user) {
+            // Ensure correct role for testing
+            if ($user->role !== 'dean') {
+                $user->role = 'dean';
+                $user->save();
+            }
+            Auth::login($user);
+            return redirect()->route('dean.dashboard');
+        }
+        return redirect()->route('login')->withErrors(['email' => 'Dean account not found']);
+    })->name('dev.login.dean');
 });
 
 Route::post('/logout', [AuthenticatedSessionController::class, 'destroy'])
     ->middleware('auth')
     ->name('logout');
 
-// 📧 Invitation Routes (accessible without authentication)
-Route::get('/invitations/activate/{token}', [InvitationController::class, 'activate'])
-    ->middleware('guest')
-    ->name('invitations.activate');
-
-Route::post('/invitations/complete/{token}', [InvitationController::class, 'complete'])
-    ->middleware('guest')
-    ->name('invitations.complete');
-
-// 🔄 Resend invitation route (requires authentication)
-Route::post('/admin/invitations/resend', [InvitationController::class, 'resend'])
-    ->middleware(['auth', 'verified'])
-    ->name('invitations.resend');
-
-// 🟩 Role-based Dashboards
+//  Role-based Dashboards
 Route::middleware(['auth'])->group(function () {
 
     // Student Dashboard
@@ -102,7 +112,7 @@ Route::middleware(['auth'])->group(function () {
 });
 
 // 🟩 Student Routes
-Route::middleware(['auth', 'verified'])->prefix('student')->group(function () {
+Route::middleware(['auth'])->prefix('student')->group(function () {
 
     // Activity Plan (Student Officer only)
     Route::middleware(['role:student_officer'])->group(function () {
@@ -163,7 +173,7 @@ Route::middleware(['auth', 'verified'])->prefix('student')->group(function () {
 });
 
 // 🟩 Equipment Request API (outside student prefix)
-Route::middleware(['auth', 'verified'])->group(function () {
+Route::middleware(['auth'])->group(function () {
     Route::get('/equipment-requests', [EquipmentRequestController::class, 'showBorrowEquipment'])
         ->name('equipment-requests.index');
     Route::post('/equipment-requests', [EquipmentRequestController::class, 'store'])
@@ -175,7 +185,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 });
 
 // 🟩 Admin + Dean Request Pages (role protected)
-Route::middleware(['auth', 'verified', 'role:admin_assistant,dean'])->group(function () {
+Route::middleware(['auth', 'role:admin_assistant,dean'])->group(function () {
     Route::get('/admin/requests', fn () => Inertia::render('admin_assistant/request'))->name('admin.requests');
     // Admin Assistant: role update requests management
     Route::get('/admin/role-requests', [App\Http\Controllers\RoleUpdateRequestController::class, 'index'])->middleware('role:admin_assistant')->name('admin.role-requests');
@@ -194,19 +204,8 @@ Route::middleware(['auth', 'verified', 'role:admin_assistant,dean'])->group(func
     // Route for PDF download removed
 });
 
-// 🟩 Role Handover Management
-Route::middleware(['auth', 'verified', 'role:admin_assistant,dean'])->prefix('admin/handover')->group(function () {
-    Route::get('/', [HandoverController::class, 'index'])->name('admin.handover');
-    Route::get('/register', [HandoverController::class, 'registerForm'])->name('admin.handover.register');
-    Route::post('/perform', [HandoverController::class, 'handover'])->name('admin.handover.perform');
-    Route::post('/perform-new', [HandoverController::class, 'handoverToNew'])->name('admin.handover.perform-new');
-    Route::get('/history/{role}', [HandoverController::class, 'history'])->name('admin.handover.history');
-    Route::get('/eligible-users/{role}', [HandoverController::class, 'getEligibleUsers'])->name('admin.handover.eligible-users');
-    Route::post('/preview', [HandoverController::class, 'previewHandover'])->name('admin.handover.preview');
-});
-
 // 🟩 Unified Approval API
-Route::middleware(['auth', 'verified', 'role:admin_assistant,dean'])->prefix('api/approvals')->group(function () {
+Route::middleware(['auth', 'role:admin_assistant,dean'])->prefix('api/approvals')->group(function () {
     Route::get('/', [ApprovalController::class, 'indexApi'])->name('approvals.index');
     Route::get('/{id}', [ApprovalController::class, 'show'])->name('approvals.show');
     Route::post('/{id}/approve', [ApprovalController::class, 'approve'])->name('approvals.approve');
@@ -219,13 +218,13 @@ Route::middleware(['auth', 'verified', 'role:admin_assistant,dean'])->prefix('ap
 });
 
 // 🟩 Equipment Management API (admin only)
-Route::middleware(['auth', 'verified', 'role:admin_assistant'])->group(function () {
+Route::middleware(['auth', 'role:admin_assistant'])->group(function () {
     Route::get('/api/equipment-requests/manage', [EquipmentRequestController::class, 'manage']);
     Route::patch('/api/equipment-requests/{id}/status', [EquipmentRequestController::class, 'updateStatus']);
 });
 
 // 🟩 Events + Announcements
-Route::middleware(['auth', 'verified'])->group(function () {
+Route::middleware(['auth'])->group(function () {
     // Calendar with events/announcements
     Route::get('/calendar', [CalendarController::class, 'index'])->name('calendar');
     Route::get('/api/calendar/events', [CalendarController::class, 'getEvents'])->name('calendar.events');

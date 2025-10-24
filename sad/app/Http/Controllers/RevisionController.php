@@ -131,7 +131,7 @@ class RevisionController extends Controller
 
         // For activity plans, redirect to the ActivityPlan editor instead of RevisionEdit
         if ($requestType === 'activity_plan') {
-            return redirect()->route('student.activity-plan.show', ['id' => $id])
+            return redirect()->route('student.requests.activity-plan.show', ['id' => $id])
                 ->with('info', 'Please address the revision comments and resubmit your activity plan.');
         }
 

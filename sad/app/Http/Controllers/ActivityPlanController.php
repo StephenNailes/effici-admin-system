@@ -82,7 +82,8 @@ class ActivityPlanController extends Controller
 
         $user = Auth::user();
 
-        DB::transaction(function () use ($plan, $user, $validated) {
+        $notifyRoles = [];
+        DB::transaction(function () use ($plan, $user, $validated, &$notifyRoles) {
             // Update plan with submitted data if provided
             $updateData = ['status' => 'pending'];
             if (isset($validated['plan_name'])) {
@@ -93,38 +94,63 @@ class ActivityPlanController extends Controller
             }
             $plan->update($updateData);
 
-            // Create approval record if it doesn't exist
-            $existingApproval = RequestApproval::where('request_type', 'activity_plan')
+            // If this was previously sent back for revision, reset the same approver(s) to pending
+            $revApprovals = RequestApproval::where('request_type', 'activity_plan')
                 ->where('request_id', $plan->id)
-                ->where('approver_role', 'admin_assistant')
-                ->first();
+                ->where('status', 'revision_requested')
+                ->get();
 
-            if (!$existingApproval) {
-                RequestApproval::insert([
-                    [
-                        'request_type' => 'activity_plan',
-                        'request_id' => $plan->id,
-                        'approver_role' => 'admin_assistant',
+            if ($revApprovals->count() > 0) {
+                // Reset only the approver(s) who requested the revision
+                RequestApproval::where('request_type', 'activity_plan')
+                    ->where('request_id', $plan->id)
+                    ->where('status', 'revision_requested')
+                    ->update([
                         'status' => 'pending',
-                        'created_at' => now(),
+                        'remarks' => null,
                         'updated_at' => now(),
-                    ]
-                ]);
+                    ]);
+
+                // Notify the same approver role(s) that it's resubmitted
+                $notifyRoles = $revApprovals->pluck('approver_role')->unique()->values()->all();
+            } else {
+                // Fresh submission: ensure admin assistant approval exists
+                $existingApproval = RequestApproval::where('request_type', 'activity_plan')
+                    ->where('request_id', $plan->id)
+                    ->where('approver_role', 'admin_assistant')
+                    ->first();
+
+                if (!$existingApproval) {
+                    RequestApproval::insert([
+                        [
+                            'request_type' => 'activity_plan',
+                            'request_id' => $plan->id,
+                            'approver_role' => 'admin_assistant',
+                            'status' => 'pending',
+                            'created_at' => now(),
+                            'updated_at' => now(),
+                        ]
+                    ]);
+                }
+
+                $notifyRoles = ['admin_assistant'];
             }
         });
 
-        // Send notification to admin assistants
+        // Send notifications to appropriate approver role(s)
         // Priority is already 'low', 'medium', or 'high' from the category
         $priority = $plan->category; // Already in correct format
         $studentName = $user->first_name . ' ' . $user->last_name;
 
-        $this->notificationService->notifyNewRequest(
-            'admin_assistant',
-            $studentName,
-            'activity_plan',
-            $plan->id,
-            $priority
-        );
+        foreach ($notifyRoles as $role) {
+            $this->notificationService->notifyNewRequest(
+                $role,
+                $studentName,
+                'activity_plan',
+                $plan->id,
+                $priority
+            );
+        }
 
         return back()->with('success', 'Activity plan submitted for approval!');
     }

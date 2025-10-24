@@ -52,31 +52,31 @@ class NotificationService
 
         if ($status === 'approved') {
             if ($requestType === 'equipment_request') {
-                $title = '✅ Equipment Request Approved';
+                $title = 'Equipment Request Approved';
                 $message = 'Great news! The Admin Assistant has approved your equipment request. You can now proceed with borrowing the requested equipment.';
                 $priority = 'high';
             } elseif ($requestType === 'activity_plan') {
                 if ($approverRole === 'admin_assistant') {
-                    $title = '✅ Activity Plan - Initial Approval';
+                    $title = 'Activity Plan - Initial Approval';
                     $message = 'Your activity plan has been approved by the Admin Assistant and is now forwarded to the Dean for final approval.';
                     $priority = 'medium';
                 } elseif ($approverRole === 'dean') {
-                    $title = '🎉 Activity Plan - Final Approval';
+                    $title = 'Activity Plan - Final Approval';
                     $message = 'Congratulations! The Dean has given final approval to your activity plan. You can now proceed with organizing your event.';
                     $priority = 'high';
                 }
             }
         } elseif ($status === 'revision_requested') {
             if ($requestType === 'equipment_request') {
-                $title = '📝 Equipment Request - Revision Required';
+                $title = 'Equipment Request - Revision Required';
                 $message = 'The Admin Assistant has requested revisions to your equipment request. Please check the details and resubmit.';
                 $priority = 'high';
             } elseif ($requestType === 'activity_plan') {
                 if ($approverRole === 'admin_assistant') {
-                    $title = '📝 Activity Plan - Revision Required';
+                    $title = 'Activity Plan - Revision Required';
                     $message = 'The Admin Assistant has requested revisions to your activity plan. Please review the feedback and resubmit.';
                 } elseif ($approverRole === 'dean') {
-                    $title = '📝 Activity Plan - Dean Revision Required';
+                    $title = 'Activity Plan - Dean Revision Required';
                     $message = 'The Dean has requested revisions to your activity plan. Please review the feedback and resubmit.';
                 }
                 $priority = 'high';
@@ -155,20 +155,20 @@ class NotificationService
         $humanType = str_replace('_', ' ', (string) $requestType);
         switch ($priority) {
             case 'high':
-                $title = $requestType === 'activity_plan' ? '🚨 HIGH: Activity Plan Request' : '🚨 HIGH: Equipment Request';
-                $message = "HIGH PRIORITY: {$studentName} submitted a {$humanType} request requiring immediate attention";
+                $title = $requestType === 'activity_plan' ? 'High Priority: Activity Plan Request' : 'High Priority: Equipment Request';
+                $message = "High priority: {$studentName} submitted a {$humanType} request requiring immediate attention.";
                 break;
             case 'medium':
                 $title = $requestType === 'activity_plan' ? 'New Activity Plan Request' : 'New Equipment Request';
-                $message = "{$studentName} submitted a new {$humanType} request for review";
+                $message = "{$studentName} submitted a new {$humanType} request for review.";
                 break;
             case 'low':
                 $title = $requestType === 'activity_plan' ? 'Activity Plan Request' : 'Equipment Request';
-                $message = "{$studentName} submitted a {$humanType} request (low priority)";
+                $message = "{$studentName} submitted a {$humanType} request (low priority).";
                 break;
             default: // medium as fallback
                 $title = $requestType === 'activity_plan' ? 'New Activity Plan Request' : 'New Equipment Request';
-                $message = "{$studentName} submitted a new {$humanType} request for review";
+                $message = "{$studentName} submitted a new {$humanType} request for review.";
                 break;
         }
 
@@ -236,17 +236,23 @@ class NotificationService
      */
     public function notifyNewEventOrAnnouncement($type, $title, $createdBy)
     {
-        // Notify all students about events and announcements
-        $students = User::where('role', 'student')->get();
+        // Notify all relevant roles except the creator role (so everyone else sees it)
+        $allRoles = ['student', 'student_officer', 'admin_assistant', 'dean'];
+        $creatorRole = in_array($createdBy, $allRoles, true) ? $createdBy : null;
+        $recipientRoles = array_values(array_filter($allRoles, function ($r) use ($creatorRole) {
+            return $r !== $creatorRole; // exclude creator
+        }));
+
+        $recipients = User::whereIn('role', $recipientRoles)->get();
 
         // Customize notification content based on type
         if ($type === 'event') {
-            $notificationTitle = '📅 New Event Posted';
+            $notificationTitle = 'New Event Posted';
             $message = "A new event '{$title}' has been scheduled. Check it out to see the details and mark your calendar!";
             $actionUrl = '/events';
             $priority = 'medium';
         } else {
-            $notificationTitle = '📢 New Announcement';
+            $notificationTitle = 'New Announcement';
             $message = "Important announcement '{$title}' has been posted. Click to read the full details.";
             $actionUrl = '/announcements';
             $priority = 'medium';
@@ -255,13 +261,13 @@ class NotificationService
         // Add extra priority for Dean announcements
         if ($createdBy === 'dean' && $type === 'announcement') {
             $priority = 'high';
-            $notificationTitle = '📢 Important Announcement from Dean';
+            $notificationTitle = 'Important Announcement from Dean';
             $message = "The Dean has posted an important announcement: '{$title}'. Please review it as soon as possible.";
         }
 
-        foreach ($students as $student) {
+        foreach ($recipients as $user) {
             $this->create([
-                'user_id' => $student->id,
+                'user_id' => $user->id,
                 'type' => 'new_' . $type,
                 'title' => $notificationTitle,
                 'message' => $message,
@@ -433,7 +439,7 @@ class NotificationService
             $this->create([
                 'user_id' => $admin->id,
                 'type' => 'role_update_request',
-                'title' => '🔍 New Officer Verification Request',
+                'title' => 'New Officer Verification Request',
                 'message' => "$studentName submitted details to verify their Student Officer status",
                 'data' => [
                     'request_id' => $roleRequestId,
@@ -450,7 +456,7 @@ class NotificationService
      */
     public function notifyRoleUpdateDecision(int $studentUserId, string $status, int $roleRequestId): void
     {
-        $title = $status === 'approved' ? '✅ Officer Status Verified' : '❌ Verification Not Approved';
+        $title = $status === 'approved' ? 'Officer Status Verified' : 'Verification Not Approved';
         $message = $status === 'approved'
             ? 'Your Student Officer status has been verified! You now have access to Activity Plan features.'
             : 'Your officer verification request was not approved. Please contact the Admin Assistant for more information.';

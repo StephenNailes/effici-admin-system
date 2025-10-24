@@ -3,13 +3,11 @@
 namespace App\Http\Controllers;
 
 use App\Models\RoleUpdateRequest;
-use App\Mail\RoleUpdateApproved;
 use App\Models\User;
 use App\Services\NotificationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
 
@@ -109,28 +107,61 @@ class RoleUpdateRequestController extends Controller
 
         $admin = Auth::user();
 
-        $roleRequest = RoleUpdateRequest::findOrFail($id);
+        $roleRequest = RoleUpdateRequest::with('user')->findOrFail($id);
 
         if ($roleRequest->status !== 'pending') {
             return back()->withErrors(['status' => 'This request has already been processed.']);
         }
 
         $approved = false;
-        DB::transaction(function () use ($validated, $roleRequest, $admin, &$approved) {
-            $roleRequest->status = $validated['action'] === 'approve' ? 'approved' : 'rejected';
-            $roleRequest->remarks = $validated['remarks'] ?? null;
-            $roleRequest->reviewed_by = $admin->id;
-            $roleRequest->reviewed_at = now();
-            $roleRequest->save();
+        
+        try {
+            DB::transaction(function () use ($validated, $roleRequest, $admin, &$approved) {
+                // Update the role request status
+                $roleRequest->status = $validated['action'] === 'approve' ? 'approved' : 'rejected';
+                $roleRequest->remarks = $validated['remarks'] ?? null;
+                $roleRequest->reviewed_by = $admin->id;
+                $roleRequest->reviewed_at = now();
+                $roleRequest->save();
 
-            // If approved, update user role
-            if ($roleRequest->status === 'approved') {
-                $user = $roleRequest->user;
-                $user->role = 'student_officer';
-                $user->save();
-                $approved = true;
-            }
-        });
+                // If approved, update user role immediately
+                if ($roleRequest->status === 'approved') {
+                    $user = $roleRequest->user;
+                    
+                    if (!$user) {
+                        Log::error('User not found for role request', ['request_id' => $roleRequest->id]);
+                        throw new \Exception('User not found for this request');
+                    }
+                    
+                    // Update the role directly
+                    $user->role = 'student_officer';
+                    $saved = $user->save();
+                    
+                    if (!$saved) {
+                        Log::error('Failed to update user role', [
+                            'user_id' => $user->id,
+                            'request_id' => $roleRequest->id
+                        ]);
+                        throw new \Exception('Failed to update user role');
+                    }
+                    
+                    Log::info('User role updated successfully', [
+                        'user_id' => $user->id,
+                        'old_role' => 'student',
+                        'new_role' => 'student_officer',
+                        'request_id' => $roleRequest->id
+                    ]);
+                    
+                    $approved = true;
+                }
+            });
+        } catch (\Throwable $e) {
+            Log::error('Error processing role update request', [
+                'error' => $e->getMessage(),
+                'request_id' => $id
+            ]);
+            return back()->withErrors(['error' => 'Failed to process request: ' . $e->getMessage()]);
+        }
 
         // Notify student
         $this->notifications->notifyRoleUpdateDecision(
@@ -139,15 +170,8 @@ class RoleUpdateRequestController extends Controller
             $roleRequest->id
         );
 
-        // Send email if approved
-        if ($approved) {
-            try {
-                Mail::to($roleRequest->user->email)->send(new RoleUpdateApproved($roleRequest));
-            } catch (\Throwable $e) {
-                Log::warning('Failed to send RoleUpdateApproved mail: '.$e->getMessage());
-            }
-        }
+        // Email sending removed - no longer needed for role updates
 
-        return back()->with('success', 'Request processed successfully.');
+        return back()->with('success', 'Request processed successfully. User role has been updated.');
     }
 }

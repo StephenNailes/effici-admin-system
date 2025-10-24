@@ -128,6 +128,11 @@ class EventController extends Controller
 
         $event = Event::with('images')->findOrFail($id);
 
+        // Check if the current user is the creator of this event
+        if ($event->user_id !== $user->id) {
+            return redirect()->route('events.index')->with('error', 'You can only edit events that you created');
+        }
+
         return Inertia::render('events/EditEvent', [
             'event' => [
                 'id' => $event->id,
@@ -158,6 +163,11 @@ class EventController extends Controller
         }
 
         $event = Event::findOrFail($id);
+
+        // Check if the current user is the creator of this event
+        if ($event->user_id !== $user->id) {
+            return redirect()->route('events.index')->with('error', 'You can only update events that you created');
+        }
 
         $validated = $request->validate([
             'title' => 'required|string|max:255',
@@ -221,6 +231,11 @@ class EventController extends Controller
         $event = Event::find($id);
         if (!$event) {
             return redirect()->route('events.index')->with('success', 'Event deleted successfully!');
+        }
+
+        // Check if the current user is the creator of this event
+        if ($event->user_id !== $user->id) {
+            return redirect()->route('events.index')->with('error', 'You can only delete events that you created');
         }
 
         // Delete associated images first

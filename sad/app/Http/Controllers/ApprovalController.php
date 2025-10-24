@@ -63,6 +63,7 @@ class ApprovalController extends Controller
                 DB::raw("CAST(COALESCE(er.category, ap.category) AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci as priority"),
                 DB::raw("CONCAT(u.first_name, ' ', u.last_name) as student_name"),
                 DB::raw("CONCAT(approver.first_name, ' ', approver.last_name) as approver_name"),
+                DB::raw("CAST(ap.plan_name AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci as activity_title"),
                 DB::raw("CAST(ap.category AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci as activity_category"),
                 DB::raw("CAST(er.purpose AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci as equipment_purpose"),
                 DB::raw("CAST(er.status AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci as equipment_status"),
@@ -71,7 +72,7 @@ class ApprovalController extends Controller
             ->where('ra.approver_role', $role)
             // Group by unique request to avoid duplicates
             ->groupBy('ra.request_id', 'ra.request_type', 'ra.approver_role', 'er.status', 'ap.status', 
-                     'er.category', 'ap.category', 'u.first_name', 'u.last_name', 
+                     'er.category', 'ap.category', 'ap.plan_name', 'u.first_name', 'u.last_name', 
                      'approver.first_name', 'approver.last_name', 'er.purpose')
             ->orderBy('submitted_at', 'desc');
 
@@ -89,6 +90,7 @@ class ApprovalController extends Controller
                 DB::raw('CAST(NULL AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci as priority'),
                 DB::raw("CONCAT(u.first_name, ' ', u.last_name) as student_name"),
                 DB::raw("CONCAT(approver.first_name, ' ', approver.last_name) as approver_name"),
+                DB::raw('CAST(NULL AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci as activity_title'),
                 DB::raw("CAST(rur.requested_role AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci as activity_category"),
                 DB::raw('CAST(NULL AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci as equipment_purpose'),
                 DB::raw('CAST(NULL AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci as equipment_status'),

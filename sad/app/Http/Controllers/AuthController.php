@@ -83,16 +83,32 @@ class AuthController extends Controller
             }
             
             // Create or update user in local database
+            // Important: NEVER downgrade local elevated roles on login.
+            // Preserve existing role if already set (e.g., student_officer, admin_assistant, dean).
+            $emailIdentifier = ($userData['user_account_id'] ?? '') . '@uic.edu.ph';
+            $existingUser = User::where('email', $emailIdentifier)->first();
+
+            $roleToPersist = $existingUser?->role ?: 'student';
+
+            if ($existingUser && $existingUser->role !== 'student') {
+                Log::info('Preserving elevated role on login', [
+                    'email' => $emailIdentifier,
+                    'role' => $existingUser->role,
+                ]);
+            }
+
             $user = User::updateOrCreate(
-                ['email' => $userData['user_account_id'] . '@uic.edu.ph'], // Use account ID as email identifier
+                ['email' => $emailIdentifier], // Use account ID as email identifier
                 [
                     'first_name' => $userData['first_name'] ?? '',
                     'middle_name' => $userData['middle_name'] ?? '',
                     'last_name' => $userData['last_name'] ?? '',
                     'name' => trim(($userData['first_name'] ?? '') . ' ' . ($userData['last_name'] ?? '')),
-                    'school_id' => $userData['user_account_id'] ?? null,
-                    'role' => 'student', // Default role, can be updated based on userData['type']
-                    'password' => bcrypt($request->input('password')), // Store encrypted password
+                    // Persist to the correct field in our schema
+                    'school_id_number' => $userData['user_account_id'] ?? null,
+                    // Preserve any previously elevated role; default to student for first-time logins
+                    'role' => $roleToPersist,
+                    'password' => bcrypt($request->input('password')), // Store encrypted password (not used by UIC but kept locally)
                     'email_verified_at' => now(), // Auto-verify since authenticated by UIC API
                 ]
             );
@@ -127,7 +143,7 @@ class AuthController extends Controller
             'Content-Type' => 'application/json',
             'Authorization' => 'Bearer ' . Session::get('uic_api_token')
         ])->post(env('UIC_API_BASE_URL') . '/accounts/auth/logout');
-
+            
 
         Log::info('UIC API Logout Response: ', ['response' => $response]);
 

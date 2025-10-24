@@ -8,6 +8,8 @@ use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -45,13 +47,6 @@ class AuthenticatedSessionController extends Controller
                 return redirect()->route('student.dashboard');
             case 'dean':
                 return redirect()->route('dean.dashboard');
-            case 'inactive_admin_assistant':
-            case 'inactive_dean':
-                // Inactive roles: logout and show message
-                Auth::logout();
-                return redirect()->route('login')->withErrors([
-                    'role' => 'Your administrative access has been revoked. Please contact the current administrator for assistance.',
-                ]);
             default:
                 // 🚨 Fallback: logout and return with error
                 Auth::logout();
@@ -66,11 +61,32 @@ class AuthenticatedSessionController extends Controller
      */
     public function destroy(Request $request): RedirectResponse
     {
+        // Attempt to revoke UIC API token before destroying local session
+        try {
+            $token = $request->session()->get('uic_api_token');
+            if ($token) {
+                Http::withHeaders([
+                    'Accept' => 'application/json',
+                    'X-API-Client-ID' => env('UIC_API_CLIENT_ID'),
+                    'X-API-Client-Secret' => env('UIC_API_CLIENT_SECRET'),
+                    'Content-Type' => 'application/json',
+                    'Authorization' => 'Bearer ' . $token,
+                ])->post(env('UIC_API_BASE_URL') . '/accounts/auth/logout');
+            }
+        } catch (\Throwable $e) {
+            Log::warning('UIC API logout failed', [
+                'error' => $e->getMessage(),
+            ]);
+        }
+
+        // Ensure token is removed from local session regardless
+        $request->session()->forget('uic_api_token');
+
         Auth::guard('web')->logout();
 
         $request->session()->invalidate();
         $request->session()->regenerateToken();
 
-    return redirect()->route('login', ['logout' => 'success']);
+        return redirect()->route('login', ['logout' => 'success']);
     }
 }

@@ -14,12 +14,12 @@ This is a **Laravel-Inertia.js-React-TypeScript** application for an educational
 ```
 sad/                           # Main application directory
 ├── app/
-│   ├── Models/               # Eloquent models (19 models)
+│   ├── Models/               # Eloquent models (16 models)
 │   ├── Http/
-│   │   ├── Controllers/      # Backend controllers (23+ controllers)
+│   │   ├── Controllers/      # Backend controllers (20+ controllers)
 │   │   └── Middleware/       # Custom middleware (EnsureRole, HandleInertiaRequests)
-│   ├── Services/             # Business logic services (HandoverService, NotificationService, PdfSignatureService)
-│   └── Mail/                 # Mailable classes (HandoverInvitation, RoleUpdateApproved)
+│   ├── Services/             # Business logic services (NotificationService, PdfSignatureService)
+│   └── Mail/                 # Mailable classes (RoleUpdateApproved)
 ├── resources/
 │   ├── js/
 │   │   ├── pages/            # React pages organized by role (student/, admin_assistant/, dean/, Auth/)
@@ -46,7 +46,6 @@ sad/                           # Main application directory
 - **Student Officers** (`student_officer`): Officers who can create activity plans and equipment requests
 - **Admin Assistants** (`admin_assistant`): Initial review and approval, equipment management
 - **Deans** (`dean`): Final approval authority for activity plans
-- **Inactive roles**: `inactive_admin_assistant`, `inactive_dean` (revoked access after handover)
 
 ### Core Entities (19 Models)
 **Requests & Approvals:**
@@ -55,10 +54,7 @@ sad/                           # Main application directory
 - `RequestApproval`: Tracks approval workflow (admin assistant → dean)
 
 **Role Management:**
-- `RoleCurrentHolder`: Tracks who currently holds admin_assistant and dean roles
-- `RoleHandoverLog`: Audit trail of role transfers
 - `RoleUpdateRequest`: Student requests to become student_officer
-- `InvitationToken`: Email-based role handover invitations
 
 **Inventory:**
 - `Equipment`, `EquipmentCategory`: Equipment catalog and categories
@@ -191,13 +187,15 @@ php artisan serve        # Backend server (port 8000)
 ### Email System
 - **Default**: `log` mailer in development (emails are written to logs)
 - **Providers configured**: SES, Postmark, Resend (see `config/mail.php` and `config/services.php`). Slack notifications config present.
-- **Verification**: Built-in Laravel email verification flow (user model implements `MustVerifyEmail`).
+- **Verification**: Email verification has been removed from the system. Users are auto-verified on registration.
 
 ### Authentication
-- **System**: Laravel authentication with Inertia pages (email verification enabled)
-- **Roles**: String-based (`student`, `admin_assistant`, `dean`, `student_officer`, etc.)  
+- **System**: UIC API-based authentication with local session management via Laravel/Inertia
+- **Login**: Accepts username or email, authenticates via external UIC API, creates/updates local user record
+- **Logout**: Revokes UIC API token and destroys local session
+- **Roles**: String-based (`student`, `admin_assistant`, `dean`, `student_officer`)  
 - **Middleware**: Standard Laravel auth; role checks are enforced in controllers (not middleware)
-- **Registration**: Custom profile fields stored on `users` (name parts, contact, address, school ID)
+- **Registration**: No self-registration - users are authenticated via UIC API and auto-created on first login
 
 ## Performance Notes
 

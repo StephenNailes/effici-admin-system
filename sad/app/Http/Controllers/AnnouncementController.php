@@ -120,6 +120,11 @@ class AnnouncementController extends Controller
 
         $announcement = Announcement::with('images')->findOrFail($id);
 
+        // Check if the current user is the creator of this announcement
+        if ($announcement->user_id !== $user->id) {
+            return redirect()->route('announcements.index')->with('error', 'You can only edit announcements that you created');
+        }
+
         return Inertia::render('announcements/EditAnnouncement', [
             'announcement' => [
                 'id' => $announcement->id,
@@ -150,6 +155,11 @@ class AnnouncementController extends Controller
         }
 
         $announcement = Announcement::findOrFail($id);
+
+        // Check if the current user is the creator of this announcement
+        if ($announcement->user_id !== $user->id) {
+            return redirect()->route('announcements.index')->with('error', 'You can only update announcements that you created');
+        }
 
         $validated = $request->validate([
             'title' => 'required|string|max:255',
@@ -205,6 +215,11 @@ class AnnouncementController extends Controller
         $announcement = Announcement::find($id);
         if (!$announcement) {
             return redirect()->route('announcements.index')->with('success', 'Announcement deleted successfully!');
+        }
+
+        // Check if the current user is the creator of this announcement
+        if ($announcement->user_id !== $user->id) {
+            return redirect()->route('announcements.index')->with('error', 'You can only delete announcements that you created');
         }
 
         // Delete associated images first
