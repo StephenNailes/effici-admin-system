@@ -15,8 +15,8 @@ class ActivityLogController extends Controller
     {
         $user = Auth::user();
 
-        // ❌ If not a student, deny access
-        if ($user->role !== 'student') {
+        // ❌ If not a student or student_officer, deny access
+        if (!in_array($user->role, ['student', 'student_officer'])) {
             abort(403, 'Unauthorized action.');
         }
 
@@ -32,10 +32,16 @@ class ActivityLogController extends Controller
             FROM equipment_requests
             WHERE user_id = ?
 
+            UNION ALL
+
+            SELECT 'Budget Request' AS type, id, request_name AS title, status, created_at AS date
+            FROM budget_requests
+            WHERE user_id = ?
+
             ORDER BY date DESC
         ";
 
-        $logs = DB::select($query, [$user->id, $user->id]);
+        $logs = DB::select($query, [$user->id, $user->id, $user->id]);
 
         return Inertia::render('student/ActivityLog', [
             'logs' => $logs

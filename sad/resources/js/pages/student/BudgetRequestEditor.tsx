@@ -16,7 +16,6 @@ import GeneratePdfConfirmModal from "@/components/GeneratePdfConfirmModal";
 export type Member = { name: string; role: string };
 export type Signatory = { name: string; position: string };
 export type SignatoriesMap = Record<string, Signatory[]>;
-import { useActivityPlanIO } from "@/hooks/useActivityPlanIO";
 import uicLogo from "/public/images/uic-logo.png";
 import tuvCertified from "/public/images/tuv-certified.jpg";
 import uicFooter from "/public/images/uic-footer.jpg";
@@ -95,11 +94,11 @@ const GlobalStyles = () => (
     /* Fonts loaded globally by app; no @import needed here to avoid side effects */
     
     :root { --brand-pink: #FF67D3; }
-    /* Force base text color to black within Activity Plan scope */
+    /* Force base text color to black within Budget Request scope */
     .ap-scope, .ap-scope .App, .ap-scope .page, .ap-scope .main-text, .ap-scope .static-content, .ap-scope .editable-content, .ap-scope .signatories-container, .ap-scope .sidebar, .ap-scope .page-footer, .ap-scope .formatting-toolbar {
       color: #000;
     }
-    /* Override Tailwind utilities ONLY inside Activity Plan scope */
+    /* Override Tailwind utilities ONLY inside Budget Request scope */
     .ap-scope .text-gray-50, .ap-scope .text-gray-100, .ap-scope .text-gray-200, .ap-scope .text-gray-300, .ap-scope .text-gray-400,
     .ap-scope .text-gray-500, .ap-scope .text-gray-600, .ap-scope .text-gray-700, .ap-scope .text-gray-800, .ap-scope .text-gray-900 { color: #000 !important; }
     .ap-scope .text-pink-50, .ap-scope .text-pink-100, .ap-scope .text-pink-200, .ap-scope .text-pink-300, .ap-scope .text-pink-400,
@@ -173,7 +172,7 @@ const GlobalStyles = () => (
     }
     .ap-scope .main-text { 
       flex: 1; 
-      padding-left: 1.5rem; 
+      padding-left: 0.3rem; 
       position: relative; 
       overflow-y: hidden;
       display: flex;
@@ -285,13 +284,13 @@ const GlobalStyles = () => (
         margin-bottom: 0.5rem;
     }
 
-    /* --- Body content and signatories: uniform Times New Roman 11pt --- */
+    /* --- Body content and signatories: uniform Arial 10pt --- */
     .ap-scope .main-text,
     .ap-scope .main-text .editable-content,
     .ap-scope .main-text .static-content,
     .ap-scope .signatories-container {
-      font-family: "Times New Roman", Times, serif;
-      font-size: 11pt;
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: 10pt;
       line-height: 1.5;
     }
     /* Tables inside the document */
@@ -444,7 +443,7 @@ const GlobalStyles = () => (
       }
       /* Hide the application shell sidebar during print */
       aside[aria-label="Sidebar"] { display: none !important; }
-      /* Show the Activity Plan document sidebar (EXECUTIVE BOARD) ONLY on the first page in print */
+      /* Show the Budget Request document sidebar (EXECUTIVE BOARD) ONLY on the first page in print */
       .ap-scope .page:first-of-type .sidebar { 
         visibility: visible !important; 
         display: block !important; 
@@ -1498,9 +1497,10 @@ const App: React.FC = () => {
   const page = usePage();
   // Expecting optional plan prop when editing/viewing a specific plan
   const plan: any = (page.props as any).plan ?? null;
+  const editorContext: string | undefined = (page.props as any).editorContext;
   const planStatus: string | null = plan?.status ?? null;
   const revisionRemarks: string | null = (page.props as any).revisionRemarks ?? null;
-  const draftStorageKey = plan?.id ? `activity_plan_draft_${plan.id}` : 'activity_plan_draft_new';
+  const draftStorageKey = plan?.id ? `budget_request_draft_${plan.id}` : 'budget_request_draft_new';
   // PDF generation removed; drafts remain HTML-only
   // CSRF priming to avoid 419 on POST
   const [csrfReady, setCsrfReady] = useState(false);
@@ -1520,14 +1520,7 @@ const App: React.FC = () => {
     ensureCsrf().finally(() => setCsrfReady(true));
   }, [ensureCsrf]);
   const getInitialContent = () => `
-    <div style="text-align: left;" class="text-sm font-semibold ap-date"> (SET DATE IN THIS AREA) </div><br>
-    <h2 style="text-align: center;" class="text-2xl font-bold mb-4">ACTIVITY PLAN</h2>
-    <h3 class="font-bold text-lg mb-2">I. NAME OF THE ACTIVITY:</h3><p class="ml-4">&lt;content&gt;</p><br>
-    <h3 class="font-bold text-lg mb-2">II. RATIONALE:</h3><p class="ml-4 text-justify">&lt;content&gt;</p><br>
-    <h3 class="font-bold text-lg mb-2">III. DATE:</h3><p class="ml-4">&lt;content&gt;</p><br>
-    <h3 class="font-bold text-lg mb-2">IV. SCHEDULE/VENUE:</h3><p class="ml-4">&lt;content&gt;</p><br>
-    <h3 class="font-bold text-lg mb-2">V. PROVISIONS:</h3><p class="ml-4">&lt;content&gt;</p><br>
-    <h3 class="font-bold text-lg mb-2">VI. EVALUATION FORM:</h3><p class="ml-4">&lt;content&gt;</p>
+    <p><br></p>
   `;
 
   const [pages, setPages] = useState<string[]>([getInitialContent()]);
@@ -1579,7 +1572,7 @@ const App: React.FC = () => {
   }, [planStatus]);
   const [showRevisionSubmitWarning, setShowRevisionSubmitWarning] = useState<boolean>(false);
   
-  // TODO: Get these from backend/props based on user role and activity plan status
+  // TODO: Get these from backend/props based on user role and Budget Request status
   const canSignAsPreparedBy = true; // Only the creator can sign
   const canSignAsDean = true; // Only dean role can sign after admin approval
 
@@ -1680,13 +1673,13 @@ const App: React.FC = () => {
       let loaded: any = null;
       
       // First, check if there's pending draft data from a fresh save (before redirect)
-      const pendingRaw = localStorage.getItem('activity_plan_draft_pending');
+      const pendingRaw = localStorage.getItem('budget_request_draft_pending');
       if (pendingRaw) {
         console.log('Found pending draft data');
         try {
           loaded = JSON.parse(pendingRaw);
           // Clear the pending draft since we're loading it now
-          localStorage.removeItem('activity_plan_draft_pending');
+          localStorage.removeItem('budget_request_draft_pending');
           console.log('Loaded pending draft data after redirect');
         } catch (e) {
           console.error('Failed to parse pending draft:', e);
@@ -1774,7 +1767,7 @@ const App: React.FC = () => {
       if (!plan?.id || !isDataLoaded || isSaving) return;
       
       // Check if we have pending draft data (from first-time save redirect)
-      const hasPendingDraft = localStorage.getItem('activity_plan_draft_pending');
+      const hasPendingDraft = localStorage.getItem('budget_request_draft_pending');
       
       // Only auto-save if there was pending draft data from a redirect
       if (!hasPendingDraft) {
@@ -1833,7 +1826,7 @@ const App: React.FC = () => {
     if (!signatureRole) return;
 
     // TODO: Send to backend
-    // await axios.post(`/student/requests/activity-plan/${activityPlanId}/signatures`, {
+    // await axios.post(`/student/requests/budget-request/${activityPlanId}/signatures`, {
     //   signature_data: signatureData,
     //   signer_role: signatureRole
     // });
@@ -1878,23 +1871,23 @@ const App: React.FC = () => {
     // Close modal and proceed with submission
     setShowSubmissionModal(false);
     
-    // Submit the activity plan to the backend
+    // Submit the Budget Request to the backend
     // Allow this intentional navigation to bypass Unsaved Changes guard
     allowNextNavRef.current = true;
     router.post(
-      `/student/requests/activity-plan/${plan.id}/submit`,
+      `/student/requests/budget-request/${plan.id}/submit`,
       {
-        // Best-effort pass-through: backend may ignore these if unsupported
-        plan_name: data?.planName,
+        // Send request_name to match backend validation
+        request_name: data?.planName,
         category: data?.priority,
       },
       {
         preserveScroll: true,
         onSuccess: () => {
-          // Redirect to the correct Activity Plan list route after successful submission
+          // Redirect to the correct Budget Request list route after successful submission
           // Also bypass guard for this follow-up navigation
           allowNextNavRef.current = true;
-          router.visit('/student/requests/activity-plan', {
+          router.visit('/student/requests/budget-request', {
             onSuccess: () => {
               // Success toast will be shown by FlashToaster from the backend flash message
             }
@@ -1944,9 +1937,9 @@ const App: React.FC = () => {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Activity Plan</title>
+  <title>Budget Request</title>
   <style>
-    /* Global Activity Plan Styles */
+    /* Global Budget Request Styles */
     ${globalStyles}
     
     /* Additional captured styles */
@@ -2023,7 +2016,7 @@ const App: React.FC = () => {
       const csrfToken = getCsrfMetaToken();
       
       const response = await axios.post(
-        `/student/requests/activity-plan/${plan.id}/preview`,
+        `/student/requests/budget-request/${plan.id}/preview`,
         {
           html,
           members,
@@ -2072,7 +2065,7 @@ const App: React.FC = () => {
       const csrfToken = getCsrfMetaToken();
       
       const response = await axios.post(
-        `/student/requests/activity-plan/${plan.id}/generate-pdf`,
+        `/student/requests/budget-request/${plan.id}/generate-pdf`,
         {
           html,
           members,
@@ -2110,7 +2103,7 @@ const App: React.FC = () => {
       try {
         const csrfToken = getCsrfMetaToken();
         await axios.post(
-          '/student/requests/activity-plan/cleanup-preview',
+          '/student/requests/budget-request/cleanup-preview',
           { filename: pdfFilename },
           {
             headers: {
@@ -2132,7 +2125,7 @@ const App: React.FC = () => {
     if (pdfPreviewUrl) {
       const link = document.createElement('a');
       link.href = pdfPreviewUrl;
-      link.download = `activity_plan_${plan?.id || 'document'}.pdf`;
+      link.download = `budget_request_${plan?.id || 'document'}.pdf`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -2164,7 +2157,7 @@ const App: React.FC = () => {
         
         // Save to a temporary key that will be picked up after redirect
         try {
-          localStorage.setItem('activity_plan_draft_pending', JSON.stringify(draftData));
+          localStorage.setItem('budget_request_draft_pending', JSON.stringify(draftData));
         } catch (e) {
           console.error('Failed to save draft to localStorage:', e);
         }
@@ -2172,7 +2165,7 @@ const App: React.FC = () => {
         // Allow the next navigation (this is a save operation, not accidental navigation)
         allowNextNavRef.current = true;
         
-        router.post('/student/requests/activity-plan/create-draft', {
+        router.post('/student/requests/budget-request/create-draft', {
           category: 'medium'
         }, {
           preserveState: false,
@@ -2212,7 +2205,7 @@ const App: React.FC = () => {
       console.log('Current pages state:', pages);
       console.log('Draft data being saved:', draftData);
       const response = await axios.post(
-        `/student/requests/activity-plan/${plan.id}/save-document`,
+        `/student/requests/budget-request/${plan.id}/save-document`,
         {
           document_html: html,
           document_data: JSON.stringify(draftData),
@@ -2306,7 +2299,7 @@ const App: React.FC = () => {
         timestamp: new Date().toISOString(),
       };
       const response = await axios.post(
-        `/student/requests/activity-plan/${plan.id}/save-document`,
+        `/student/requests/budget-request/${plan.id}/save-document`,
         { document_html: html, document_data: JSON.stringify(draftData) },
         { headers: { 'X-CSRF-TOKEN': csrfToken, 'Content-Type': 'application/json' } }
       );
@@ -2729,19 +2722,19 @@ const App: React.FC = () => {
         <button
           onClick={() => {
             if (hasUnsavedChanges) {
-              pendingNavRef.current = () => router.get('/student/requests/activity-plan');
+              pendingNavRef.current = () => router.get(editorContext === 'budget' ? '/student/requests/budget-request' : '/student/requests/budget-request');
               setShowLeaveConfirm(true);
             } else {
-              router.get('/student/requests/activity-plan');
+              router.get(editorContext === 'budget' ? '/student/requests/budget-request' : '/student/requests/budget-request');
             }
           }}
           className="inline-flex items-center gap-2 text-sm text-gray-600 hover:text-red-600 transition"
-          aria-label="Back to Activity Requests"
+          aria-label={editorContext === 'budget' ? 'Back to Budget Requests' : 'Back to Activity Requests'}
         >
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
             <path d="M15 18l-6-6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
-          Back to Activity Requests
+          {editorContext === 'budget' ? 'Back to Budget Requests' : 'Back to Activity Requests'}
         </button>
       </div>
 
@@ -2770,7 +2763,7 @@ const App: React.FC = () => {
                 {revisionRemarks}
               </p>
               <p className="text-xs text-yellow-700 mt-2">
-                Please address the comments above and resubmit your activity plan.
+                Please address the comments above and resubmit your Budget Request.
               </p>
             </div>
           </div>
@@ -2901,7 +2894,7 @@ const App: React.FC = () => {
         isOpen={showSubmissionModal}
         onConfirm={handleConfirmSubmission}
         onCancel={handleCancelSubmission}
-        requestType="activity_plan"
+        requestType="budget_request"
       />
 
       {/* PDF Preview Modal */}
@@ -2911,7 +2904,7 @@ const App: React.FC = () => {
         onClose={handleClosePdfPreview}
         onDownload={handleDownloadPdf}
         isLoading={pdfGenerating}
-        title="Activity Plan Preview"
+        title="Budget Request Preview"
       />
 
       {/* Header Settings Modal */}
@@ -2968,7 +2961,7 @@ const App: React.FC = () => {
         open={showRevisionSubmitWarning}
         onClose={() => setShowRevisionSubmitWarning(false)}
         variant="warning"
-        title="Confirm resubmission of the Activity Plan"
+        title="Confirm resubmission of the Budget Request"
         message={
           <span>
             After submission, no edits can be made unless the plan is sent back for revision.
@@ -2983,17 +2976,17 @@ const App: React.FC = () => {
         open={showStatusGuard}
         onClose={() => setShowStatusGuard(false)}
         variant="warning"
-        title={planStatus === 'pending' ? 'Editing Disabled' : 'Activity Plan Locked'}
+        title={planStatus === 'pending' ? 'Editing Disabled' : 'Budget Request Locked'}
         message={
           planStatus === 'pending'
             ? (
               <span>
-                The current activity plan is being reviewed by the admin. You cannot edit the file unless asked to revise.
+                The current Budget Request is being reviewed by the admin. You cannot edit the file unless asked to revise.
               </span>
             )
             : (
               <span>
-                The activity plan has been approved. This activity is currently being implemented, therefore you cannot make any further changes to the file.
+                The Budget Request has been approved. This activity is currently being implemented, therefore you cannot make any further changes to the file.
               </span>
             )
         }

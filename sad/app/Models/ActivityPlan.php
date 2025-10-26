@@ -44,4 +44,28 @@ class ActivityPlan extends Model
     {
         return $this->belongsTo(User::class);
     }
+
+    // Relationship to signatures
+    public function signatures()
+    {
+        return $this->hasMany(ActivityPlanSignature::class, 'activity_plan_id');
+    }
+
+    // Get dean signature
+    public function deanSignature()
+    {
+        return $this->hasOne(ActivityPlanSignature::class)->where('role', 'dean');
+    }
+
+    // Get moderator signature
+    public function moderatorSignature()
+    {
+        return $this->hasOne(ActivityPlanSignature::class)->where('role', 'moderator');
+    }
+
+    // Get academic coordinator signature
+    public function academicCoordinatorSignature()
+    {
+        return $this->hasOne(ActivityPlanSignature::class)->where('role', 'academic_coordinator');
+    }
 }

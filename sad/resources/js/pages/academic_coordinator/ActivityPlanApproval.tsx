@@ -70,7 +70,7 @@ export default function ActivityPlanApproval({ id }: Props) {
       .then((sigRes) => {
         if (sigRes?.data?.signatures) {
           const list: Signature[] = sigRes.data.signatures;
-          // Show ALL existing signatures so dean can see where previous approvers placed theirs
+          // Show ALL existing signatures so academic coordinator can see where previous approvers placed theirs
           setSignatures(list);
         }
       })
@@ -93,7 +93,7 @@ export default function ActivityPlanApproval({ id }: Props) {
         }
       });
   toast.success('Activity plan approved.');
-  router.visit('/dean/requests');
+  router.visit('/academic-coordinator/requests');
     } catch (err) {
       console.error('Error approving activity plan:', err);
     } finally {
@@ -297,7 +297,7 @@ export default function ActivityPlanApproval({ id }: Props) {
         }
       });
   toast.info('Revision requested for this activity plan.');
-  router.visit('/dean/requests');
+  router.visit('/academic-coordinator/requests');
     } catch (err) {
       console.error('Error requesting revision:', err);
     } finally {
@@ -347,7 +347,7 @@ export default function ActivityPlanApproval({ id }: Props) {
             transition={{ duration: 0.4, ease: "easeOut" }}
           >
             <button
-              onClick={() => router.visit('/dean/requests')}
+              onClick={() => router.visit('/academic-coordinator/requests')}
               className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
             >
               <ArrowLeft className="w-5 h-5 text-gray-600" />

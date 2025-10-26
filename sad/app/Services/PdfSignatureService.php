@@ -3,24 +3,31 @@
 namespace App\Services;
 
 use setasign\Fpdi\Fpdi;
-use App\Models\ActivityPlanDeanSignature;
+use App\Models\ActivityPlanSignature;
+use App\Models\BudgetRequestSignature;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Log;
 
 class PdfSignatureService
 {
     /**
-     * Overlay dean signatures onto an activity plan PDF
-     * 
-     * @param string $sourcePdfPath - Path to the source PDF file
-     * @param int $activityPlanId - Activity plan ID to get signatures for
-     * @return string|null - Path to the signed PDF or null on failure
+     * Overlay signatures onto a PDF for either an activity plan or a budget request.
+     * Supports roles: moderator, academic_coordinator, dean, vp_finance
+     *
+     * @param string $sourcePdfPath Path to the source PDF file (stored on public disk)
+     * @param int    $requestId     The activity plan ID or budget request ID
+     * @param string $type          'activity_plan' | 'budget_request' (default: activity_plan)
+     * @return string|null          Path to the signed PDF or null on failure
      */
-    public function overlaySignatures(string $sourcePdfPath, int $activityPlanId): ?string
+    public function overlaySignatures(string $sourcePdfPath, int $requestId, string $type = 'activity_plan'): ?string
     {
         try {
-            // Get all signatures for this activity plan
-            $signatures = ActivityPlanDeanSignature::where('activity_plan_id', $activityPlanId)->get();
+            // Fetch signatures based on request type
+            if ($type === 'budget_request') {
+                $signatures = BudgetRequestSignature::where('budget_request_id', $requestId)->get();
+            } else {
+                $signatures = ActivityPlanSignature::where('activity_plan_id', $requestId)->get();
+            }
             
             if ($signatures->isEmpty()) {
                 return $sourcePdfPath; // No signatures to add
@@ -63,13 +70,13 @@ class PdfSignatureService
                 $pdf->AddPage($size['orientation'], [$size['width'], $size['height']]);
                 $pdf->useTemplate($templateId, 0, 0);
 
-                // Add signatures on the LAST page (where approval signatures typically are in activity plans)
-                // Activity plans are usually 2 pages, with signatures on page 2
+                // Add signatures on the LAST page (where approval signatures typically are)
                 if ($pageNo === $pageCount) {
-                    Log::info("Adding dean signatures to final page", [
+                    Log::info("Adding approval signatures to final page", [
                         'page_number' => $pageNo,
                         'total_pages' => $pageCount,
-                        'signature_count' => count($signatures)
+                        'signature_count' => count($signatures),
+                        'roles' => method_exists($signatures, 'pluck') ? $signatures->pluck('role')->toArray() : []
                     ]);
                     foreach ($signatures as $signature) {
                         $this->addSignatureToPage($pdf, $signature, $size['width'], $size['height']);
@@ -102,7 +109,7 @@ class PdfSignatureService
     /**
      * Add a signature image to the current PDF page
      */
-    protected function addSignatureToPage(Fpdi $pdf, ActivityPlanDeanSignature $signature, float $pageWidthMm, float $pageHeightMm): void
+    protected function addSignatureToPage(Fpdi $pdf, $signature, float $pageWidthMm, float $pageHeightMm): void
     {
         try {
             // Decode base64 image
@@ -162,8 +169,8 @@ class PdfSignatureService
             
             // Log coordinate transformation for debugging
             Log::info("Signature placement debug", [
-                'signature_id' => $signature->id,
-                'input_px' => ['x' => $signature->position_x, 'y' => $signature->position_y],
+                'signature_id' => $signature->id ?? null,
+                'input_px' => ['x' => $signature->position_x ?? null, 'y' => $signature->position_y ?? null],
                 'container_px' => ['width' => $containerWidthPx, 'height' => $containerHeightPx],
                 'page_mm' => ['width' => $pageWidthMm, 'height' => $pageHeightMm],
                 'scale_factors' => ['x' => $scaleX, 'y' => $scaleY],
@@ -204,7 +211,7 @@ class PdfSignatureService
     /**
      * Get signed PDF path if it exists, otherwise return original
      */
-    public function getSignedPdfPath(string $sourcePdfPath, int $activityPlanId): string
+    public function getSignedPdfPath(string $sourcePdfPath, int $requestId, string $type = 'activity_plan'): string
     {
         $signedPath = $this->generateSignedPdfPath($sourcePdfPath);
         $disk = Storage::disk('public');

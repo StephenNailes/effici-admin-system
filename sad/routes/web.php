@@ -32,7 +32,10 @@ Route::get('/', function () {
         return match ($role) {
             'student', 'student_officer' => redirect()->route('student.dashboard'),
             'admin_assistant' => redirect()->route('admin.dashboard'),
+            'moderator' => redirect()->route('moderator.dashboard'),
+            'academic_coordinator' => redirect()->route('academic_coordinator.dashboard'),
             'dean' => redirect()->route('dean.dashboard'),
+            'vp_finance' => redirect()->route('vp_finance.dashboard'),
             default => redirect()->route('login'),
         };
     }
@@ -72,6 +75,48 @@ Route::middleware('guest')->group(function () {
         }
         return redirect()->route('login')->withErrors(['email' => 'Dean account not found']);
     })->name('dev.login.dean');
+    
+    Route::get('/dev-login/moderator', function () {
+        $user = \App\Models\User::where('email', 'moderator@example.com')->first();
+        if ($user) {
+            // Ensure correct role for testing
+            if ($user->role !== 'moderator') {
+                $user->role = 'moderator';
+                $user->save();
+            }
+            Auth::login($user);
+            return redirect()->route('moderator.dashboard');
+        }
+        return redirect()->route('login')->withErrors(['email' => 'Moderator account not found']);
+    })->name('dev.login.moderator');
+    
+    Route::get('/dev-login/academic-coordinator', function () {
+        $user = \App\Models\User::where('email', 'academic_coordinator@example.com')->first();
+        if ($user) {
+            // Ensure correct role for testing
+            if ($user->role !== 'academic_coordinator') {
+                $user->role = 'academic_coordinator';
+                $user->save();
+            }
+            Auth::login($user);
+            return redirect()->route('academic_coordinator.dashboard');
+        }
+        return redirect()->route('login')->withErrors(['email' => 'Academic Coordinator account not found']);
+    })->name('dev.login.academic_coordinator');
+    
+    Route::get('/dev-login/vp-finance', function () {
+        $user = \App\Models\User::where('email', 'vp_finance@example.com')->first();
+        if ($user) {
+            // Ensure correct role for testing
+            if ($user->role !== 'vp_finance') {
+                $user->role = 'vp_finance';
+                $user->save();
+            }
+            Auth::login($user);
+            return redirect()->route('vp_finance.dashboard');
+        }
+        return redirect()->route('login')->withErrors(['email' => 'VP Finance account not found']);
+    })->name('dev.login.vp_finance');
 });
 
 Route::post('/logout', [AuthenticatedSessionController::class, 'destroy'])
@@ -95,6 +140,24 @@ Route::middleware(['auth'])->group(function () {
         'events' => Event::orderByDesc('id')->take(2)->get(),
         'announcements' => Announcement::orderByDesc('id')->take(2)->get(),
     ]))->name('dean.dashboard');
+
+    // Moderator Dashboard  
+    Route::get('/moderator/dashboard', fn () => Inertia::render('ModeratorDashboard', [
+        'events' => Event::orderByDesc('id')->take(2)->get(),
+        'announcements' => Announcement::orderByDesc('id')->take(2)->get(),
+    ]))->name('moderator.dashboard');
+
+    // Academic Coordinator Dashboard
+    Route::get('/academic-coordinator/dashboard', fn () => Inertia::render('AcademicCoordinatorDashboard', [
+        'events' => Event::orderByDesc('id')->take(2)->get(),
+        'announcements' => Announcement::orderByDesc('id')->take(2)->get(),
+    ]))->name('academic_coordinator.dashboard');
+
+    // VP Finance Dashboard
+    Route::get('/vp-finance/dashboard', fn () => Inertia::render('VpFinanceDashboard', [
+        'events' => Event::orderByDesc('id')->take(2)->get(),
+        'announcements' => Announcement::orderByDesc('id')->take(2)->get(),
+    ]))->name('vp_finance.dashboard');
 
     // Profile page
     Route::get('/profile', [App\Http\Controllers\ProfileController::class, 'show'])->name('profile');
@@ -150,6 +213,39 @@ Route::middleware(['auth'])->prefix('student')->group(function () {
         // Thumbnail for recent documents grid
         Route::get('/requests/activity-plan/{id}/thumbnail', [ActivityPlanController::class, 'thumbnail'])
             ->name('student.requests.activity-plan.thumbnail');
+        
+        // Budget Request Routes (Student Officer only)
+        Route::get('/requests/budget-request', [App\Http\Controllers\BudgetRequestController::class, 'index'])
+            ->name('student.requests.budget-request');
+        Route::get('/requests/budget-request/new', [App\Http\Controllers\BudgetRequestController::class, 'create'])
+            ->name('student.requests.budget-request.create');
+        Route::post('/requests/budget-request/create-draft', [App\Http\Controllers\BudgetRequestController::class, 'createDraft'])
+            ->name('student.requests.budget-request.create-draft');
+        Route::post('/requests/budget-request/{id}/submit', [App\Http\Controllers\BudgetRequestController::class, 'submit'])
+            ->name('student.requests.budget-request.submit');
+        Route::post('/requests/budget-request', [App\Http\Controllers\BudgetRequestController::class, 'store'])
+            ->name('student.requests.budget-request.store');
+        Route::get('/requests/budget-request/{id}', [App\Http\Controllers\BudgetRequestController::class, 'show'])
+            ->name('student.requests.budget-request.show');
+        Route::get('/requests/budget-request/{id}/view-pdf', [App\Http\Controllers\BudgetRequestController::class, 'viewApprovedPdf'])
+            ->name('student.requests.budget-request.view-pdf');
+        Route::patch('/requests/budget-request/{id}', [App\Http\Controllers\BudgetRequestController::class, 'update'])
+            ->name('student.requests.budget-request.update');
+        Route::delete('/requests/budget-request/{id}', [App\Http\Controllers\BudgetRequestController::class, 'destroy'])
+            ->name('student.requests.budget-request.destroy');
+        // PDF generation and preview routes
+        Route::post('/requests/budget-request/{id}/preview', [App\Http\Controllers\BudgetRequestController::class, 'preview'])
+            ->name('student.requests.budget-request.preview');
+        Route::post('/requests/budget-request/{id}/generate-pdf', [App\Http\Controllers\BudgetRequestController::class, 'generatePdf'])
+            ->name('student.requests.budget-request.generate-pdf');
+        Route::post('/requests/budget-request/cleanup-preview', [App\Http\Controllers\BudgetRequestController::class, 'cleanupPreview'])
+            ->name('student.requests.budget-request.cleanup-preview');
+        // Document save route
+        Route::post('/requests/budget-request/{id}/save-document', [App\Http\Controllers\BudgetRequestController::class, 'saveDocument'])
+            ->name('student.requests.budget-request.save-document');
+        // Thumbnail
+        Route::get('/requests/budget-request/{id}/thumbnail', [App\Http\Controllers\BudgetRequestController::class, 'thumbnail'])
+            ->name('student.requests.budget-request.thumbnail');
     });
 
     // Generated documents for activity plan (PDF generation removed)
@@ -184,8 +280,8 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/api/equipment/availableForStudent', [EquipmentController::class, 'availableForStudent']);
 });
 
-// 🟩 Admin + Dean Request Pages (role protected)
-Route::middleware(['auth', 'role:admin_assistant,dean'])->group(function () {
+// 🟩 Admin + Dean + Moderator + Academic Coordinator + VP Finance Request Pages (role protected)
+Route::middleware(['auth', 'role:admin_assistant,moderator,academic_coordinator,dean,vp_finance'])->group(function () {
     Route::get('/admin/requests', fn () => Inertia::render('admin_assistant/request'))->name('admin.requests');
     // Admin Assistant: role update requests management
     Route::get('/admin/role-requests', [App\Http\Controllers\RoleUpdateRequestController::class, 'index'])->middleware('role:admin_assistant')->name('admin.role-requests');
@@ -194,10 +290,33 @@ Route::middleware(['auth', 'role:admin_assistant,dean'])->group(function () {
     Route::get('/admin/equipment-management', [EquipmentRequestController::class, 'equipmentManagement'])->name('admin.equipment-management');
     Route::patch('/equipment-requests/{id}/status', [EquipmentRequestController::class, 'updateStatus'])->name('equipment-requests.update-status');
     Route::get('/admin/analytics', [App\Http\Controllers\AnalyticsController::class, 'adminAssistantIndex'])->name('admin_assistant.analytics');
+    
+    // Dean routes
     Route::get('/dean/requests', fn () => Inertia::render('dean/request'))->name('dean.requests');
     Route::get('/dean/activity-plan-approval/{id}', [App\Http\Controllers\NotificationController::class, 'showActivityPlanApproval'])->name('dean.activity-plan-approval');
     Route::get('/admin/activity-history', fn () => Inertia::render('admin_assistant/ActivityHistory'))->name('admin.activity-history');
     Route::get('/dean/activity-history', fn () => Inertia::render('dean/ActivityHistory'))->name('dean.activity-history');
+
+    // Moderator routes
+    Route::get('/moderator/requests', fn () => Inertia::render('moderator/request'))->name('moderator.requests');
+    Route::get('/moderator/activity-plan-approval/{id}', fn ($id) => Inertia::render('moderator/ActivityPlanApproval', ['id' => $id]))->name('moderator.activity-plan-approval');
+    Route::get('/moderator/activity-history', fn () => Inertia::render('moderator/ActivityHistory'))->name('moderator.activity-history');
+
+    // Academic Coordinator routes
+    Route::get('/academic-coordinator/requests', fn () => Inertia::render('academic_coordinator/request'))->name('academic_coordinator.requests');
+    Route::get('/academic-coordinator/activity-plan-approval/{id}', fn ($id) => Inertia::render('academic_coordinator/ActivityPlanApproval', ['id' => $id]))->name('academic_coordinator.activity-plan-approval');
+    Route::get('/academic-coordinator/activity-history', fn () => Inertia::render('academic_coordinator/ActivityHistory'))->name('academic_coordinator.activity-history');
+
+    // VP Finance routes
+    Route::get('/vp-finance/requests', fn () => Inertia::render('vp_finance/request'))->name('vp_finance.requests');
+    Route::get('/vp-finance/budget-request-approval/{id}', fn ($id) => Inertia::render('vp_finance/BudgetRequestApproval', ['id' => $id]))->name('vp_finance.budget-request-approval');
+    Route::get('/vp-finance/activity-history', fn () => Inertia::render('vp_finance/ActivityHistory'))->name('vp_finance.activity-history');
+
+    // Budget Request approval pages for other roles
+    Route::get('/admin/budget-request-approval/{id}', fn ($id) => Inertia::render('admin_assistant/BudgetRequestApproval', ['id' => $id]))->name('admin.budget-request-approval');
+    Route::get('/moderator/budget-request-approval/{id}', fn ($id) => Inertia::render('moderator/BudgetRequestApproval', ['id' => $id]))->name('moderator.budget-request-approval');
+    Route::get('/academic-coordinator/budget-request-approval/{id}', fn ($id) => Inertia::render('academic_coordinator/BudgetRequestApproval', ['id' => $id]))->name('academic_coordinator.budget-request-approval');
+    Route::get('/dean/budget-request-approval/{id}', fn ($id) => Inertia::render('dean/BudgetRequestApproval', ['id' => $id]))->name('dean.budget-request-approval');
 
     // Reviewer access to generated documents with gating (admin assistant first, then dean)
     // Reviewer download route removed
@@ -205,15 +324,15 @@ Route::middleware(['auth', 'role:admin_assistant,dean'])->group(function () {
 });
 
 // 🟩 Unified Approval API
-Route::middleware(['auth', 'role:admin_assistant,dean'])->prefix('api/approvals')->group(function () {
+Route::middleware(['auth', 'role:admin_assistant,moderator,academic_coordinator,dean,vp_finance'])->prefix('api/approvals')->group(function () {
     Route::get('/', [ApprovalController::class, 'indexApi'])->name('approvals.index');
     Route::get('/{id}', [ApprovalController::class, 'show'])->name('approvals.show');
     Route::post('/{id}/approve', [ApprovalController::class, 'approve'])->name('approvals.approve');
     Route::post('/{id}/revision', [ApprovalController::class, 'requestRevision'])->name('approvals.revision');
     Route::post('/batch-approve', [ApprovalController::class, 'batchApprove'])->name('approvals.batch-approve');
     
-    // Dean signature routes
-    Route::post('/{id}/save-signatures', [ApprovalController::class, 'saveSignatures'])->middleware('role:dean')->name('approvals.save-signatures');
+    // Signature routes (allow only approver roles to save signatures)
+    Route::post('/{id}/save-signatures', [ApprovalController::class, 'saveSignatures'])->middleware('role:moderator,academic_coordinator,dean,vp_finance')->name('approvals.save-signatures');
     Route::get('/{id}/signatures', [ApprovalController::class, 'getSignatures'])->name('approvals.get-signatures');
 });
 

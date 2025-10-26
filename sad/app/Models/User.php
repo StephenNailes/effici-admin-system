@@ -21,7 +21,7 @@ class User extends Authenticatable
         'last_name',
         'email',
         'password',
-    'role', // student | student_officer | admin_assistant | dean
+        'role', // student | student_officer | admin_assistant | moderator | academic_coordinator | dean
         'profile_picture',
         'school_id_number',
         'date_of_birth',
@@ -132,5 +132,15 @@ class User extends Authenticatable
     public function isDean(): bool
     {
         return $this->role === 'dean';
+    }
+
+    public function isModerator(): bool
+    {
+        return $this->role === 'moderator';
+    }
+
+    public function isAcademicCoordinator(): bool
+    {
+        return $this->role === 'academic_coordinator';
     }
 }

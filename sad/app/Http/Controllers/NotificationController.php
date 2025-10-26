@@ -165,4 +165,28 @@ class NotificationController extends Controller
         // Render the activity plan approval page
         return Inertia::render('dean/ActivityPlanApproval', ['id' => $id]);
     }
+
+    public function showBudgetRequestApproval($id)
+    {
+        $user = Auth::user();
+        $role = $user->role;
+        
+        // Mark any related notifications as read when user accesses the approval page
+        Notification::where('user_id', $user->id)
+            ->whereJsonContains('data->request_id', $id)
+            ->whereNull('read_at')
+            ->update(['read_at' => now()]);
+
+        // Determine which approval page to render based on user role
+        $pagePath = match($role) {
+            'admin_assistant' => 'admin_assistant/BudgetRequestApproval',
+            'moderator' => 'moderator/BudgetRequestApproval',
+            'academic_coordinator' => 'academic_coordinator/BudgetRequestApproval',
+            'dean' => 'dean/BudgetRequestApproval',
+            'vp_finance' => 'vp_finance/BudgetRequestApproval',
+            default => abort(403, 'Unauthorized role for budget request approval')
+        };
+
+        return Inertia::render($pagePath, ['id' => $id]);
+    }
 }

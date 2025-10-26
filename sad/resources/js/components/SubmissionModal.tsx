@@ -7,13 +7,21 @@ export interface SubmissionModalProps {
   isOpen: boolean;
   onConfirm: (data: { planName: string; priority: 'low' | 'medium' | 'high' }) => void;
   onCancel: () => void;
+  requestType?: 'activity_plan' | 'budget_request'; // Determines modal labels/text
 }
 
-export default function SubmissionModal({ isOpen, onConfirm, onCancel }: SubmissionModalProps) {
+export default function SubmissionModal({ isOpen, onConfirm, onCancel, requestType = 'activity_plan' }: SubmissionModalProps) {
   const [isChecked, setIsChecked] = useState(false);
   const [planName, setPlanName] = useState('');
   const [priority, setPriority] = useState<'low' | 'medium' | 'high'>('medium');
   const [showPriorityInfo, setShowPriorityInfo] = useState(false);
+
+  // Dynamic labels based on request type
+  const isBudgetRequest = requestType === 'budget_request';
+  const modalTitle = isBudgetRequest ? 'Submit Budget Request' : 'Submit Activity Plan';
+  const nameLabel = isBudgetRequest ? 'Budget Request Name' : 'Activity Plan Name';
+  const namePlaceholder = isBudgetRequest ? 'e.g., Q1 2024 Equipment Budget' : 'e.g., Outreach Program - Barangay 12';
+  const confirmText = isBudgetRequest ? 'Set a clear name and priority for your budget request, ensure that you have already generated the PDF, then confirm to send it for approval.' : 'Set a clear name and priority for your activity plan, ensure that you have already generated the PDF, then confirm to send it for approval.';
 
   const canConfirm = useMemo(() => {
     return isChecked && planName.trim().length > 0;
@@ -58,7 +66,7 @@ export default function SubmissionModal({ isOpen, onConfirm, onCancel }: Submiss
                     <CheckCircle2 className="w-5 h-5" />
                   </div>
                   <div>
-                    <h2 id="submission-modal-title" className="text-lg font-semibold text-gray-900">Submit Activity Plan</h2>
+                    <h2 id="submission-modal-title" className="text-lg font-semibold text-gray-900">{modalTitle}</h2>
                     <p className="text-xs text-gray-500">Review details before sending for approval</p>
                   </div>
                 </div>
@@ -74,20 +82,20 @@ export default function SubmissionModal({ isOpen, onConfirm, onCancel }: Submiss
               {/* Content */}
               <div className="p-6 space-y-5">
                 <p className="text-gray-700 leading-relaxed">
-                  Set a clear name and priority for your activity plan, ensure that you have already generated the PDF, then confirm to send it for approval.
+                  {confirmText}
                 </p>
 
                 {/* Plan Name */}
                 <div>
                   <label htmlFor="plan-name" className="flex items-center gap-2 text-sm font-medium text-gray-800 mb-2">
-                    <TypeIcon className="w-4 h-4 text-red-600" /> Activity Plan Name
+                    <TypeIcon className="w-4 h-4 text-red-600" /> {nameLabel}
                   </label>
                   <input
                     id="plan-name"
                     type="text"
                     value={planName}
                     onChange={(e) => setPlanName(e.target.value)}
-                    placeholder="e.g., Outreach Program - Barangay 12"
+                    placeholder={namePlaceholder}
                     className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-gray-900 placeholder:text-gray-400 focus-visible:outline-none focus:ring-2 focus:ring-red-500/50 focus:border-red-500/50 transition-shadow"
                   />
                   <p className="mt-1.5 text-xs text-gray-500">A concise title helps reviewers identify your request quickly.</p>

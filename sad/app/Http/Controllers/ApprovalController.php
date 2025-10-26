@@ -6,7 +6,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use App\Services\NotificationService;
 use Carbon\Carbon;
-use App\Models\ActivityPlanDeanSignature;
+use App\Models\ActivityPlanSignature;
+use App\Models\BudgetRequestSignature;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Log;
@@ -19,11 +20,11 @@ class ApprovalController extends Controller
     {
         $this->notificationService = $notificationService;
     }
-    // Fetch requests for any approver role (admin_assistant or dean)
+    // Fetch requests for any approver role (admin_assistant, moderator, academic_coordinator, dean, or vp_finance)
     public function indexApi(Request $request)
     {
         $role = optional($request->user())->role;
-        if (!in_array($role, ['admin_assistant', 'dean'], true)) {
+        if (!in_array($role, ['admin_assistant', 'moderator', 'academic_coordinator', 'dean', 'vp_finance'], true)) {
             abort(403);
         }
 
@@ -37,8 +38,12 @@ class ApprovalController extends Controller
                 $join->on('ra.request_id', '=', 'ap.id')
                      ->where('ra.request_type', '=', 'activity_plan');
             })
+            ->leftJoin('budget_requests as br', function ($join) {
+                $join->on('ra.request_id', '=', 'br.id')
+                     ->where('ra.request_type', '=', 'budget_request');
+            })
             ->leftJoin('users as u', function ($join) {
-                $join->on('u.id', '=', DB::raw('COALESCE(er.user_id, ap.user_id)'));
+                $join->on('u.id', '=', DB::raw('COALESCE(er.user_id, ap.user_id, br.user_id)'));
             })
             // Get the approver who last acted on this request
             ->leftJoin('users as approver', function($join) {
@@ -60,19 +65,21 @@ class ApprovalController extends Controller
                 DB::raw("CAST(MAX(ra.status) AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci as approval_status"),
                 DB::raw("MIN(ra.created_at) as submitted_at"),
                 DB::raw("CAST(ra.approver_role AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci as approver_role"),
-                DB::raw("CAST(COALESCE(er.category, ap.category) AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci as priority"),
+                DB::raw("CAST(COALESCE(er.category, ap.category, br.category) AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci as priority"),
                 DB::raw("CONCAT(u.first_name, ' ', u.last_name) as student_name"),
                 DB::raw("CONCAT(approver.first_name, ' ', approver.last_name) as approver_name"),
                 DB::raw("CAST(ap.plan_name AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci as activity_title"),
-                DB::raw("CAST(ap.category AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci as activity_category"),
-                DB::raw("CAST(er.purpose AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci as equipment_purpose"),
+                DB::raw("CAST(COALESCE(ap.category, br.request_name) AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci as activity_category"),
+                DB::raw("CAST(COALESCE(er.purpose, br.request_name) AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci as equipment_purpose"),
                 DB::raw("CAST(er.status AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci as equipment_status"),
-                DB::raw("CAST(ap.status AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci as activity_status")
+                DB::raw("CAST(COALESCE(ap.status, br.status) AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci as activity_status"),
+                DB::raw("CAST(br.request_name AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci as request_title"),
+                DB::raw("CAST(br.category AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci as request_category")
             )
             ->where('ra.approver_role', $role)
             // Group by unique request to avoid duplicates
-            ->groupBy('ra.request_id', 'ra.request_type', 'ra.approver_role', 'er.status', 'ap.status', 
-                     'er.category', 'ap.category', 'ap.plan_name', 'u.first_name', 'u.last_name', 
+            ->groupBy('ra.request_id', 'ra.request_type', 'ra.approver_role', 'er.status', 'ap.status', 'br.status',
+                     'er.category', 'ap.category', 'br.category', 'ap.plan_name', 'br.request_name', 'u.first_name', 'u.last_name', 
                      'approver.first_name', 'approver.last_name', 'er.purpose')
             ->orderBy('submitted_at', 'desc');
 
@@ -94,7 +101,9 @@ class ApprovalController extends Controller
                 DB::raw("CAST(rur.requested_role AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci as activity_category"),
                 DB::raw('CAST(NULL AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci as equipment_purpose'),
                 DB::raw('CAST(NULL AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci as equipment_status'),
-                DB::raw('CAST(NULL AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci as activity_status')
+                DB::raw('CAST(NULL AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci as activity_status'),
+                DB::raw('CAST(NULL AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci as request_title'),
+                DB::raw('CAST(NULL AS CHAR CHARACTER SET utf8mb4) COLLATE utf8mb4_unicode_ci as request_category')
             );
 
         // Union with existing $requests query
@@ -137,6 +146,11 @@ class ApprovalController extends Controller
     // Show single request details
     public function show($id)
     {
+        // Update viewed_at timestamp
+        DB::table('request_approvals')
+            ->where('id', $id)
+            ->update(['viewed_at' => now()]);
+
         $request = DB::table('request_approvals as ra')
             ->leftJoin('equipment_requests as er', function ($join) {
                 $join->on('ra.request_id', '=', 'er.id')
@@ -146,8 +160,12 @@ class ApprovalController extends Controller
                 $join->on('ra.request_id', '=', 'ap.id')
                      ->where('ra.request_type', '=', 'activity_plan');
             })
+            ->leftJoin('budget_requests as br', function ($join) {
+                $join->on('ra.request_id', '=', 'br.id')
+                     ->where('ra.request_type', '=', 'budget_request');
+            })
             ->leftJoin('users as u', function ($join) {
-                $join->on('u.id', '=', DB::raw('COALESCE(er.user_id, ap.user_id)'));
+                $join->on('u.id', '=', DB::raw('COALESCE(er.user_id, ap.user_id, br.user_id)'));
             })
             ->leftJoin('users as approver', 'approver.id', '=', 'ra.approver_id')
             ->select(
@@ -157,14 +175,18 @@ class ApprovalController extends Controller
                 'ra.status as approval_status',
                 'ra.created_at as submitted_at',
                 'ra.approver_role',
-                DB::raw("COALESCE(er.category, ap.category) as priority"),
+                DB::raw("COALESCE(er.category, ap.category, br.category) as priority"),
                 DB::raw("CONCAT(u.first_name, ' ', u.last_name) as student_name"),
                 DB::raw("CONCAT(approver.first_name, ' ', approver.last_name) as approver_name"),
                 'ap.category as activity_category',
                 'er.purpose as equipment_purpose',
                 'er.status as equipment_status',
                 'ap.status as activity_status',
-                'ap.pdf_path as activity_pdf_path'
+                'ap.pdf_path as activity_pdf_path',
+                'br.request_name as request_title',
+                'br.category as request_category',
+                'br.status as budget_status',
+                'br.pdf_path as budget_pdf_path'
             )
             ->where('ra.id', $id)
             ->first();
@@ -215,6 +237,43 @@ class ApprovalController extends Controller
             }
         }
 
+        // Enrich with PDF URL and organization for budget requests
+        if ($request && $request->request_type === 'budget_request') {
+            // Build public URL for PDF if available
+            if (!empty($request->budget_pdf_path)) {
+                try {
+                    $request->pdf_url = \Illuminate\Support\Facades\Storage::url($request->budget_pdf_path);
+                } catch (\Throwable $e) {
+                    $request->pdf_url = null;
+                }
+            } else {
+                $request->pdf_url = null;
+            }
+
+            // Attempt to read latest document_data to extract organization/headerSociety
+            try {
+                $docData = DB::table('budget_request_files')
+                    ->where('budget_request_id', $request->request_id)
+                    ->orderByDesc('id')
+                    ->value('document_data');
+                $org = null;
+                if ($docData) {
+                    $decoded = json_decode($docData, true);
+                    if (is_array($decoded)) {
+                        if (isset($decoded['headerSociety']) && is_string($decoded['headerSociety'])) {
+                            $org = $decoded['headerSociety'];
+                        } elseif (isset($decoded['organization']) && is_string($decoded['organization'])) {
+                            // fallback key if present
+                            $org = $decoded['organization'];
+                        }
+                    }
+                }
+                $request->organization = $org;
+            } catch (\Throwable $e) {
+                $request->organization = null;
+            }
+        }
+
         return response()->json($request);
     }
 
@@ -223,7 +282,7 @@ class ApprovalController extends Controller
     {
         $role = optional($request->user())->role;
         $approverId = $request->user()->id;
-        if (!in_array($role, ['admin_assistant', 'dean'], true)) {
+        if (!in_array($role, ['admin_assistant', 'moderator', 'academic_coordinator', 'dean', 'vp_finance'], true)) {
             abort(403);
         }
 
@@ -238,6 +297,8 @@ class ApprovalController extends Controller
             $studentId = null;
             if ($ra->request_type === 'equipment') {
                 $studentId = DB::table('equipment_requests')->where('id', $ra->request_id)->value('user_id');
+            } elseif ($ra->request_type === 'budget_request') {
+                $studentId = DB::table('budget_requests')->where('id', $ra->request_id)->value('user_id');
             } else {
                 $studentId = DB::table('activity_plans')->where('id', $ra->request_id)->value('user_id');
             }
@@ -272,12 +333,100 @@ class ApprovalController extends Controller
                         'admin_assistant'
                     );
                 }
-            } else { // activity_plan
+            } elseif ($ra->request_type === 'activity_plan') {
+                // New approval chain: admin_assistant → moderator → academic_coordinator → dean
                 if ($role === 'admin_assistant') {
-                    // Admin assistant approves → activity plan stays 'pending' until dean approves
-                    // Do NOT update activity_plans status here - it should remain 'pending'
-                    
-                    // Ensure dean pending approval row exists
+                    // Admin assistant approves → forward to moderator
+                    $existsModerator = DB::table('request_approvals')
+                        ->where('request_type', 'activity_plan')
+                        ->where('request_id', $ra->request_id)
+                        ->where('approver_role', 'moderator')
+                        ->exists();
+                    if (!$existsModerator) {
+                        DB::table('request_approvals')->insert([
+                            'request_type' => 'activity_plan',
+                            'request_id' => $ra->request_id,
+                            'approver_role' => 'moderator',
+                            'status' => 'pending',
+                            'created_at' => now(),
+                            'updated_at' => now(),
+                        ]);
+
+                        // Notify moderators
+                        try {
+                            $student = DB::table('users')->select('first_name','last_name')->where('id', $studentId)->first();
+                            $planMeta = DB::table('activity_plans')->select('category')->where('id', $ra->request_id)->first();
+                            $studentName = $student ? trim(($student->first_name ?? '') . ' ' . ($student->last_name ?? '')) : 'Student';
+                            $priority = isset($planMeta->category) ? $planMeta->category : 'medium';
+                            $this->notificationService->notifyNewRequest(
+                                'moderator',
+                                $studentName,
+                                'activity_plan',
+                                $ra->request_id,
+                                $priority
+                            );
+                        } catch (\Throwable $e) {
+                            Log::warning('Failed to notify moderator: ' . $e->getMessage());
+                        }
+                    }
+
+                    // Notify student that admin assistant approved
+                    if ($studentId) {
+                        $this->notificationService->notifyRequestStatusChange(
+                            $studentId, 
+                            'activity_plan', 
+                            'approved', 
+                            $ra->request_id, 
+                            'admin_assistant'
+                        );
+                    }
+                } elseif ($role === 'moderator') {
+                    // Moderator approves → forward to academic coordinator
+                    $existsCoordinator = DB::table('request_approvals')
+                        ->where('request_type', 'activity_plan')
+                        ->where('request_id', $ra->request_id)
+                        ->where('approver_role', 'academic_coordinator')
+                        ->exists();
+                    if (!$existsCoordinator) {
+                        DB::table('request_approvals')->insert([
+                            'request_type' => 'activity_plan',
+                            'request_id' => $ra->request_id,
+                            'approver_role' => 'academic_coordinator',
+                            'status' => 'pending',
+                            'created_at' => now(),
+                            'updated_at' => now(),
+                        ]);
+
+                        // Notify academic coordinators
+                        try {
+                            $student = DB::table('users')->select('first_name','last_name')->where('id', $studentId)->first();
+                            $planMeta = DB::table('activity_plans')->select('category')->where('id', $ra->request_id)->first();
+                            $studentName = $student ? trim(($student->first_name ?? '') . ' ' . ($student->last_name ?? '')) : 'Student';
+                            $priority = isset($planMeta->category) ? $planMeta->category : 'medium';
+                            $this->notificationService->notifyNewRequest(
+                                'academic_coordinator',
+                                $studentName,
+                                'activity_plan',
+                                $ra->request_id,
+                                $priority
+                            );
+                        } catch (\Throwable $e) {
+                            Log::warning('Failed to notify academic coordinator: ' . $e->getMessage());
+                        }
+                    }
+
+                    // Notify student that moderator approved
+                    if ($studentId) {
+                        $this->notificationService->notifyRequestStatusChange(
+                            $studentId, 
+                            'activity_plan', 
+                            'approved', 
+                            $ra->request_id, 
+                            'moderator'
+                        );
+                    }
+                } elseif ($role === 'academic_coordinator') {
+                    // Academic coordinator approves → forward to dean
                     $existsDean = DB::table('request_approvals')
                         ->where('request_type', 'activity_plan')
                         ->where('request_id', $ra->request_id)
@@ -293,15 +442,12 @@ class ApprovalController extends Controller
                             'updated_at' => now(),
                         ]);
 
-                        // Notify deans that a plan needs final approval (forwarded)
+                        // Notify deans
                         try {
-                            // Get student full name and plan priority/category
                             $student = DB::table('users')->select('first_name','last_name')->where('id', $studentId)->first();
                             $planMeta = DB::table('activity_plans')->select('category')->where('id', $ra->request_id)->first();
                             $studentName = $student ? trim(($student->first_name ?? '') . ' ' . ($student->last_name ?? '')) : 'Student';
-                            // Priority is already 'low', 'medium', or 'high' in the database
                             $priority = isset($planMeta->category) ? $planMeta->category : 'medium';
-                            // Broadcast to all dean users
                             $this->notificationService->notifyNewRequest(
                                 'dean',
                                 $studentName,
@@ -310,18 +456,18 @@ class ApprovalController extends Controller
                                 $priority
                             );
                         } catch (\Throwable $e) {
-                            Log::warning('Failed to notify dean about forwarded activity plan: ' . $e->getMessage());
+                            Log::warning('Failed to notify dean: ' . $e->getMessage());
                         }
                     }
 
-                    // Notify student that admin assistant approved their activity plan (still needs dean approval)
+                    // Notify student that academic coordinator approved
                     if ($studentId) {
                         $this->notificationService->notifyRequestStatusChange(
                             $studentId, 
                             'activity_plan', 
                             'approved', 
                             $ra->request_id, 
-                            'admin_assistant'
+                            'academic_coordinator'
                         );
                     }
                 } elseif ($role === 'dean') {
@@ -354,6 +500,221 @@ class ApprovalController extends Controller
                             'approved', 
                             $ra->request_id, 
                             'dean'
+                        );
+                    }
+                }
+            } elseif ($ra->request_type === 'budget_request') {
+                // Budget request approval chain: admin_assistant → moderator → academic_coordinator → dean → vp_finance
+                if ($role === 'admin_assistant') {
+                    // Admin assistant approves → forward to moderator
+                    $existsModerator = DB::table('request_approvals')
+                        ->where('request_type', 'budget_request')
+                        ->where('request_id', $ra->request_id)
+                        ->where('approver_role', 'moderator')
+                        ->exists();
+                    if (!$existsModerator) {
+                        DB::table('request_approvals')->insert([
+                            'request_type' => 'budget_request',
+                            'request_id' => $ra->request_id,
+                            'approver_role' => 'moderator',
+                            'status' => 'pending',
+                            'created_at' => now(),
+                            'updated_at' => now(),
+                        ]);
+
+                        // Notify moderators
+                        try {
+                            $student = DB::table('users')->select('first_name','last_name')->where('id', $studentId)->first();
+                            $budgetMeta = DB::table('budget_requests')->select('category', 'request_name')->where('id', $ra->request_id)->first();
+                            $studentName = $student ? trim(($student->first_name ?? '') . ' ' . ($student->last_name ?? '')) : 'Student';
+                            $priority = isset($budgetMeta->category) ? $budgetMeta->category : 'medium';
+                            $this->notificationService->notifyNewRequest(
+                                'moderator',
+                                $studentName,
+                                'budget_request',
+                                $ra->request_id,
+                                $priority
+                            );
+                        } catch (\Throwable $e) {
+                            Log::warning('Failed to notify moderator: ' . $e->getMessage());
+                        }
+                    }
+
+                    // Notify student that admin assistant approved
+                    if ($studentId) {
+                        $this->notificationService->notifyRequestStatusChange(
+                            $studentId, 
+                            'budget_request', 
+                            'approved', 
+                            $ra->request_id, 
+                            'admin_assistant'
+                        );
+                    }
+                } elseif ($role === 'moderator') {
+                    // Moderator approves → forward to academic coordinator
+                    $existsCoordinator = DB::table('request_approvals')
+                        ->where('request_type', 'budget_request')
+                        ->where('request_id', $ra->request_id)
+                        ->where('approver_role', 'academic_coordinator')
+                        ->exists();
+                    if (!$existsCoordinator) {
+                        DB::table('request_approvals')->insert([
+                            'request_type' => 'budget_request',
+                            'request_id' => $ra->request_id,
+                            'approver_role' => 'academic_coordinator',
+                            'status' => 'pending',
+                            'created_at' => now(),
+                            'updated_at' => now(),
+                        ]);
+
+                        // Notify academic coordinators
+                        try {
+                            $student = DB::table('users')->select('first_name','last_name')->where('id', $studentId)->first();
+                            $budgetMeta = DB::table('budget_requests')->select('category', 'request_name')->where('id', $ra->request_id)->first();
+                            $studentName = $student ? trim(($student->first_name ?? '') . ' ' . ($student->last_name ?? '')) : 'Student';
+                            $priority = isset($budgetMeta->category) ? $budgetMeta->category : 'medium';
+                            $this->notificationService->notifyNewRequest(
+                                'academic_coordinator',
+                                $studentName,
+                                'budget_request',
+                                $ra->request_id,
+                                $priority
+                            );
+                        } catch (\Throwable $e) {
+                            Log::warning('Failed to notify academic coordinator: ' . $e->getMessage());
+                        }
+                    }
+
+                    // Notify student that moderator approved
+                    if ($studentId) {
+                        $this->notificationService->notifyRequestStatusChange(
+                            $studentId, 
+                            'budget_request', 
+                            'approved', 
+                            $ra->request_id, 
+                            'moderator'
+                        );
+                    }
+                } elseif ($role === 'academic_coordinator') {
+                    // Academic coordinator approves → forward to dean
+                    $existsDean = DB::table('request_approvals')
+                        ->where('request_type', 'budget_request')
+                        ->where('request_id', $ra->request_id)
+                        ->where('approver_role', 'dean')
+                        ->exists();
+                    if (!$existsDean) {
+                        DB::table('request_approvals')->insert([
+                            'request_type' => 'budget_request',
+                            'request_id' => $ra->request_id,
+                            'approver_role' => 'dean',
+                            'status' => 'pending',
+                            'created_at' => now(),
+                            'updated_at' => now(),
+                        ]);
+
+                        // Notify deans
+                        try {
+                            $student = DB::table('users')->select('first_name','last_name')->where('id', $studentId)->first();
+                            $budgetMeta = DB::table('budget_requests')->select('category', 'request_name')->where('id', $ra->request_id)->first();
+                            $studentName = $student ? trim(($student->first_name ?? '') . ' ' . ($student->last_name ?? '')) : 'Student';
+                            $priority = isset($budgetMeta->category) ? $budgetMeta->category : 'medium';
+                            $this->notificationService->notifyNewRequest(
+                                'dean',
+                                $studentName,
+                                'budget_request',
+                                $ra->request_id,
+                                $priority
+                            );
+                        } catch (\Throwable $e) {
+                            Log::warning('Failed to notify dean: ' . $e->getMessage());
+                        }
+                    }
+
+                    // Notify student that academic coordinator approved
+                    if ($studentId) {
+                        $this->notificationService->notifyRequestStatusChange(
+                            $studentId, 
+                            'budget_request', 
+                            'approved', 
+                            $ra->request_id, 
+                            'academic_coordinator'
+                        );
+                    }
+                } elseif ($role === 'dean') {
+                    // Dean approves → forward to vp_finance
+                    $existsVpFinance = DB::table('request_approvals')
+                        ->where('request_type', 'budget_request')
+                        ->where('request_id', $ra->request_id)
+                        ->where('approver_role', 'vp_finance')
+                        ->exists();
+                    if (!$existsVpFinance) {
+                        DB::table('request_approvals')->insert([
+                            'request_type' => 'budget_request',
+                            'request_id' => $ra->request_id,
+                            'approver_role' => 'vp_finance',
+                            'status' => 'pending',
+                            'created_at' => now(),
+                            'updated_at' => now(),
+                        ]);
+
+                        // Notify vp_finance users
+                        try {
+                            $student = DB::table('users')->select('first_name','last_name')->where('id', $studentId)->first();
+                            $budgetMeta = DB::table('budget_requests')->select('category', 'request_name')->where('id', $ra->request_id)->first();
+                            $studentName = $student ? trim(($student->first_name ?? '') . ' ' . ($student->last_name ?? '')) : 'Student';
+                            $priority = isset($budgetMeta->category) ? $budgetMeta->category : 'medium';
+                            $this->notificationService->notifyNewRequest(
+                                'vp_finance',
+                                $studentName,
+                                'budget_request',
+                                $ra->request_id,
+                                $priority
+                            );
+                        } catch (\Throwable $e) {
+                            Log::warning('Failed to notify vp_finance: ' . $e->getMessage());
+                        }
+                    }
+
+                    // Notify student that dean approved
+                    if ($studentId) {
+                        $this->notificationService->notifyRequestStatusChange(
+                            $studentId, 
+                            'budget_request', 
+                            'approved', 
+                            $ra->request_id, 
+                            'dean'
+                        );
+                    }
+                } elseif ($role === 'vp_finance') {
+                    // VP Finance approves → final approval
+                    DB::table('budget_requests')->where('id', $ra->request_id)->update(['status' => 'approved']);
+
+                    // Regenerate signed PDF with vp_finance signature if applicable
+                    try {
+                        $budgetRequest = DB::table('budget_requests')->where('id', $ra->request_id)->first();
+                        if ($budgetRequest && !empty($budgetRequest->pdf_path)) {
+                            $pdfSignatureService = app(\App\Services\PdfSignatureService::class);
+                            $signedPdfPath = $pdfSignatureService->overlaySignatures($budgetRequest->pdf_path, $ra->request_id, 'budget_request');
+
+                            if ($signedPdfPath) {
+                                DB::table('budget_requests')->where('id', $ra->request_id)->update([
+                                    'pdf_path' => $signedPdfPath
+                                ]);
+                                Log::info("Budget request {$ra->request_id} PDF regenerated with vp_finance signatures on approval: {$signedPdfPath}");
+                            }
+                        }
+                    } catch (\Throwable $e) {
+                        Log::error("Failed to regenerate signed PDF on vp_finance approval for budget request {$ra->request_id}: " . $e->getMessage());
+                    }
+
+                    // Notify student that vp_finance approved their budget request (final approval)
+                    if ($studentId) {
+                        $this->notificationService->notifyRequestStatusChange(
+                            $studentId, 
+                            'budget_request', 
+                            'approved', 
+                            $ra->request_id, 
+                            'vp_finance'
                         );
                     }
                 }
@@ -391,7 +752,7 @@ class ApprovalController extends Controller
         $remarks = $request->input('remarks');
         $role = optional($request->user())->role;
         $approverId = $request->user()->id;
-        if (!in_array($role, ['admin_assistant', 'dean'], true)) {
+        if (!in_array($role, ['admin_assistant', 'moderator', 'academic_coordinator', 'dean', 'vp_finance'], true)) {
             abort(403);
         }
 
@@ -405,6 +766,8 @@ class ApprovalController extends Controller
             $studentId = null;
             if ($ra->request_type === 'equipment') {
                 $studentId = DB::table('equipment_requests')->where('id', $ra->request_id)->value('user_id');
+            } elseif ($ra->request_type === 'budget_request') {
+                $studentId = DB::table('budget_requests')->where('id', $ra->request_id)->value('user_id');
             } else {
                 $studentId = DB::table('activity_plans')->where('id', $ra->request_id)->value('user_id');
             }
@@ -424,6 +787,19 @@ class ApprovalController extends Controller
                     $this->notificationService->notifyRequestStatusChange(
                         $studentId, 
                         'equipment_request', 
+                        'revision_requested', 
+                        $ra->request_id, 
+                        $role
+                    );
+                }
+            } elseif ($ra->request_type === 'budget_request') {
+                DB::table('budget_requests')->where('id', $ra->request_id)->update(['status' => 'under_revision']);
+                
+                // Notify student that revision is requested for their budget request
+                if ($studentId) {
+                    $this->notificationService->notifyRequestStatusChange(
+                        $studentId, 
+                        'budget_request', 
                         'revision_requested', 
                         $ra->request_id, 
                         $role
@@ -561,7 +937,7 @@ class ApprovalController extends Controller
     {
         $role = optional($request->user())->role;
         $approverId = $request->user()->id;
-        if (!in_array($role, ['admin_assistant', 'dean'], true)) {
+        if (!in_array($role, ['admin_assistant', 'moderator', 'academic_coordinator', 'dean', 'vp_finance'], true)) {
             abort(403, 'Unauthorized');
         }
 
@@ -601,30 +977,50 @@ class ApprovalController extends Controller
 
                     // Update request status
                     if ($ra->request_type === 'equipment') {
+                        // Equipment requests only need admin_assistant approval (no change)
                         if ($role === 'admin_assistant') {
-                            // Check if dean approval exists
-                            $deanApproval = DB::table('request_approvals')
+                            DB::table('equipment_requests')->where('id', $ra->request_id)->update(['status' => 'approved']);
+                        }
+                    } elseif ($ra->request_type === 'activity_plan') {
+                        // Activity plan - handle 4-level chain
+                        if ($role === 'admin_assistant') {
+                            // Forward to moderator
+                            $moderatorApproval = DB::table('request_approvals')
                                 ->where('request_id', $ra->request_id)
-                                ->where('request_type', 'equipment')
-                                ->where('approver_role', 'dean')
+                                ->where('request_type', 'activity_plan')
+                                ->where('approver_role', 'moderator')
                                 ->first();
 
-                            if (!$deanApproval) {
-                                // Create dean approval
+                            if (!$moderatorApproval) {
                                 DB::table('request_approvals')->insert([
                                     'request_id' => $ra->request_id,
-                                    'request_type' => 'equipment',
-                                    'approver_role' => 'dean',
+                                    'request_type' => 'activity_plan',
+                                    'approver_role' => 'moderator',
                                     'status' => 'pending',
                                     'created_at' => now(),
                                     'updated_at' => now()
                                 ]);
                             }
-                        } else { // dean
-                            DB::table('equipment_requests')->where('id', $ra->request_id)->update(['status' => 'approved']);
-                        }
-                    } else { // activity_plan
-                        if ($role === 'admin_assistant') {
+                        } elseif ($role === 'moderator') {
+                            // Forward to academic_coordinator
+                            $coordinatorApproval = DB::table('request_approvals')
+                                ->where('request_id', $ra->request_id)
+                                ->where('request_type', 'activity_plan')
+                                ->where('approver_role', 'academic_coordinator')
+                                ->first();
+
+                            if (!$coordinatorApproval) {
+                                DB::table('request_approvals')->insert([
+                                    'request_id' => $ra->request_id,
+                                    'request_type' => 'activity_plan',
+                                    'approver_role' => 'academic_coordinator',
+                                    'status' => 'pending',
+                                    'created_at' => now(),
+                                    'updated_at' => now()
+                                ]);
+                            }
+                        } elseif ($role === 'academic_coordinator') {
+                            // Forward to dean
                             $deanApproval = DB::table('request_approvals')
                                 ->where('request_id', $ra->request_id)
                                 ->where('request_type', 'activity_plan')
@@ -641,8 +1037,67 @@ class ApprovalController extends Controller
                                     'updated_at' => now()
                                 ]);
                             }
-                        } else { // dean
+                        } else { // dean - final approval
                             DB::table('activity_plans')->where('id', $ra->request_id)->update(['status' => 'approved']);
+                        }
+                    } elseif ($ra->request_type === 'budget_request') {
+                        // Budget request - handle 4-level chain (admin_assistant → academic_coordinator → dean → vp_finance)
+                        if ($role === 'admin_assistant') {
+                            // Forward to academic_coordinator
+                            $coordinatorApproval = DB::table('request_approvals')
+                                ->where('request_id', $ra->request_id)
+                                ->where('request_type', 'budget_request')
+                                ->where('approver_role', 'academic_coordinator')
+                                ->first();
+
+                            if (!$coordinatorApproval) {
+                                DB::table('request_approvals')->insert([
+                                    'request_id' => $ra->request_id,
+                                    'request_type' => 'budget_request',
+                                    'approver_role' => 'academic_coordinator',
+                                    'status' => 'pending',
+                                    'created_at' => now(),
+                                    'updated_at' => now()
+                                ]);
+                            }
+                        } elseif ($role === 'academic_coordinator') {
+                            // Forward to dean
+                            $deanApproval = DB::table('request_approvals')
+                                ->where('request_id', $ra->request_id)
+                                ->where('request_type', 'budget_request')
+                                ->where('approver_role', 'dean')
+                                ->first();
+
+                            if (!$deanApproval) {
+                                DB::table('request_approvals')->insert([
+                                    'request_id' => $ra->request_id,
+                                    'request_type' => 'budget_request',
+                                    'approver_role' => 'dean',
+                                    'status' => 'pending',
+                                    'created_at' => now(),
+                                    'updated_at' => now()
+                                ]);
+                            }
+                        } elseif ($role === 'dean') {
+                            // Forward to vp_finance
+                            $vpFinanceApproval = DB::table('request_approvals')
+                                ->where('request_id', $ra->request_id)
+                                ->where('request_type', 'budget_request')
+                                ->where('approver_role', 'vp_finance')
+                                ->first();
+
+                            if (!$vpFinanceApproval) {
+                                DB::table('request_approvals')->insert([
+                                    'request_id' => $ra->request_id,
+                                    'request_type' => 'budget_request',
+                                    'approver_role' => 'vp_finance',
+                                    'status' => 'pending',
+                                    'created_at' => now(),
+                                    'updated_at' => now()
+                                ]);
+                            }
+                        } else { // vp_finance - final approval
+                            DB::table('budget_requests')->where('id', $ra->request_id)->update(['status' => 'approved']);
                         }
                     }
 
@@ -664,12 +1119,13 @@ class ApprovalController extends Controller
     }
 
     /**
-     * Save dean signatures for an activity plan and embed them into the PDF immediately
+     * Save signatures for an activity plan or budget request and embed them into the PDF immediately
+     * Now supports all approver roles: moderator, academic_coordinator, dean, vp_finance
      */
     public function saveSignatures(Request $request, $id)
     {
         $user = Auth::user();
-        if (!$user || $user->role !== 'dean') {
+        if (!$user || !in_array($user->role, ['moderator', 'academic_coordinator', 'dean', 'vp_finance'], true)) {
             return response()->json(['error' => 'Unauthorized'], 403);
         }
 
@@ -680,66 +1136,125 @@ class ApprovalController extends Controller
             'signatures.*.y' => 'required|numeric',
         ]);
 
-        // Get the approval record to find the activity plan
+        // Get the approval record to find the activity plan or budget request
         $approval = DB::table('request_approvals')
             ->where('id', $id)
-            ->where('request_type', 'activity_plan')
-            ->where('approver_role', 'dean')
+            ->whereIn('request_type', ['activity_plan', 'budget_request'])
+            ->where('approver_role', $user->role)
             ->first();
 
         if (!$approval) {
             return response()->json(['error' => 'Approval not found'], 404);
         }
 
-        $activityPlanId = $approval->request_id;
+        $requestId = $approval->request_id;
+        $requestType = $approval->request_type;
 
-        // Delete existing signatures for this activity plan
-        ActivityPlanDeanSignature::where('activity_plan_id', $activityPlanId)->delete();
+        // Handle based on request type
+        if ($requestType === 'activity_plan') {
+            // Delete existing signatures for this user's role on this activity plan
+            ActivityPlanSignature::where('activity_plan_id', $requestId)
+                ->where('role', $user->role)
+                ->delete();
 
-        // Save each signature to database
-        $savedSignatures = [];
-        foreach ($request->signatures as $sig) {
-            // Log incoming coordinates from frontend for debugging
-            Log::info("Received signature coordinates from frontend", [
-                'activity_plan_id' => $activityPlanId,
-                'x_px' => $sig['x'],
-                'y_px' => $sig['y']
-            ]);
-            
-            $signature = ActivityPlanDeanSignature::create([
-                'activity_plan_id' => $activityPlanId,
-                'dean_id' => $user->id,
-                'signature_data' => $sig['imageData'],
-                'position_x' => $sig['x'],
-                'position_y' => $sig['y'],
-            ]);
+            // Save each signature to database
+            $savedSignatures = [];
+            foreach ($request->signatures as $sig) {
+                // Log incoming coordinates from frontend for debugging
+                Log::info("Received signature coordinates from frontend", [
+                    'activity_plan_id' => $requestId,
+                    'role' => $user->role,
+                    'user_id' => $user->id,
+                    'x_px' => $sig['x'],
+                    'y_px' => $sig['y']
+                ]);
+                
+                $signature = ActivityPlanSignature::create([
+                    'activity_plan_id' => $requestId,
+                    'user_id' => $user->id,
+                    'role' => $user->role,
+                    'signature_data' => $sig['imageData'],
+                    'position_x' => $sig['x'],
+                    'position_y' => $sig['y'],
+                ]);
 
-            $savedSignatures[] = [
-                'id' => $signature->id,
-                'x' => $signature->position_x,
-                'y' => $signature->position_y,
-            ];
+                $savedSignatures[] = [
+                    'id' => $signature->id,
+                    'x' => $signature->position_x,
+                    'y' => $signature->position_y,
+                ];
+            }
+        } elseif ($requestType === 'budget_request') {
+            // Delete existing signatures for this user's role on this budget request
+            BudgetRequestSignature::where('budget_request_id', $requestId)
+                ->where('role', $user->role)
+                ->delete();
+
+            // Save each signature to database
+            $savedSignatures = [];
+            foreach ($request->signatures as $sig) {
+                Log::info("Received budget request signature coordinates from frontend", [
+                    'budget_request_id' => $requestId,
+                    'role' => $user->role,
+                    'user_id' => $user->id,
+                    'x_px' => $sig['x'],
+                    'y_px' => $sig['y']
+                ]);
+                
+                $signature = BudgetRequestSignature::create([
+                    'budget_request_id' => $requestId,
+                    'user_id' => $user->id,
+                    'role' => $user->role,
+                    'signature_data' => $sig['imageData'],
+                    'position_x' => $sig['x'],
+                    'position_y' => $sig['y'],
+                ]);
+
+                $savedSignatures[] = [
+                    'id' => $signature->id,
+                    'x' => $signature->position_x,
+                    'y' => $signature->position_y,
+                ];
+            }
         }
 
         // IMMEDIATELY generate the signed PDF with embedded signatures
         try {
-            $activityPlan = DB::table('activity_plans')->where('id', $activityPlanId)->first();
-            if ($activityPlan && !empty($activityPlan->pdf_path)) {
-                $pdfSignatureService = app(\App\Services\PdfSignatureService::class);
-                $signedPdfPath = $pdfSignatureService->overlaySignatures($activityPlan->pdf_path, $activityPlanId);
-                
-                if ($signedPdfPath && $signedPdfPath !== $activityPlan->pdf_path) {
-                    // Update the activity plan to use the signed PDF
-                    DB::table('activity_plans')->where('id', $activityPlanId)->update([
-                        'pdf_path' => $signedPdfPath
-                    ]);
-                    Log::info("Activity plan {$activityPlanId} PDF updated with dean signatures on save: {$signedPdfPath}");
-                } else {
-                    Log::warning("Failed to generate signed PDF for activity plan {$activityPlanId}");
+            if ($requestType === 'activity_plan') {
+                $activityPlan = DB::table('activity_plans')->where('id', $requestId)->first();
+                if ($activityPlan && !empty($activityPlan->pdf_path)) {
+                    $pdfSignatureService = app(\App\Services\PdfSignatureService::class);
+                    $signedPdfPath = $pdfSignatureService->overlaySignatures($activityPlan->pdf_path, $requestId);
+                    
+                    if ($signedPdfPath && $signedPdfPath !== $activityPlan->pdf_path) {
+                        // Update the activity plan to use the signed PDF
+                        DB::table('activity_plans')->where('id', $requestId)->update([
+                            'pdf_path' => $signedPdfPath
+                        ]);
+                        Log::info("Activity plan {$requestId} PDF updated with {$user->role} signatures on save: {$signedPdfPath}");
+                    } else {
+                        Log::warning("Failed to generate signed PDF for activity plan {$requestId}");
+                    }
+                }
+            } elseif ($requestType === 'budget_request') {
+                $budgetRequest = DB::table('budget_requests')->where('id', $requestId)->first();
+                if ($budgetRequest && !empty($budgetRequest->pdf_path)) {
+                    $pdfSignatureService = app(\App\Services\PdfSignatureService::class);
+                    $signedPdfPath = $pdfSignatureService->overlaySignatures($budgetRequest->pdf_path, $requestId, 'budget_request');
+                    
+                    if ($signedPdfPath && $signedPdfPath !== $budgetRequest->pdf_path) {
+                        // Update the budget request to use the signed PDF
+                        DB::table('budget_requests')->where('id', $requestId)->update([
+                            'pdf_path' => $signedPdfPath
+                        ]);
+                        Log::info("Budget request {$requestId} PDF updated with {$user->role} signatures on save: {$signedPdfPath}");
+                    } else {
+                        Log::warning("Failed to generate signed PDF for budget request {$requestId}");
+                    }
                 }
             }
         } catch (\Exception $e) {
-            Log::error("Error generating signed PDF on save for activity plan {$activityPlanId}: " . $e->getMessage());
+            Log::error("Error generating signed PDF on save for {$requestType} {$requestId}: " . $e->getMessage());
             return response()->json([
                 'error' => 'Failed to embed signatures into PDF',
                 'message' => $e->getMessage()
@@ -753,37 +1268,59 @@ class ApprovalController extends Controller
     }
 
     /**
-     * Get dean signatures for an activity plan
+     * Get signatures for an activity plan or budget request (supports all approver roles)
      */
     public function getSignatures($id)
     {
         $user = Auth::user();
-        if (!$user || !in_array($user->role, ['dean', 'admin_assistant'], true)) {
+        if (!$user || !in_array($user->role, ['moderator', 'academic_coordinator', 'dean', 'vp_finance', 'admin_assistant'], true)) {
             return response()->json(['error' => 'Unauthorized'], 403);
         }
 
-        // Get the approval record to find the activity plan
+        // Get the approval record to find the activity plan or budget request
         $approval = DB::table('request_approvals')
             ->where('id', $id)
-            ->where('request_type', 'activity_plan')
+            ->whereIn('request_type', ['activity_plan', 'budget_request'])
             ->first();
 
         if (!$approval) {
             return response()->json(['error' => 'Approval not found'], 404);
         }
 
-        $activityPlanId = $approval->request_id;
+        $requestId = $approval->request_id;
+        $requestType = $approval->request_type;
 
-        $signatures = ActivityPlanDeanSignature::where('activity_plan_id', $activityPlanId)
-            ->get()
-            ->map(function($sig) {
-                return [
-                    'id' => 'sig-' . $sig->id,
-                    'imageData' => $sig->signature_data,
-                    'x' => $sig->position_x,
-                    'y' => $sig->position_y,
-                ];
-            });
+        if ($requestType === 'activity_plan') {
+            // Get ALL signatures for activity plan so approvers can see where previous approvers placed theirs
+            $signatures = ActivityPlanSignature::where('activity_plan_id', $requestId)
+                ->orderBy('created_at', 'asc')
+                ->get()
+                ->map(function($sig) {
+                    return [
+                        'id' => 'sig-' . $sig->id,
+                        'role' => $sig->role,
+                        'imageData' => $sig->signature_data,
+                        'x' => $sig->position_x,
+                        'y' => $sig->position_y,
+                    ];
+                });
+        } elseif ($requestType === 'budget_request') {
+            // Get ALL signatures for budget request so approvers can see where previous approvers placed theirs
+            $signatures = BudgetRequestSignature::where('budget_request_id', $requestId)
+                ->orderBy('created_at', 'asc')
+                ->get()
+                ->map(function($sig) {
+                    return [
+                        'id' => 'sig-' . $sig->id,
+                        'role' => $sig->role,
+                        'imageData' => $sig->signature_data,
+                        'x' => $sig->position_x,
+                        'y' => $sig->position_y,
+                    ];
+                });
+        } else {
+            $signatures = collect([]);
+        }
 
         return response()->json([
             'signatures' => $signatures,

@@ -35,7 +35,7 @@ export default function Request() {
   const PAGE_SIZE = 8;
   const [currentPage, setCurrentPage] = useState(1);
 
-  // Fetch dean requests on component mount
+  // Fetch moderator requests on component mount
   useEffect(() => {
     fetchRequests();
   }, []);
@@ -44,8 +44,8 @@ export default function Request() {
     try {
       setLoading(true);
       
-      // Fetch dean approval requests from the API
-      const response = await csrfFetch('/api/approvals?role=dean', {
+      // Fetch moderator approval requests from the API
+      const response = await csrfFetch('/api/approvals?role=moderator', {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -133,9 +133,9 @@ export default function Request() {
   };
 
   // Filter requests based on search term, status, and priority
-  // Dean handles activity plans AND budget requests
+  // Moderator handles activity plans AND budget requests
   const filteredRequests = requests.filter((request: RequestData) => {
-    // First filter: Only show activity plans and budget requests
+    // First filter: Show activity plans and budget requests
     if (request.request_type !== 'activity_plan' && request.request_type !== 'budget_request') {
       return false;
     }
@@ -270,7 +270,7 @@ export default function Request() {
           <div className="bg-white p-4 rounded-lg shadow-sm">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600">Approved by Dean</p>
+                <p className="text-sm text-gray-600">Approved by Moderator</p>
                 <p className="text-2xl font-bold text-black">{filteredStats.approved}</p>
               </div>
               <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
@@ -405,9 +405,9 @@ export default function Request() {
                         onClick={() => {
                           const type = request.request_type?.toLowerCase();
                           if (type === "activity_plan") {
-                            router.visit(`/dean/activity-plan-approval/${request.approval_id}`);
+                            router.visit(`/moderator/activity-plan-approval/${request.approval_id}`);
                           } else if (type === "budget_request") {
-                            router.visit(`/dean/budget-request-approval/${request.approval_id}`);
+                            router.visit(`/moderator/budget-request-approval/${request.approval_id}`);
                           }
                         }}
                         className="inline-flex items-center gap-1 px-3 py-1.5 rounded-md text-xs font-medium bg-blue-50 text-blue-600 hover:bg-blue-100 transition"
@@ -469,7 +469,7 @@ export default function Request() {
           onClose={() => setBatchApprovalModalOpen(false)}
           onConfirm={confirmBatchApproval}
           selectedRequests={selectedApprovals.map(id => ({ approval_id: id }))}
-          userRole="dean"
+          userRole="moderator"
         />
       </div>
     </MainLayout>

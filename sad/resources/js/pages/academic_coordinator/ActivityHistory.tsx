@@ -192,17 +192,17 @@ export default function ActivityHistory() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Fetch dean activities on mount
+  // Fetch academic coordinator activities on mount
   useEffect(() => {
     setLoading(true);
     setError(null);
-    csrfFetch("/api/approvals?role=dean")
+    csrfFetch("/api/approvals?role=academic_coordinator")
       .then((res) => {
         if (!res.ok) throw new Error("Failed to fetch activities");
         return res.json();
       })
       .then((data) => {
-        // Map API response to table format and filter out role updates for dean
+        // Map API response to table format and filter out role updates for academic coordinator
         const mapped = (data.requests || [])
           .filter((item: any) => item.request_type !== "role_update") // Exclude role updates
           .map((item: any) => {
@@ -405,7 +405,7 @@ export default function ActivityHistory() {
             </div>
 
             {/* Clear Filters Button */}
-            {(priorityFilter !== "All Priorities" || statusFilter !== "All Status" || dateFilter || searchTerm) && (
+            {(typeFilter !== "All Types" || priorityFilter !== "All Priorities" || statusFilter !== "All Status" || dateFilter || searchTerm) && (
               <motion.button
                 initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}

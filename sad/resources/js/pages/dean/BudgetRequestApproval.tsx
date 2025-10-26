@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import MainLayout from "@/layouts/mainlayout";
-import { Download, Maximize2, Check, X, ArrowLeft, Users, PenTool, Save, Trash2, Move } from "lucide-react";
+import { Download, Maximize2, Check, X, ArrowLeft, Users, PenTool, Save, Trash2, Move, DollarSign } from "lucide-react";
 import axios from "axios";
 import { router } from "@inertiajs/react";
 import PDFPreviewModal from "@/components/PDFPreviewModal";
@@ -19,8 +19,8 @@ interface Signature {
   y: number;
 }
 
-export default function ActivityPlanApproval({ id }: Props) {
-  const [activityPlan, setActivityPlan] = useState<any>(null);
+export default function BudgetRequestApproval({ id }: Props) {
+  const [budgetRequest, setBudgetRequest] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [remarks, setRemarks] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -44,25 +44,25 @@ export default function ActivityPlanApproval({ id }: Props) {
 
   // Memoize the PDF URL to prevent iframe reloads during signature dragging
   const pdfUrl = useMemo(() => {
-    if (!activityPlan?.pdf_url) return null;
+    if (!budgetRequest?.pdf_url) return null;
     
-    const base = activityPlan.pdf_url.split('?')[0];
+    const base = budgetRequest.pdf_url.split('?')[0];
     const unsigned = base.replace(/_signed\.pdf$/i, '.pdf');
     const url = isSignatureMode ? unsigned : base;
     
-    // Use a stable cache buster that only changes when activityPlan.pdf_url changes
-    const cacheBuster = `t=${activityPlan.pdf_url}`;
-    const existingQs = activityPlan.pdf_url.includes('?') ? activityPlan.pdf_url.split('?')[1] : '';
+    // Use a stable cache buster that only changes when budgetRequest.pdf_url changes
+    const cacheBuster = `t=${budgetRequest.pdf_url}`;
+    const existingQs = budgetRequest.pdf_url.includes('?') ? budgetRequest.pdf_url.split('?')[1] : '';
     const qs = existingQs ? `${existingQs}&${cacheBuster}` : cacheBuster;
     
     return `${url}?${qs}#page=2&view=Fit&toolbar=0&navpanes=0&zoom=100`;
-  }, [activityPlan?.pdf_url, isSignatureMode]);
+  }, [budgetRequest?.pdf_url, isSignatureMode]);
 
   useEffect(() => {
     axios
       .get(`/api/approvals/${id}`)
       .then((res) => {
-        setActivityPlan(res.data);
+        setBudgetRequest(res.data);
         setLoading(false);
         // Load existing signatures
         return axios.get(`/api/approvals/${id}/signatures`);
@@ -75,7 +75,7 @@ export default function ActivityPlanApproval({ id }: Props) {
         }
       })
       .catch((err) => {
-        console.error("Error loading activity plan:", err);
+        console.error("Error loading budget request:", err);
         setLoading(false);
       });
   }, [id]);
@@ -92,10 +92,11 @@ export default function ActivityPlanApproval({ id }: Props) {
           'Content-Type': 'application/json'
         }
       });
-  toast.success('Activity plan approved.');
-  router.visit('/dean/requests');
+      toast.success('Budget request approved.');
+      router.visit('/dean/requests');
     } catch (err) {
-      console.error('Error approving activity plan:', err);
+      console.error('Error approving budget request:', err);
+      toast.error('Failed to approve budget request.');
     } finally {
       setSubmitting(false);
     }
@@ -159,22 +160,29 @@ export default function ActivityPlanApproval({ id }: Props) {
     if (signatureCanvasRef.current && !signatureCanvasRef.current.isEmpty()) {
       const imageData = signatureCanvasRef.current.toDataURL('image/png');
       const newSignature: Signature = {
-        id: `sig-${Date.now()}`,
+        id: `sig-new-${Date.now()}`, // Mark as new with 'sig-new-' prefix
         imageData,
         x: 100,
         y: 100,
       };
-      // Allow only one signature at a time
-      setSignatures([newSignature]);
+      // Remove any previous NEW signatures (starting with 'sig-new-'), but keep existing ones from backend
+      const existingSignatures = signatures.filter(s => !s.id.startsWith('sig-new-'));
+      setSignatures([...existingSignatures, newSignature]);
       closeSignatureModal();
     }
   };
 
   const removeSignature = (sigId: string) => {
-    setSignatures(signatures.filter(s => s.id !== sigId));
+    // Only allow removing NEW signatures (not existing ones from other approvers)
+    if (sigId.startsWith('sig-new-')) {
+      setSignatures(signatures.filter(s => s.id !== sigId));
+    }
   };
 
   const handleMouseDownOnSignature = (e: React.MouseEvent, sigId: string) => {
+    // Only allow dragging NEW signatures (not existing ones from other approvers)
+    if (!sigId.startsWith('sig-new-')) return;
+    
     e.preventDefault();
     e.stopPropagation();
     const sig = signatures.find(s => s.id === sigId);
@@ -196,16 +204,6 @@ export default function ActivityPlanApproval({ id }: Props) {
     // Clamp within bounds of the page
     const pageWidth = rect.width;
     const pageHeight = rect.height;
-    // Log actual dimensions for debugging coordinate issues
-    if (draggingId && Math.random() < 0.1) { // Log occasionally to avoid spam
-      console.log('[Dean E-Sign] Container dimensions:', {
-        width: rect.width,
-        height: rect.height,
-        expectedHeight: 794 * (297 / 210),
-        signature: { x: newX, y: newY }
-      });
-    }
-    // Assuming signature image max width ~200px, prevent it from going out completely
     const maxSigW = 200;
     const maxSigH = 80;
     newX = Math.max(0, Math.min(newX, pageWidth - maxSigW));
@@ -222,13 +220,19 @@ export default function ActivityPlanApproval({ id }: Props) {
     try {
       const csrf = getCsrfMetaToken();
       
-      // Debug: Log container and signature positions before saving
+      // Only send NEW signatures to backend (those with 'sig-new-' prefix)
+      const newSignaturesToSave = signatures.filter(s => s.id.startsWith('sig-new-'));
+      
+      if (newSignaturesToSave.length === 0) {
+        toast.error('No new signature to save. Please draw a signature first.');
+        return;
+      }
+      
       if (pageRef.current) {
         const rect = pageRef.current.getBoundingClientRect();
-        console.log('[Dean E-Sign] Saving signatures with container info:', {
+        console.log('[Dean E-Sign] Saving NEW signatures with container info:', {
           containerDimensions: { width: rect.width, height: rect.height },
-          expectedDimensions: { width: 794, height: 794 * (297 / 210) },
-          signatures: signatures.map(sig => ({
+          signatures: newSignaturesToSave.map(sig => ({
             x: sig.x,
             y: sig.y,
             percentX: (sig.x / rect.width * 100).toFixed(2) + '%',
@@ -238,7 +242,7 @@ export default function ActivityPlanApproval({ id }: Props) {
       }
       
       const response = await axios.post(`/api/approvals/${id}/save-signatures`, { 
-        signatures: signatures.map(sig => ({
+        signatures: newSignaturesToSave.map(sig => ({
           imageData: sig.imageData,
           x: sig.x,
           y: sig.y,
@@ -253,30 +257,28 @@ export default function ActivityPlanApproval({ id }: Props) {
       });
       
       setIsSignatureMode(false);
-      // Exit pan mode if it was active
       if (panTimerRef.current) {
         window.clearTimeout(panTimerRef.current);
         panTimerRef.current = null;
       }
       setIsPanMode(false);
       
-      // Refetch the activity plan to get the updated PDF URL pointing to the signed PDF
+      // Refetch the budget request to get the updated PDF URL
       try {
         const refreshResponse = await axios.get(`/api/approvals/${id}`);
-        setActivityPlan(refreshResponse.data);
-        alert('Signatures saved and permanently embedded into the PDF!\n\nThe preview has been refreshed. You can now approve the request.');
+        setBudgetRequest(refreshResponse.data);
+        toast.success('Signatures saved and embedded into the PDF!');
       } catch (refreshErr) {
-        console.error('Error refreshing activity plan:', refreshErr);
-        // Fallback: just add cache buster if refresh fails
-        setActivityPlan((prev: any) => prev ? {
+        console.error('Error refreshing budget request:', refreshErr);
+        setBudgetRequest((prev: any) => prev ? {
           ...prev,
           pdf_url: prev.pdf_url ? `${prev.pdf_url.split('?')[0]}?t=${Date.now()}` : prev.pdf_url
         } : prev);
-        alert('Signatures saved! Please refresh the page to see the updated PDF.');
+        toast.success('Signatures saved! Please refresh to see the updated PDF.');
       }
     } catch (error) {
       console.error('Error saving signatures:', error);
-      alert('Failed to save and embed signatures into PDF. Please try again.');
+      toast.error('Failed to save signatures. Please try again.');
     } finally {
       setSaving(false);
     }
@@ -296,10 +298,11 @@ export default function ActivityPlanApproval({ id }: Props) {
           'Content-Type': 'application/json'
         }
       });
-  toast.info('Revision requested for this activity plan.');
-  router.visit('/dean/requests');
+      toast.info('Revision requested for this budget request.');
+      router.visit('/dean/requests');
     } catch (err) {
       console.error('Error requesting revision:', err);
+      toast.error('Failed to request revision.');
     } finally {
       setSubmitting(false);
     }
@@ -309,17 +312,17 @@ export default function ActivityPlanApproval({ id }: Props) {
     return (
       <MainLayout>
         <div className="p-6 flex items-center justify-center min-h-screen">
-          <div className="text-lg text-gray-600">Loading activity plan...</div>
+          <div className="text-lg text-gray-600">Loading budget request...</div>
         </div>
       </MainLayout>
     );
   }
 
-  if (!activityPlan) {
+  if (!budgetRequest) {
     return (
       <MainLayout>
         <div className="p-6 flex items-center justify-center min-h-screen">
-          <div className="text-lg text-red-600">Activity plan not found.</div>
+          <div className="text-lg text-red-600">Budget request not found.</div>
         </div>
       </MainLayout>
     );
@@ -353,8 +356,8 @@ export default function ActivityPlanApproval({ id }: Props) {
               <ArrowLeft className="w-5 h-5 text-gray-600" />
             </button>
             <div className="flex-1">
-              <h1 className="text-lg font-semibold text-gray-900 tracking-tight">Activity Plan Approval</h1>
-              <p className="text-xs text-gray-500">Review the first page, open full PDF as needed, then approve or request revisions.</p>
+              <h1 className="text-lg font-semibold text-gray-900 tracking-tight">Budget Request Approval (Dean)</h1>
+              <p className="text-xs text-gray-500">Review the budget request document, add your signature, then approve or request revisions.</p>
             </div>
           </motion.div>
         </motion.div>
@@ -377,11 +380,14 @@ export default function ActivityPlanApproval({ id }: Props) {
                 transition={{ duration: 0.4, ease: "easeOut" }}
               >
                 <div className="flex items-center justify-between">
-                  <h2 className="text-lg font-semibold text-gray-900">Activity Plan Request</h2>
+                  <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                    <DollarSign className="w-5 h-5 text-red-600" />
+                    Budget Request Document
+                  </h2>
                   <div className="flex items-center gap-2">
-                    {activityPlan?.pdf_url && (
+                    {budgetRequest?.pdf_url && (
                       <a
-                        href={activityPlan.pdf_url}
+                        href={budgetRequest.pdf_url}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="flex items-center gap-1 text-sm text-gray-600 hover:text-gray-800 transition-colors"
@@ -390,7 +396,7 @@ export default function ActivityPlanApproval({ id }: Props) {
                         Download
                       </a>
                     )}
-                    {activityPlan?.pdf_url && (
+                    {budgetRequest?.pdf_url && (
                       <button
                         className="flex items-center gap-1 text-sm text-gray-600 hover:text-gray-800 transition-colors"
                         aria-label="View"
@@ -418,57 +424,67 @@ export default function ActivityPlanApproval({ id }: Props) {
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.4, ease: "easeOut" }}
                 >
-                  {activityPlan?.pdf_url ? (
+                  {budgetRequest?.pdf_url ? (
                     <div className="flex justify-center relative overflow-auto">
-                      {/* A4 page container: max width ~794px at 96dpi with A4 aspect ratio */}
                       <div ref={pageRef} className="relative bg-white shadow-xl border rounded-sm overflow-hidden w-[794px] min-w-[794px] max-w-[794px] aspect-[210/297]">
                         <iframe
                           key={pdfUrl}
                           src={pdfUrl || undefined}
                           className="absolute inset-0 w-full h-full border-0"
-                          title="Activity Plan Last Page (Approval Signatures)"
+                          title="Budget Request Document"
                           style={{ pointerEvents: isSignatureMode && !isPanMode ? 'none' : 'auto' }}
                         />
-                        {/* Signature overlay - render ONLY in signature edit mode (avoid double-visual) */}
-                        {isSignatureMode && !isPanMode && signatures.length > 0 && signatures.map(sig => (
+                        {/* Signature overlay */}
+                        {isSignatureMode && !isPanMode && signatures.length > 0 && signatures.map(sig => {
+                          const isNewSignature = sig.id.startsWith('sig-new-');
+                          return (
                           <div
                             key={sig.id}
                             style={{
                               position: 'absolute',
                               left: `${sig.x}px`,
                               top: `${sig.y}px`,
-                              cursor: isSignatureMode ? 'move' : 'default',
+                              cursor: isSignatureMode && isNewSignature ? 'move' : 'default',
                               zIndex: 10,
                             }}
-                            onMouseDown={isSignatureMode ? (e) => handleMouseDownOnSignature(e, sig.id) : undefined}
+                            onMouseDown={isSignatureMode && isNewSignature ? (e) => handleMouseDownOnSignature(e, sig.id) : undefined}
                           >
                             <div className="relative group">
                               <img 
                                 src={sig.imageData} 
                                 alt="Signature" 
-                                className={`max-w-[200px] pointer-events-none ring-2 ring-blue-400 ring-offset-2`}
+                                className={`max-w-[200px] pointer-events-none ring-2 ring-offset-2 ${
+                                  isNewSignature 
+                                    ? 'ring-blue-400' // New signature - draggable
+                                    : 'ring-gray-300 opacity-60' // Existing signature - read-only
+                                }`}
                                 draggable={false}
                                 style={{
                                   backgroundColor: 'transparent'
                                 }}
                               />
-                              {isSignatureMode && (
+                              {isSignatureMode && isNewSignature && (
                                 <button
                                   onClick={() => removeSignature(sig.id)}
                                   className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
                                 >
-                                  <Trash2 className="w-3 h-3" />
+                                  <X className="w-3 h-3" />
                                 </button>
+                              )}
+                              {!isNewSignature && (
+                                <div className="absolute -top-6 left-0 text-xs text-gray-500 bg-white px-2 py-1 rounded shadow-sm whitespace-nowrap">
+                                  Previous Approver
+                                </div>
                               )}
                             </div>
                           </div>
-                        ))}
+                        )})}
                       </div>
                     </div>
                   ) : (
                     <div className="flex justify-center">
                       <div className="relative bg-white shadow-xl border rounded-sm overflow-hidden w-full max-w-[794px] aspect-[210/297] flex items-center justify-center text-gray-500">
-                        No PDF submitted for this activity plan.
+                        No PDF submitted for this budget request.
                       </div>
                     </div>
                   )}
@@ -487,258 +503,247 @@ export default function ActivityPlanApproval({ id }: Props) {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.4, ease: "easeOut" }}
               >
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Requester</h3>
+                <div className="flex items-center gap-2 text-sm text-gray-700">
+                  <Users className="w-4 h-4 text-red-600" />
+                  <span>{budgetRequest.student_name || '—'}</span>
+                </div>
+              </motion.div>
+
+              {/* Organization Name */}
+              <motion.div
+                className="bg-white rounded-lg shadow-md p-4 border border-gray-100"
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.4, ease: "easeOut", delay: 0.03 }}
+              >
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">Organization</h3>
                 <div className="flex items-center gap-2 text-sm text-gray-700">
                   <Users className="w-4 h-4 text-red-600" />
-                  <span>{activityPlan.organization || '—'}</span>
+                  <span>{budgetRequest.organization || '—'}</span>
                 </div>
               </motion.div>
 
-              {/* Submission Details Card */}
+              {/* Request Details Card */}
               <motion.div
                 className="bg-white rounded-lg shadow-md p-4 border border-gray-100"
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.4, ease: "easeOut" }}
+                transition={{ duration: 0.4, ease: "easeOut", delay: 0.05 }}
               >
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Submission Details</h3>
-                <div className="space-y-2 text-sm">
-                  <div className="flex items-center justify-between">
-                    <span className="text-gray-600">Submitted by</span>
-                    <span className="text-gray-900 font-medium">{activityPlan.student_name}</span>
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Request Details</h3>
+                <div className="space-y-3">
+                  <div>
+                    <p className="text-xs text-gray-500">Category</p>
+                    <p className="text-sm text-gray-900 font-medium">{budgetRequest.request_category || '—'}</p>
                   </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-gray-600">Status</span>
-                    <span
-                      className={`inline-flex px-2 py-1 rounded-full text-xs font-semibold ${
-                        activityPlan.approval_status === 'pending'
-                          ? 'bg-yellow-100 text-yellow-800'
-                          : activityPlan.approval_status === 'approved'
-                          ? 'bg-green-100 text-green-800'
-                          : 'bg-red-100 text-red-800'
-                      }`}
-                    >
-                      {activityPlan.approval_status === 'revision_requested'
-                        ? 'Under Revision'
-                        : activityPlan.approval_status}
+                  <div>
+                    <p className="text-xs text-gray-500">Priority</p>
+                    <span className={`inline-block px-2 py-1 text-xs rounded-full font-medium ${
+                      budgetRequest.priority === 'high' ? 'bg-red-100 text-red-700' :
+                      budgetRequest.priority === 'medium' ? 'bg-blue-100 text-blue-700' :
+                      'bg-green-100 text-green-700'
+                    }`}>
+                      {budgetRequest.priority ? budgetRequest.priority.charAt(0).toUpperCase() + budgetRequest.priority.slice(1) : '—'}
                     </span>
                   </div>
-                  {activityPlan.submitted_at && (
-                    <div className="flex items-center justify-between">
-                      <span className="text-gray-600">Submitted on</span>
-                      <span className="text-gray-900 font-medium">{new Date(activityPlan.submitted_at).toLocaleDateString()}</span>
-                    </div>
-                  )}
-                  {activityPlan.priority && (
-                    <div className="flex items-center justify-between">
-                      <span className="text-gray-600">Priority</span>
-                      <span
-                        className={`px-2 py-1 rounded text-xs font-semibold ${
-                          activityPlan.priority?.toLowerCase() === 'high'
-                            ? 'bg-red-100 text-red-800'
-                            : ['medium'].includes(activityPlan.priority?.toLowerCase() || '')
-                            ? 'bg-blue-100 text-blue-800'
-                            : 'bg-green-100 text-green-800'
-                        }`}
-                      >
-                        {activityPlan.priority?.charAt(0).toUpperCase()}{activityPlan.priority?.slice(1)}
-                      </span>
-                    </div>
-                  )}
+                  <div>
+                    <p className="text-xs text-gray-500">Submitted</p>
+                    <p className="text-sm text-gray-900">{budgetRequest.submitted_at ? new Date(budgetRequest.submitted_at).toLocaleDateString() : '—'}</p>
+                  </div>
                 </div>
               </motion.div>
 
-              {/* Remarks Card */}
+              {/* E-Signature Section */}
               <motion.div
                 className="bg-white rounded-lg shadow-md p-4 border border-gray-100"
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.4, ease: "easeOut" }}
+                transition={{ duration: 0.4, ease: "easeOut", delay: 0.1 }}
               >
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">Remarks (optional)</h3>
-                <textarea
-                  className="w-full border border-gray-300 rounded p-3 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none text-black placeholder:text-gray-400 outline-none"
-                  placeholder="Add remarks or feedback..."
-                  value={remarks}
-                  onChange={(e) => setRemarks(e.target.value)}
-                  rows={4}
-                />
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">E-Signature (Dean)</h3>
+                <p className="text-sm text-gray-600 mb-4">
+                  Add your signature to the document before approval.
+                </p>
+                {!isSignatureMode ? (
+                  <button
+                    onClick={toggleSignatureMode}
+                    className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                  >
+                    <PenTool className="w-4 h-4" />
+                    Enter Signature Mode
+                  </button>
+                ) : (
+                  <div className="space-y-2">
+                    <div className="flex gap-2">
+                      <button
+                        onClick={openSignatureModal}
+                        className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm"
+                      >
+                        <PenTool className="w-4 h-4" />
+                        Draw Signature
+                      </button>
+                      <button
+                        onClick={togglePanMode}
+                        className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg transition-colors text-sm ${
+                          isPanMode 
+                            ? 'bg-purple-600 text-white hover:bg-purple-700' 
+                            : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                        }`}
+                      >
+                        <Move className="w-4 h-4" />
+                        {isPanMode ? 'Pan Active' : 'Pan PDF'}
+                      </button>
+                    </div>
+                    <button
+                      onClick={saveSignedDocument}
+                      disabled={signatures.length === 0 || saving}
+                      className={`w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg transition-colors ${
+                        signatures.length === 0 || saving
+                          ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                          : 'bg-blue-600 text-white hover:bg-blue-700'
+                      }`}
+                    >
+                      {saving ? (
+                        <>
+                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                          Saving...
+                        </>
+                      ) : (
+                        <>
+                          <Save className="w-4 h-4" />
+                          Save Signature to PDF
+                        </>
+                      )}
+                    </button>
+                    <button
+                      onClick={toggleSignatureMode}
+                      className="w-full px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors"
+                    >
+                      Exit Signature Mode
+                    </button>
+                  </div>
+                )}
               </motion.div>
 
-              {/* Actions Card */}
-              {activityPlan.approval_status === 'pending' && (
-                <motion.div
-                  className="bg-white rounded-lg shadow-md p-4 border border-gray-100"
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.4, ease: "easeOut" }}
-                >
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Actions</h3>
-                  <div className="space-y-3">
-                    {!isSignatureMode ? (
-                      <>
-                        <button
-                          onClick={toggleSignatureMode}
-                          className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
-                        >
-                          <PenTool className="w-4 h-4" />
-                          E-Sign Document
-                        </button>
-                        <button
-                          onClick={handleApprove}
-                          disabled={submitting}
-                          className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors disabled:opacity-50"
-                        >
-                          <Check className="w-4 h-4" />
-                          {submitting ? 'Processing...' : 'Approve Request'}
-                        </button>
-                        <button
-                          onClick={handleRevision}
-                          disabled={submitting}
-                          className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors disabled:opacity-50"
-                        >
-                          <X className="w-4 h-4" />
-                          {submitting ? 'Processing...' : 'Request Revision'}
-                        </button>
-                      </>
-                    ) : (
-                      <>
-                        <button
-                          onClick={openSignatureModal}
-                          className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors"
-                        >
-                          <PenTool className="w-4 h-4" />
-                          Add Signature
-                        </button>
-                        <button
-                          onClick={togglePanMode}
-                          className={`w-full flex items-center justify-center gap-2 px-4 py-3 ${isPanMode ? 'bg-gray-700' : 'bg-gray-500'} text-white rounded-lg hover:brightness-110 transition-colors`}
-                          title={isPanMode ? 'Pan mode is ON (auto-exits in a few seconds)' : 'Enable Pan mode to scroll the PDF'}
-                        >
-                          <Move className="w-4 h-4" />
-                          {isPanMode ? 'Pan Mode (ON)' : 'Pan PDF'}
-                        </button>
-                        <button
-                          onClick={saveSignedDocument}
-                          disabled={saving}
-                          className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors disabled:opacity-50"
-                        >
-                          <Save className="w-4 h-4" />
-                          {saving ? 'Saving...' : 'Save Signed Document'}
-                        </button>
-                        <button
-                          onClick={toggleSignatureMode}
-                          className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors"
-                        >
-                          <X className="w-4 h-4" />
-                          Cancel
-                        </button>
-                      </>
-                    )}
+              {/* Action Buttons */}
+              <motion.div
+                className="bg-white rounded-lg shadow-md p-4 border border-gray-100"
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.4, ease: "easeOut", delay: 0.15 }}
+              >
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Actions</h3>
+                <div className="space-y-3">
+                  <button
+                    onClick={handleApprove}
+                    disabled={submitting}
+                    className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <Check className="w-5 h-5" />
+                    {submitting ? 'Approving...' : 'Approve Budget Request'}
+                  </button>
+                  
+                  <div className="relative">
+                    <div className="absolute inset-0 flex items-center">
+                      <div className="w-full border-t border-gray-200"></div>
+                    </div>
+                    <div className="relative flex justify-center text-xs">
+                      <span className="px-2 bg-white text-gray-500">OR</span>
+                    </div>
                   </div>
-                </motion.div>
-              )}
 
-              {/* Actions + Remarks merged above; keep only actions below */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Request Revision (Optional)
+                    </label>
+                    <textarea
+                      value={remarks}
+                      onChange={(e) => setRemarks(e.target.value)}
+                      placeholder="Enter revision comments..."
+                      rows={3}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent text-sm"
+                    />
+                  </div>
+
+                  <button
+                    onClick={handleRevision}
+                    disabled={submitting || !remarks.trim()}
+                    className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <X className="w-5 h-5" />
+                    {submitting ? 'Processing...' : 'Request Revision'}
+                  </button>
+                </div>
+              </motion.div>
             </div>
           </div>
         </div>
       </motion.div>
-      {/* PDF View Modal */}
-      <PDFPreviewModal
-        isOpen={showPdf}
-        pdfUrl={activityPlan?.pdf_url || null}
-        onClose={() => setShowPdf(false)}
-        onDownload={activityPlan?.pdf_url ? () => window.open(activityPlan.pdf_url, '_blank') : undefined}
-        title="Activity Plan PDF"
-      />
 
       {/* Signature Drawing Modal */}
       <AnimatePresence>
         {showSignatureModal && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center p-4"
-            style={{
-              backdropFilter: 'blur(8px)',
-              WebkitBackdropFilter: 'blur(8px)',
-              backgroundColor: 'rgba(0, 0, 0, 0.4)'
-            }}
-            onClick={closeSignatureModal}
-          >
+          <>
             <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              onClick={(e) => e.stopPropagation()}
-              className="bg-white rounded-xl shadow-2xl max-w-2xl w-full overflow-hidden"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black bg-opacity-50 z-40"
+              onClick={closeSignatureModal}
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="fixed inset-0 z-50 flex items-center justify-center p-4"
             >
-              <div className="p-6 border-b border-gray-200">
-                <h3 className="text-xl font-semibold text-gray-900">Draw Your Signature</h3>
-                <p className="text-sm text-gray-500 mt-1">Sign using your mouse or touchpad</p>
-              </div>
-              <div className="p-6">
-                <div className="border-2 border-gray-300 rounded-lg bg-white relative overflow-hidden">
-                  {/* Checkered background pattern to show transparency */}
-                  <div 
-                    className="absolute inset-0 pointer-events-none"
-                    style={{
-                      backgroundImage: `
-                        linear-gradient(45deg, #f0f0f0 25%, transparent 25%),
-                        linear-gradient(-45deg, #f0f0f0 25%, transparent 25%),
-                        linear-gradient(45deg, transparent 75%, #f0f0f0 75%),
-                        linear-gradient(-45deg, transparent 75%, #f0f0f0 75%)
-                      `,
-                      backgroundSize: '20px 20px',
-                      backgroundPosition: '0 0, 0 10px, 10px -10px, -10px 0px'
-                    }}
-                  />
+              <div className="bg-white rounded-2xl shadow-xl max-w-lg w-full p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-xl font-semibold text-gray-900">Draw Your Signature</h3>
+                  <button
+                    onClick={closeSignatureModal}
+                    className="p-1 hover:bg-gray-100 rounded-lg transition-colors"
+                  >
+                    <X className="w-5 h-5 text-gray-400" />
+                  </button>
+                </div>
+                <div className="border-2 border-gray-300 rounded-lg mb-4">
                   <ReactSignatureCanvas
                     ref={signatureCanvasRef}
                     canvasProps={{
-                      width: 600,
-                      height: 200,
-                      className: 'w-full h-[200px] cursor-crosshair relative z-10'
+                      className: 'w-full h-48 cursor-crosshair',
                     }}
-                    backgroundColor="rgba(0, 0, 0, 0)"
-                    penColor="#000000"
                   />
                 </div>
-              </div>
-              <div className="flex items-center justify-between p-6 border-t border-gray-200 bg-gray-50">
-                <button
-                  onClick={() => signatureCanvasRef.current?.clear()}
-                  className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-700 
-                           border border-gray-300 hover:border-gray-400 rounded-lg 
-                           hover:bg-gray-100 transition-colors duration-150"
-                >
-                  Clear
-                </button>
                 <div className="flex gap-3">
                   <button
-                    onClick={closeSignatureModal}
-                    className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-700 
-                             border border-gray-300 hover:border-gray-400 rounded-lg 
-                             hover:bg-gray-100 transition-colors duration-150"
+                    onClick={() => signatureCanvasRef.current?.clear()}
+                    className="flex-1 px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg font-medium transition-colors"
                   >
-                    Cancel
+                    Clear
                   </button>
                   <button
                     onClick={saveSignatureToCanvas}
-                    className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 
-                             rounded-lg transition-colors duration-150 focus:outline-none 
-                             focus:ring-2 focus:ring-blue-200"
+                    className="flex-1 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-colors"
                   >
                     Add to Document
                   </button>
                 </div>
               </div>
             </motion.div>
-          </motion.div>
+          </>
         )}
       </AnimatePresence>
+
+      {/* PDF Preview Modal */}
+      {showPdf && budgetRequest?.pdf_url && (
+        <PDFPreviewModal
+          isOpen={showPdf}
+          pdfUrl={budgetRequest.pdf_url}
+          onClose={() => setShowPdf(false)}
+        />
+      )}
     </MainLayout>
   );
 }

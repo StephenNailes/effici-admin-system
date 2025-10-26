@@ -85,33 +85,63 @@ class AuthController extends Controller
             // Create or update user in local database
             // Important: NEVER downgrade local elevated roles on login.
             // Preserve existing role if already set (e.g., student_officer, admin_assistant, dean).
-            $emailIdentifier = ($userData['user_account_id'] ?? '') . '@uic.edu.ph';
-            $existingUser = User::where('email', $emailIdentifier)->first();
+            
+            // Use the actual email address from the API response
+            $emailAddress = $userData['email_address'] ?? null;
+            
+            if (!$emailAddress) {
+                throw ValidationException::withMessages([
+                    'username' => ['Email address not found in API response.'],
+                ]);
+            }
+            
+            $existingUser = User::where('email', $emailAddress)->first();
 
             $roleToPersist = $existingUser?->role ?: 'student';
 
             if ($existingUser && $existingUser->role !== 'student') {
                 Log::info('Preserving elevated role on login', [
-                    'email' => $emailIdentifier,
+                    'email' => $emailAddress,
                     'role' => $existingUser->role,
+                ]);
+            }
+            
+            // Extract school ID from email address (12 digits after underscore, before @)
+            // Example: snailes_230000001146@uic.edu.ph -> 230000001146
+            $schoolId = null;
+            if (preg_match('/_(\d{12})@/', $emailAddress, $matches)) {
+                $schoolId = $matches[1];
+                Log::info('Extracted school ID from email', [
+                    'email' => $emailAddress,
+                    'school_id' => $schoolId
+                ]);
+            } else {
+                Log::info('Could not extract school ID - email format does not match pattern', [
+                    'email' => $emailAddress
                 ]);
             }
 
             $user = User::updateOrCreate(
-                ['email' => $emailIdentifier], // Use account ID as email identifier
+                ['email' => $emailAddress], // Use actual email address
                 [
                     'first_name' => $userData['first_name'] ?? '',
                     'middle_name' => $userData['middle_name'] ?? '',
                     'last_name' => $userData['last_name'] ?? '',
                     'name' => trim(($userData['first_name'] ?? '') . ' ' . ($userData['last_name'] ?? '')),
-                    // Persist to the correct field in our schema
-                    'school_id_number' => $userData['user_account_id'] ?? null,
+                    // Extract school ID from email address (12 digits before @)
+                    'school_id_number' => $schoolId,
                     // Preserve any previously elevated role; default to student for first-time logins
                     'role' => $roleToPersist,
                     'password' => bcrypt($request->input('password')), // Store encrypted password (not used by UIC but kept locally)
                     'email_verified_at' => now(), // Auto-verify since authenticated by UIC API
                 ]
             );
+            
+            Log::info('User created/updated', [
+                'email' => $emailAddress,
+                'school_id_number' => $user->school_id_number,
+                'role' => $user->role
+            ]);
             
             // Log the user into the system
             Auth::login($user, $request->boolean('remember'));

@@ -19,7 +19,7 @@ type RequestItem = {
   approval_id: number;
   request_id: number;
   student_name: string;
-  request_type: string; // 'equipment' | 'activity' | 'activity_plan'
+  request_type: string; // 'equipment' | 'activity' | 'activity_plan' | 'budget_request'
   title?: string;
   priority?: string; // 'high' | 'medium' | 'low' | string
   approval_status: string; // 'pending' | 'approved' | 'revision_requested' | 'under_revision' | string
@@ -271,7 +271,7 @@ export default function Request() {
       case "high":
         return "text-red-600";
       case "medium":
-        return "text-yellow-600";
+        return "text-blue-600";
       case "low":
         return "text-green-600";
       default:
@@ -369,11 +369,11 @@ export default function Request() {
     }
   };
 
-  // Enhanced filtering logic for search - show equipment & activity plan requests but HIDE approved ones (reverted per request)
+  // Enhanced filtering logic for search - show equipment, activity plan, and budget requests but HIDE approved ones
   const filteredRequests = requests
     .filter((r) => {
       const requestType = r.request_type?.toLowerCase();
-      if (!(requestType === "equipment" || requestType === "activity" || requestType === "activity_plan")) return false;
+      if (!(requestType === "equipment" || requestType === "activity" || requestType === "activity_plan" || requestType === "budget_request")) return false;
       // Exclude anything already approved so the table focuses on actionable items
       if (r.approval_status?.toLowerCase() === 'approved') return false;
       return true;
@@ -628,10 +628,13 @@ export default function Request() {
                       <button
                         className="inline-flex items-center gap-1 px-3 py-1.5 rounded-md text-xs font-medium bg-blue-50 text-blue-600 hover:bg-blue-100 transition"
                         onClick={() => {
-                          if (req.request_type?.toLowerCase() === "activity" || req.request_type?.toLowerCase() === "activity_plan") {
+                          const type = req.request_type?.toLowerCase();
+                          if (type === "activity" || type === "activity_plan") {
                             router.visit(`/admin/activity-plan-approval/${req.approval_id}`);
-                          } else {
-                            setSelected(req);
+                          } else if (type === "budget_request") {
+                            router.visit(`/admin/budget-request-approval/${req.approval_id}`);
+                          } else if (type === "equipment") {
+                            setSelected(req); // open equipment modal
                           }
                         }}
                       >

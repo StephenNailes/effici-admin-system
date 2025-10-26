@@ -9,6 +9,7 @@ import {
   FaUser,
   FaChevronDown,
   FaClipboardList, // Add for Activity Plan
+  FaDollarSign,    // Add for Budget Request
   FaToolbox,       // Add for Borrow Equipment
   FaChartBar,      // Add for Analytics Dashboard
   FaBell,          // Add for Notifications
@@ -25,7 +26,7 @@ import { getCsrfToken, getXsrfCookieToken, refreshCsrfToken } from '../lib/csrf'
 import RoleAccessModal from './RoleAccessModal';
 import { useNotifications } from '@/contexts/NotificationContext';
 
-type UserRole = 'student' | 'student_officer' | 'admin_assistant' | 'dean';
+type UserRole = 'student' | 'student_officer' | 'admin_assistant' | 'moderator' | 'academic_coordinator' | 'dean' | 'vp_finance';
 
 interface MenuItem {
   name: string;
@@ -121,12 +122,26 @@ export default function Sidebar() {
     return 'U';
   };
 
+  // Get role display name
+  const getRoleDisplay = (role: string) => {
+    const roleMap: Record<string, string> = {
+      'student': 'Student',
+      'student_officer': 'Student Officer',
+      'admin_assistant': 'Admin Assistant',
+      'moderator': 'Moderator',
+      'academic_coordinator': 'Academic Coordinator',
+      'dean': 'Dean',
+      'vp_finance': 'VP Finance'
+    };
+    return roleMap[role] || role.replace('_', ' ');
+  };
+
   // Calculate notification badge counts based on role and notification data
   const notificationBadgeCount = (() => {
     let badgeCount = 0;
     
-    // For admin/dean users, include all unread notifications
-    if (role === 'admin_assistant' || role === 'dean') {
+    // For admin/moderator/academic_coordinator/dean/vp_finance users, include all unread notifications
+    if (role === 'admin_assistant' || role === 'moderator' || role === 'academic_coordinator' || role === 'dean' || role === 'vp_finance') {
       badgeCount = notifications.filter(n => !n.is_read).length;
     } else {
       // For students and student officers, include all unread notifications
@@ -187,9 +202,9 @@ export default function Sidebar() {
 
   // Handle restricted navigation for regular students
   const handleNavigation = (e: React.MouseEvent, child: { name: string; href: string }) => {
-    if (role === 'student' && child.name === 'Activity Plan') {
+    if (role === 'student' && (child.name === 'Activity Plan' || child.name === 'Budget Request')) {
       e.preventDefault();
-      setBlockedFeature({ name: 'Activity Plan', requiredRole: 'Student Officer' });
+      setBlockedFeature({ name: child.name, requiredRole: 'Student Officer' });
       setRoleAccessModalOpen(true);
     }
   };
@@ -219,6 +234,7 @@ export default function Sidebar() {
         icon: <FaFileAlt />,
         children: [
           { name: 'Activity Plan', href: route('student.requests.activity-plan'), routeName: 'student.requests.activity-plan', icon: <FaClipboardList /> },
+          { name: 'Budget Request', href: route('student.requests.budget-request'), routeName: 'student.requests.budget-request', icon: <FaDollarSign /> },
           { name: 'Borrow Equipment', href: route('student.borrow-equipment'), routeName: 'student.borrow-equipment', icon: <FaToolbox /> },
           // 🔜 Add more requests here (e.g. Room Reservation, etc.)
         ],
@@ -234,6 +250,7 @@ export default function Sidebar() {
         icon: <FaFileAlt />,
         children: [
           { name: 'Activity Plan', href: route('student.requests.activity-plan'), routeName: 'student.requests.activity-plan', icon: <FaClipboardList /> },
+          { name: 'Budget Request', href: route('student.requests.budget-request'), routeName: 'student.requests.budget-request', icon: <FaDollarSign /> },
           { name: 'Borrow Equipment', href: route('student.borrow-equipment'), routeName: 'student.borrow-equipment', icon: <FaToolbox /> },
         ],
       },
@@ -250,10 +267,28 @@ export default function Sidebar() {
       { name: 'Activity History', href: route('admin.activity-history'), routeName: 'admin.activity-history', icon: <FaChartLine /> },
       { name: 'Calendar', href: route('calendar'), routeName: 'calendar', icon: <FaCalendarAlt /> },
     ],
+    moderator: [
+      { name: 'Home', href: route('moderator.dashboard'), routeName: 'moderator.dashboard', icon: <FaHome /> },
+      { name: 'Requests', href: route('moderator.requests'), routeName: 'moderator.requests', icon: <FaFileAlt /> },
+      { name: 'Activity History', href: route('moderator.activity-history'), routeName: 'moderator.activity-history', icon: <FaChartLine /> },
+      { name: 'Calendar', href: route('calendar'), routeName: 'calendar', icon: <FaCalendarAlt /> },
+    ],
+    academic_coordinator: [
+      { name: 'Home', href: route('academic_coordinator.dashboard'), routeName: 'academic_coordinator.dashboard', icon: <FaHome /> },
+      { name: 'Requests', href: route('academic_coordinator.requests'), routeName: 'academic_coordinator.requests', icon: <FaFileAlt /> },
+      { name: 'Activity History', href: route('academic_coordinator.activity-history'), routeName: 'academic_coordinator.activity-history', icon: <FaChartLine /> },
+      { name: 'Calendar', href: route('calendar'), routeName: 'calendar', icon: <FaCalendarAlt /> },
+    ],
     dean: [
       { name: 'Home', href: route('dean.dashboard'), routeName: 'dean.dashboard', icon: <FaHome /> },
       { name: 'Requests', href: route('dean.requests'), routeName: 'dean.requests', icon: <FaFileAlt /> },
       { name: 'Activity History', href: route('dean.activity-history'), routeName: 'dean.activity-history', icon: <FaChartLine /> },
+      { name: 'Calendar', href: route('calendar'), routeName: 'calendar', icon: <FaCalendarAlt /> },
+    ],
+    vp_finance: [
+      { name: 'Home', href: route('vp_finance.dashboard'), routeName: 'vp_finance.dashboard', icon: <FaHome /> },
+      { name: 'Budget Requests', href: route('vp_finance.requests'), routeName: 'vp_finance.requests', icon: <FaDollarSign /> },
+      { name: 'Activity History', href: route('vp_finance.activity-history'), routeName: 'vp_finance.activity-history', icon: <FaChartLine /> },
       { name: 'Calendar', href: route('calendar'), routeName: 'calendar', icon: <FaCalendarAlt /> },
     ],
   };
@@ -306,10 +341,17 @@ export default function Sidebar() {
                       (added['History'] = true) && <SectionHeading label="History" />
                     )}
 
-                    {role === 'dean' && item.name === 'Requests' && !added['Approvals'] && (
+                    {(role === 'moderator' || role === 'academic_coordinator' || role === 'dean') && item.name === 'Requests' && !added['Approvals'] && (
                       (added['Approvals'] = true) && <SectionHeading label="Approvals" />
                     )}
-                    {role === 'dean' && item.name === 'Activity History' && !added['History'] && (
+                    {(role === 'moderator' || role === 'academic_coordinator' || role === 'dean') && item.name === 'Activity History' && !added['History'] && (
+                      (added['History'] = true) && <SectionHeading label="History" />
+                    )}
+
+                    {role === 'vp_finance' && item.name === 'Budget Requests' && !added['Approvals'] && (
+                      (added['Approvals'] = true) && <SectionHeading label="Approvals" />
+                    )}
+                    {role === 'vp_finance' && item.name === 'Activity History' && !added['History'] && (
                       (added['History'] = true) && <SectionHeading label="History" />
                     )}
 
@@ -351,7 +393,7 @@ export default function Sidebar() {
                                 {item.children
                                   .map((child) => {
                                   const childActive = isActiveItem(child);
-                                  const isLocked = role === 'student' && child.name === 'Activity Plan';
+                                  const isLocked = role === 'student' && (child.name === 'Activity Plan' || child.name === 'Budget Request');
                                   return (
                                     <div key={child.name} className="relative">
                                       {childActive && (
@@ -382,7 +424,7 @@ export default function Sidebar() {
                             <div className="ml-8 mt-2 flex flex-col gap-2">
                               {item.children.map((child) => {
                                 const childActive = isActiveItem(child);
-                                const isLocked = role === 'student' && child.name === 'Activity Plan';
+                                const isLocked = role === 'student' && (child.name === 'Activity Plan' || child.name === 'Budget Request');
                                 return (
                                   <div key={child.name} className="relative">
                                     {childActive && (
@@ -475,7 +517,7 @@ export default function Sidebar() {
               </div>
               <div>
                 <p className="text-base font-semibold leading-tight">{user.first_name}</p>
-                <p className="text-xs opacity-80 capitalize">{user.role.replace('_', ' ')}</p>
+                <p className="text-xs opacity-80">{getRoleDisplay(user.role)}</p>
               </div>
             </div>
             <FaChevronDown className={`transition-transform ${dropdownOpen ? 'rotate-180' : ''}`} />

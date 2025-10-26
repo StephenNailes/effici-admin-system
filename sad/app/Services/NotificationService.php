@@ -58,11 +58,37 @@ class NotificationService
             } elseif ($requestType === 'activity_plan') {
                 if ($approverRole === 'admin_assistant') {
                     $title = 'Activity Plan - Initial Approval';
-                    $message = 'Your activity plan has been approved by the Admin Assistant and is now forwarded to the Dean for final approval.';
+                    $message = 'Your activity plan has been approved by the Admin Assistant and is now forwarded to the Moderator for review.';
+                    $priority = 'medium';
+                } elseif ($approverRole === 'moderator') {
+                    $title = 'Activity Plan - Moderator Approval';
+                    $message = 'Your activity plan has been approved by the Moderator and is now forwarded to the Academic Coordinator.';
+                    $priority = 'medium';
+                } elseif ($approverRole === 'academic_coordinator') {
+                    $title = 'Activity Plan - Academic Coordinator Approval';
+                    $message = 'Your activity plan has been approved by the Academic Coordinator and is now forwarded to the Dean for final approval.';
                     $priority = 'medium';
                 } elseif ($approverRole === 'dean') {
                     $title = 'Activity Plan - Final Approval';
                     $message = 'Congratulations! The Dean has given final approval to your activity plan. You can now proceed with organizing your event.';
+                    $priority = 'high';
+                }
+            } elseif ($requestType === 'budget_request') {
+                if ($approverRole === 'admin_assistant') {
+                    $title = 'Budget Request - Initial Approval';
+                    $message = 'Your budget request has been approved by the Admin Assistant and is now forwarded to the Academic Coordinator for review.';
+                    $priority = 'medium';
+                } elseif ($approverRole === 'academic_coordinator') {
+                    $title = 'Budget Request - Academic Coordinator Approval';
+                    $message = 'Your budget request has been approved by the Academic Coordinator and is now forwarded to the Dean.';
+                    $priority = 'medium';
+                } elseif ($approverRole === 'dean') {
+                    $title = 'Budget Request - Dean Approval';
+                    $message = 'Your budget request has been approved by the Dean and is now forwarded to the VP Finance for final approval.';
+                    $priority = 'medium';
+                } elseif ($approverRole === 'vp_finance') {
+                    $title = 'Budget Request - Final Approval';
+                    $message = 'Congratulations! The VP Finance has given final approval to your budget request. You can now proceed with your budgeted activities.';
                     $priority = 'high';
                 }
             }
@@ -75,9 +101,30 @@ class NotificationService
                 if ($approverRole === 'admin_assistant') {
                     $title = 'Activity Plan - Revision Required';
                     $message = 'The Admin Assistant has requested revisions to your activity plan. Please review the feedback and resubmit.';
+                } elseif ($approverRole === 'moderator') {
+                    $title = 'Activity Plan - Moderator Revision Required';
+                    $message = 'The Moderator has requested revisions to your activity plan. Please review the feedback and resubmit.';
+                } elseif ($approverRole === 'academic_coordinator') {
+                    $title = 'Activity Plan - Academic Coordinator Revision Required';
+                    $message = 'The Academic Coordinator has requested revisions to your activity plan. Please review the feedback and resubmit.';
                 } elseif ($approverRole === 'dean') {
                     $title = 'Activity Plan - Dean Revision Required';
                     $message = 'The Dean has requested revisions to your activity plan. Please review the feedback and resubmit.';
+                }
+                $priority = 'high';
+            } elseif ($requestType === 'budget_request') {
+                if ($approverRole === 'admin_assistant') {
+                    $title = 'Budget Request - Revision Required';
+                    $message = 'The Admin Assistant has requested revisions to your budget request. Please review the feedback and resubmit.';
+                } elseif ($approverRole === 'academic_coordinator') {
+                    $title = 'Budget Request - Academic Coordinator Revision Required';
+                    $message = 'The Academic Coordinator has requested revisions to your budget request. Please review the feedback and resubmit.';
+                } elseif ($approverRole === 'dean') {
+                    $title = 'Budget Request - Dean Revision Required';
+                    $message = 'The Dean has requested revisions to your budget request. Please review the feedback and resubmit.';
+                } elseif ($approverRole === 'vp_finance') {
+                    $title = 'Budget Request - VP Finance Revision Required';
+                    $message = 'The VP Finance has requested revisions to your budget request. Please review the feedback and resubmit.';
                 }
                 $priority = 'high';
             }
@@ -89,9 +136,14 @@ class NotificationService
             $message = $approverRole === 'dean' ? 'Dean has updated your request status' : 'Admin has updated your request status';
         }
 
-        $actionUrl = $requestType === 'activity_plan' 
-            ? "/student/requests/activity-plan"
-            : "/student/borrow-equipment";
+        // Set action URL based on request type
+        if ($requestType === 'activity_plan') {
+            $actionUrl = "/student/requests/activity-plan";
+        } elseif ($requestType === 'budget_request') {
+            $actionUrl = "/student/requests/budget-request";
+        } else {
+            $actionUrl = "/student/borrow-equipment";
+        }
 
         return $this->create([
             'user_id' => $userId,
@@ -141,9 +193,49 @@ class NotificationService
         // Get all users with the approver role
         $approvers = User::where('role', $approverRole)->get();
 
-        $actionUrl = $approverRole === 'dean' && $requestType === 'activity_plan'
-            ? "/dean/activity-plan-approval/{$requestId}"
-            : "/admin/requests";
+        // Route approvers to the correct approval page when possible
+        if ($requestType === 'activity_plan') {
+            switch ($approverRole) {
+                case 'dean':
+                    $actionUrl = "/dean/activity-plan-approval/{$requestId}";
+                    break;
+                case 'moderator':
+                    $actionUrl = "/moderator/activity-plan-approval/{$requestId}";
+                    break;
+                case 'academic_coordinator':
+                    $actionUrl = "/academic-coordinator/activity-plan-approval/{$requestId}";
+                    break;
+                case 'admin_assistant':
+                    // Admin assistant has an activity plan approval route too
+                    $actionUrl = "/admin/activity-plan-approval/{$requestId}";
+                    break;
+                default:
+                    $actionUrl = "/admin/requests";
+                    break;
+            }
+        } elseif ($requestType === 'budget_request') {
+            // Budget request routing
+            switch ($approverRole) {
+                case 'vp_finance':
+                    $actionUrl = "/vp-finance/budget-request-approval/{$requestId}";
+                    break;
+                case 'dean':
+                    $actionUrl = "/dean/budget-request-approval/{$requestId}";
+                    break;
+                case 'academic_coordinator':
+                    $actionUrl = "/academic-coordinator/budget-request-approval/{$requestId}";
+                    break;
+                case 'admin_assistant':
+                    $actionUrl = "/admin/budget-request-approval/{$requestId}";
+                    break;
+                default:
+                    $actionUrl = "/admin/requests";
+                    break;
+            }
+        } else {
+            // Equipment and other types fall back to role dashboards
+            $actionUrl = "/admin/requests";
+        }
 
         // Normalize priority to valid enum values
         if (!in_array($priority, ['low', 'medium', 'high'], true)) {
@@ -155,15 +247,33 @@ class NotificationService
         $humanType = str_replace('_', ' ', (string) $requestType);
         switch ($priority) {
             case 'high':
-                $title = $requestType === 'activity_plan' ? 'High Priority: Activity Plan Request' : 'High Priority: Equipment Request';
+                if ($requestType === 'activity_plan') {
+                    $title = 'High Priority: Activity Plan Request';
+                } elseif ($requestType === 'budget_request') {
+                    $title = 'High Priority: Budget Request';
+                } else {
+                    $title = 'High Priority: Equipment Request';
+                }
                 $message = "High priority: {$studentName} submitted a {$humanType} request requiring immediate attention.";
                 break;
             case 'medium':
-                $title = $requestType === 'activity_plan' ? 'New Activity Plan Request' : 'New Equipment Request';
+                if ($requestType === 'activity_plan') {
+                    $title = 'New Activity Plan Request';
+                } elseif ($requestType === 'budget_request') {
+                    $title = 'New Budget Request';
+                } else {
+                    $title = 'New Equipment Request';
+                }
                 $message = "{$studentName} submitted a new {$humanType} request for review.";
                 break;
             case 'low':
-                $title = $requestType === 'activity_plan' ? 'Activity Plan Request' : 'Equipment Request';
+                if ($requestType === 'activity_plan') {
+                    $title = 'Activity Plan Request';
+                } elseif ($requestType === 'budget_request') {
+                    $title = 'Budget Request';
+                } else {
+                    $title = 'Equipment Request';
+                }
                 $message = "{$studentName} submitted a {$humanType} request (low priority).";
                 break;
             default: // medium as fallback

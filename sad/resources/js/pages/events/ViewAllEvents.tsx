@@ -61,7 +61,7 @@ interface Comment {
 type AuthUser = {
   first_name: string;
   last_name: string;
-  role: 'student' | 'admin_assistant' | 'dean' | 'student_officer';
+  role: 'student' | 'admin_assistant' | 'dean' | 'student_officer' | 'moderator' | 'academic_coordinator';
   avatarUrl?: string;
 };
 
@@ -289,6 +289,10 @@ export default function ViewAllEvents() {
                 router.visit('/admin/dashboard');
               } else if (userRole === 'dean') {
                 router.visit('/dean/dashboard');
+              } else if (userRole === 'moderator') {
+                router.visit('/moderator/dashboard');
+              } else if (userRole === 'academic_coordinator') {
+                router.visit('/academic-coordinator/dashboard');
               } else {
                 router.visit('/student/dashboard');
               }

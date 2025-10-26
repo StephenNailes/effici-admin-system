@@ -206,6 +206,8 @@ export default function Revision({ revisions = [] }: RevisionProps) {
                           onClick={() => {
                             if (req.request_type === 'activity_plan') {
                               router.get(`/student/requests/activity-plan/${req.id}`)
+                            } else if (req.request_type === 'budget_request') {
+                              router.get(`/student/requests/budget-request/${req.id}`)
                             } else {
                               router.get(route('student.revision.edit', { id: req.id, type: req.request_type }))
                             }

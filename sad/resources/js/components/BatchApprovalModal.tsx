@@ -7,7 +7,7 @@ interface BatchApprovalModalProps {
   onClose: () => void;
   onConfirm: () => void;
   selectedRequests: any[];
-  userRole: 'admin_assistant' | 'dean';
+  userRole: 'admin_assistant' | 'dean' | 'moderator' | 'academic_coordinator' | 'vp_finance';
   isLoading?: boolean;
 }
 
@@ -21,7 +21,15 @@ export default function BatchApprovalModal({
 }: BatchApprovalModalProps) {
   const [confirmed, setConfirmed] = useState(false);
 
-  const roleDisplay = userRole === 'admin_assistant' ? 'Admin Assistant' : 'Dean';
+  const roleDisplayMap: Record<'admin_assistant' | 'dean' | 'moderator' | 'academic_coordinator' | 'vp_finance', string> = {
+    admin_assistant: 'Admin Assistant',
+    dean: 'Dean',
+    moderator: 'Moderator',
+    academic_coordinator: 'Academic Coordinator',
+    vp_finance: 'VP Finance'
+  };
+  
+  const roleDisplay = roleDisplayMap[userRole];
   
   const handleConfirm = () => {
     if (confirmed) {

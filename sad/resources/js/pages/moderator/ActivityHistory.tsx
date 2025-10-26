@@ -192,17 +192,17 @@ export default function ActivityHistory() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Fetch dean activities on mount
+  // Fetch moderator activities on mount
   useEffect(() => {
     setLoading(true);
     setError(null);
-    csrfFetch("/api/approvals?role=dean")
+    csrfFetch("/api/approvals?role=moderator")
       .then((res) => {
         if (!res.ok) throw new Error("Failed to fetch activities");
         return res.json();
       })
       .then((data) => {
-        // Map API response to table format and filter out role updates for dean
+        // Map API response to table format and filter out role updates for moderator
         const mapped = (data.requests || [])
           .filter((item: any) => item.request_type !== "role_update") // Exclude role updates
           .map((item: any) => {

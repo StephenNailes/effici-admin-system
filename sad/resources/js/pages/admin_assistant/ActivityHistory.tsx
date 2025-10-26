@@ -24,7 +24,7 @@ const FilterModal = ({
   const [tempTypeFilter, setTempTypeFilter] = useState(typeFilter);
   const [tempStatusFilter, setTempStatusFilter] = useState(statusFilter);
 
-  const typeOptions = ["All Types", "Activity Plan", "Equipment", "Role Update"];
+  const typeOptions = ["All Types", "Activity Plan", "Equipment", "Budget Request", "Role Update"];
   const statusOptions = [
     "All Status", "Pending", "Approved", "Completed", 
     "Under Revision", "Checked Out", 
@@ -192,7 +192,7 @@ export default function ActivityHistory() {
         return res.json();
       })
       .then((data) => {
-        // Map API response to table format
+  // Map API response to table format
   const mapped = (data.requests || []).map((item: any) => {
           let status = "-";
           if (item.request_type === "equipment") {
@@ -241,20 +241,24 @@ export default function ActivityHistory() {
             }
             console.log("Normalized activity status:", status);
           }
-          // Compute clean category/purpose
+          // Compute clean category/purpose (handle activity, budget, role update, equipment)
           const categoryPurpose = item.request_type === 'activity_plan'
             ? (item.activity_category || '-')
-            : item.request_type === 'role_update'
-              ? (item.activity_category || '-')
-              : (item.equipment_purpose || '-');
+            : item.request_type === 'budget_request'
+              ? (item.budget_category || item.category || '-')
+              : item.request_type === 'role_update'
+                ? (item.activity_category || '-')
+                : (item.equipment_purpose || '-');
           return {
             id: item.request_id || item.approval_id || item.id,
             student: item.student_name || "-",
             type: item.request_type === "activity_plan" 
               ? "Activity Plan" 
-              : item.request_type === "role_update"
-                ? "Role Update"
-                : "Equipment",
+              : item.request_type === "budget_request"
+                ? "Budget Request"
+                : item.request_type === "role_update"
+                  ? "Role Update"
+                  : "Equipment",
             dateSubmitted: item.submitted_at ? item.submitted_at.slice(0, 10) : "-",
             category: categoryPurpose,
             priority: (item.priority || null),

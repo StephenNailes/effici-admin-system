@@ -39,19 +39,23 @@ sad/                           # Main application directory
 
 ## Business Domain
 
-**Multi-role approval system** for academic activities and equipment in an educational facility:
+**Multi-role approval system** for academic activities, equipment, and budget requests in an educational facility:
 
 ### User Roles
 - **Students** (`student`): Basic students who can submit equipment requests
-- **Student Officers** (`student_officer`): Officers who can create activity plans and equipment requests
+- **Student Officers** (`student_officer`): Officers who can create activity plans, budget requests, and equipment requests
 - **Admin Assistants** (`admin_assistant`): Initial review and approval, equipment management
-- **Deans** (`dean`): Final approval authority for activity plans
+- **Moderators** (`moderator`): Second-level approval for activity plans
+- **Academic Coordinators** (`academic_coordinator`): Third-level approval for activity plans and budget requests
+- **Deans** (`dean`): Fourth-level approval for activity plans and budget requests
+- **VP Finance** (`vp_finance`): Final approval authority for budget requests
 
-### Core Entities (19 Models)
+### Core Entities (22 Models)
 **Requests & Approvals:**
-- `ActivityPlan`: Student officer-created event plans requiring dual approval
-- `EquipmentRequest`, `EquipmentRequestItem`: Equipment borrowing requests
-- `RequestApproval`: Tracks approval workflow (admin assistant → dean)
+- `ActivityPlan`: Student officer-created event plans requiring 4-step approval (admin_assistant → moderator → academic_coordinator → dean)
+- `BudgetRequest`: Student officer-created budget proposals requiring 4-step approval (admin_assistant → academic_coordinator → dean → vp_finance)
+- `EquipmentRequest`, `EquipmentRequestItem`: Equipment borrowing requests (admin_assistant approval only)
+- `RequestApproval`: Tracks approval workflow for all request types
 
 **Role Management:**
 - `RoleUpdateRequest`: Student requests to become student_officer
@@ -75,15 +79,17 @@ sad/                           # Main application directory
 
 ### Status Enums
 - `ActivityPlan.status`: `draft`, `pending`, `under_revision`, `approved`, `completed`
+- `BudgetRequest.status`: `draft`, `pending`, `under_revision`, `approved`
 - `EquipmentRequest.status`: `pending`, `under_revision`, `approved`, `completed`, `denied`, `cancelled`, `checked_out`, `returned`, `overdue`
 - `RequestApproval.status`: `pending`, `approved`, `revision_requested`
 - `RoleUpdateRequest.status`: `pending`, `approved`, `rejected`
 
 ### Approval Workflow
-- `RequestApproval.request_type`: `equipment` | `activity_plan`
-- `RequestApproval.approver_role`: `admin_assistant` | `dean`
-- Activity plans require sequential approval: admin_assistant → dean
-- Equipment requests require only admin_assistant approval
+- `RequestApproval.request_type`: `equipment` | `activity_plan` | `budget_request`
+- `RequestApproval.approver_role`: `admin_assistant` | `moderator` | `academic_coordinator` | `dean` | `vp_finance`
+- **Activity plans** require 4-step sequential approval: admin_assistant → moderator → academic_coordinator → dean
+- **Budget requests** require 5-step sequential approval: admin_assistant → moderator → academic_coordinator → dean → vp_finance
+- **Equipment requests** require only admin_assistant approval
 
 ## Development Patterns
 
