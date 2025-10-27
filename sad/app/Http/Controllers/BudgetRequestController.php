@@ -225,6 +225,7 @@ class BudgetRequestController extends Controller
             'plan_name' => $req->request_name,
             'status' => $req->status,
             'category' => $req->category,
+            'pdf_path' => $req->pdf_path,
             'created_at' => $req->created_at,
             'updated_at' => $req->updated_at,
             'document_data' => $req->currentFile?->document_data,

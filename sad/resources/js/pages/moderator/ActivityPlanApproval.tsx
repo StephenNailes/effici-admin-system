@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import MainLayout from "@/layouts/mainlayout";
-import { Download, Maximize2, Check, X, ArrowLeft, Users, PenTool, Save, Trash2, Move } from "lucide-react";
+import { Download, Maximize2, Check, X, ArrowLeft, Users, PenTool, Save, Trash2, Move, MessageSquare } from "lucide-react";
 import axios from "axios";
 import { router } from "@inertiajs/react";
 import PDFPreviewModal from "@/components/PDFPreviewModal";
+import AddPdfCommentsModal from "@/components/AddPdfCommentsModal";
 import { toast } from 'react-toastify';
 import ReactSignatureCanvas from 'react-signature-canvas';
 
@@ -32,6 +33,7 @@ export default function ActivityPlanApproval({ id }: Props) {
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [saving, setSaving] = useState(false);
   const [isPanMode, setIsPanMode] = useState(false);
+  const [showCommentViewer, setShowCommentViewer] = useState(false);
   const panTimerRef = useRef<number | null>(null);
   const signatureCanvasRef = useRef<ReactSignatureCanvas | null>(null);
   const pdfContainerRef = useRef<HTMLDivElement | null>(null);
@@ -548,22 +550,7 @@ export default function ActivityPlanApproval({ id }: Props) {
                 </div>
               </motion.div>
 
-              {/* Remarks Card */}
-              <motion.div
-                className="bg-white rounded-lg shadow-md p-4 border border-gray-100"
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.4, ease: "easeOut" }}
-              >
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">Remarks (optional)</h3>
-                <textarea
-                  className="w-full border border-gray-300 rounded p-3 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none text-black placeholder:text-gray-400 outline-none"
-                  placeholder="Add remarks or feedback..."
-                  value={remarks}
-                  onChange={(e) => setRemarks(e.target.value)}
-                  rows={4}
-                />
-              </motion.div>
+              {/* Removed inline remarks in favor of structured PDF comments */}
 
               {/* Actions Card */}
               {activityPlan.approval_status === 'pending' && (
@@ -577,6 +564,13 @@ export default function ActivityPlanApproval({ id }: Props) {
                   <div className="space-y-3">
                     {!isSignatureMode ? (
                       <>
+                        <button
+                          onClick={() => setShowCommentViewer(true)}
+                          className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+                        >
+                          <MessageSquare className="w-4 h-4" />
+                          Add PDF Comments
+                        </button>
                         <button
                           onClick={toggleSignatureMode}
                           className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
@@ -739,6 +733,45 @@ export default function ActivityPlanApproval({ id }: Props) {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* PDF Comment Viewer Modal - centralized component */}
+      {activityPlan?.pdf_url && (
+        <AddPdfCommentsModal
+          isOpen={showCommentViewer}
+          onClose={() => setShowCommentViewer(false)}
+          pdfUrl={activityPlan.pdf_url}
+          requestId={activityPlan.request_id}
+          requestType="activity_plan"
+          isApprover={true}
+          onSaveComments={async (comments) => {
+            try {
+              const csrf = getCsrfMetaToken();
+              await axios.post(`/api/approvals/${id}/comments`, {
+                comments: comments.map(c => ({
+                  page_number: c.pageNumber,
+                  region_x1_pct: c.x,
+                  region_y1_pct: c.y,
+                  region_x2_pct: c.x + c.width,
+                  region_y2_pct: c.y + c.height,
+                  comment_text: c.text,
+                }))
+              }, {
+                withCredentials: true,
+                headers: {
+                  'X-Requested-With': 'XMLHttpRequest',
+                  'X-CSRF-TOKEN': csrf,
+                  'Content-Type': 'application/json'
+                }
+              });
+              toast.success('Comments saved successfully!');
+              setShowCommentViewer(false);
+            } catch (error) {
+              console.error('Error saving comments:', error);
+              toast.error('Failed to save comments. Please try again.');
+            }
+          }}
+        />
+      )}
     </MainLayout>
   );
 }

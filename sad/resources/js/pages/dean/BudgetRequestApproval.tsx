@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import MainLayout from "@/layouts/mainlayout";
-import { Download, Maximize2, Check, X, ArrowLeft, Users, PenTool, Save, Trash2, Move, DollarSign } from "lucide-react";
+import { Download, Maximize2, Check, X, ArrowLeft, Users, PenTool, Save, Trash2, Move, DollarSign, MessageSquare } from "lucide-react";
 import axios from "axios";
 import { router } from "@inertiajs/react";
 import PDFPreviewModal from "@/components/PDFPreviewModal";
+import AddPdfCommentsModal from "@/components/AddPdfCommentsModal";
 import { toast } from 'react-toastify';
 import ReactSignatureCanvas from 'react-signature-canvas';
 
@@ -32,6 +33,7 @@ export default function BudgetRequestApproval({ id }: Props) {
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [saving, setSaving] = useState(false);
   const [isPanMode, setIsPanMode] = useState(false);
+  const [showCommentViewer, setShowCommentViewer] = useState(false);
   const panTimerRef = useRef<number | null>(null);
   const signatureCanvasRef = useRef<ReactSignatureCanvas | null>(null);
   const pdfContainerRef = useRef<HTMLDivElement | null>(null);
@@ -636,6 +638,14 @@ export default function BudgetRequestApproval({ id }: Props) {
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">Actions</h3>
                 <div className="space-y-3">
                   <button
+                    onClick={() => setShowCommentViewer(true)}
+                    className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+                  >
+                    <MessageSquare className="w-4 h-4" />
+                    Add PDF Comments
+                  </button>
+
+                  <button
                     onClick={handleApprove}
                     disabled={submitting}
                     className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
@@ -653,22 +663,9 @@ export default function BudgetRequestApproval({ id }: Props) {
                     </div>
                   </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Request Revision (Optional)
-                    </label>
-                    <textarea
-                      value={remarks}
-                      onChange={(e) => setRemarks(e.target.value)}
-                      placeholder="Enter revision comments..."
-                      rows={3}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent text-sm"
-                    />
-                  </div>
-
                   <button
                     onClick={handleRevision}
-                    disabled={submitting || !remarks.trim()}
+                    disabled={submitting}
                     className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <X className="w-5 h-5" />
@@ -742,6 +739,45 @@ export default function BudgetRequestApproval({ id }: Props) {
           isOpen={showPdf}
           pdfUrl={budgetRequest.pdf_url}
           onClose={() => setShowPdf(false)}
+        />
+      )}
+
+      {/* PDF Comment Viewer Modal - centralized component */}
+      {budgetRequest?.pdf_url && (
+        <AddPdfCommentsModal
+          isOpen={showCommentViewer}
+          onClose={() => setShowCommentViewer(false)}
+          pdfUrl={budgetRequest.pdf_url}
+          requestId={budgetRequest.request_id}
+          requestType="budget_request"
+          isApprover={true}
+          onSaveComments={async (comments) => {
+            try {
+              const csrf = getCsrfMetaToken();
+              await axios.post(`/api/approvals/${id}/comments`, {
+                comments: comments.map(c => ({
+                  page_number: c.pageNumber,
+                  region_x1_pct: c.x,
+                  region_y1_pct: c.y,
+                  region_x2_pct: c.x + c.width,
+                  region_y2_pct: c.y + c.height,
+                  comment_text: c.text,
+                }))
+              }, {
+                withCredentials: true,
+                headers: {
+                  'X-Requested-With': 'XMLHttpRequest',
+                  'X-CSRF-TOKEN': csrf,
+                  'Content-Type': 'application/json'
+                }
+              });
+              toast.success('Comments saved successfully!');
+              setShowCommentViewer(false);
+            } catch (error) {
+              console.error('Error saving comments:', error);
+              toast.error('Failed to save comments. Please try again.');
+            }
+          }}
         />
       )}
     </MainLayout>

@@ -1,11 +1,12 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import MainLayout from '@/layouts/mainlayout';
-import { ArrowLeft, Check, Download, Maximize2, Users, X } from 'lucide-react';
+import { ArrowLeft, Check, Download, Maximize2, Users, X, MessageSquare } from 'lucide-react';
 import axios from 'axios';
 import { router } from '@inertiajs/react';
 import { toast } from 'react-toastify';
 import PDFPreviewModal from '@/components/PDFPreviewModal';
+import AddPdfCommentsModal from '@/components/AddPdfCommentsModal';
 
 interface Props { id: number }
 
@@ -16,6 +17,7 @@ export default function BudgetRequestApproval({ id }: Props) {
   const [remarks, setRemarks] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [showPdf, setShowPdf] = useState(false);
+  const [showCommentViewer, setShowCommentViewer] = useState(false);
 
   const pdfUrl = useMemo(() => {
     const url = data?.pdf_url;
@@ -48,7 +50,6 @@ export default function BudgetRequestApproval({ id }: Props) {
   };
 
   const requestRevision = async () => {
-    if (!remarks.trim()) { toast.error('Please add remarks'); return; }
     setSubmitting(true);
     try {
       await axios.post(`/api/approvals/${id}/revision`, { remarks });
@@ -270,22 +271,7 @@ export default function BudgetRequestApproval({ id }: Props) {
                 </div>
               </motion.div>
 
-              {/* Remarks Card */}
-              <motion.div
-                className="bg-white rounded-lg shadow-md p-4 border border-gray-100"
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.4, ease: 'easeOut' }}
-              >
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">Remarks (optional)</h3>
-                <textarea
-                  className="w-full border border-gray-300 rounded p-3 text-sm focus:ring-2 focus:ring-red-500/50 focus:border-red-500/50 resize-none text-black placeholder:text-gray-400 outline-none"
-                  placeholder="Add remarks or feedback..."
-                  value={remarks}
-                  onChange={(e) => setRemarks(e.target.value)}
-                  rows={4}
-                />
-              </motion.div>
+              {/* Removed inline remarks in favor of structured PDF comments */}
 
               {/* Actions Card */}
               {status === 'pending' && (
@@ -297,6 +283,13 @@ export default function BudgetRequestApproval({ id }: Props) {
                 >
                   <h3 className="text-lg font-semibold text-gray-900 mb-4">Actions</h3>
                   <div className="space-y-3">
+                    <button
+                      onClick={() => setShowCommentViewer(true)}
+                      className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+                    >
+                      <MessageSquare className="w-4 h-4" />
+                      Add PDF Comments
+                    </button>
                     <button
                       onClick={approve}
                       disabled={submitting}
@@ -330,6 +323,45 @@ export default function BudgetRequestApproval({ id }: Props) {
         onDownload={data?.pdf_url ? () => window.open(data.pdf_url, '_blank') : undefined}
         title="Budget Request PDF"
       />
+
+      {/* PDF Comment Viewer Modal - centralized component */}
+      {data?.pdf_url && (
+        <AddPdfCommentsModal
+          isOpen={showCommentViewer}
+          onClose={() => setShowCommentViewer(false)}
+          pdfUrl={data.pdf_url}
+          requestId={data.request_id}
+          requestType="budget_request"
+          isApprover={true}
+          onSaveComments={async (comments) => {
+            try {
+              const csrf = (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement | null)?.content || '';
+              await axios.post(`/api/approvals/${id}/comments`, {
+                comments: comments.map(c => ({
+                  page_number: c.pageNumber,
+                  region_x1_pct: c.x,
+                  region_y1_pct: c.y,
+                  region_x2_pct: c.x + c.width,
+                  region_y2_pct: c.y + c.height,
+                  comment_text: c.text,
+                }))
+              }, {
+                withCredentials: true,
+                headers: {
+                  'X-Requested-With': 'XMLHttpRequest',
+                  'X-CSRF-TOKEN': csrf,
+                  'Content-Type': 'application/json'
+                }
+              });
+              toast.success('Comments saved successfully!');
+              setShowCommentViewer(false);
+            } catch (error) {
+              console.error('Error saving comments:', error);
+              toast.error('Failed to save comments. Please try again.');
+            }
+          }}
+        />
+      )}
     </MainLayout>
   );
 }

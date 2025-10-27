@@ -334,6 +334,16 @@ Route::middleware(['auth', 'role:admin_assistant,moderator,academic_coordinator,
     // Signature routes (allow only approver roles to save signatures)
     Route::post('/{id}/save-signatures', [ApprovalController::class, 'saveSignatures'])->middleware('role:moderator,academic_coordinator,dean,vp_finance')->name('approvals.save-signatures');
     Route::get('/{id}/signatures', [ApprovalController::class, 'getSignatures'])->name('approvals.get-signatures');
+    
+    // PDF Comments routes (allow all approver roles)
+    Route::post('/{id}/comments', [App\Http\Controllers\PdfCommentController::class, 'store'])->name('approvals.comments.store');
+});
+
+// 🟩 PDF Comments API (for students and approvers)
+Route::middleware(['auth'])->prefix('api/pdf-comments')->group(function () {
+    Route::get('/{requestType}/{requestId}', [App\Http\Controllers\PdfCommentController::class, 'index'])->name('pdf-comments.index');
+    Route::post('/{commentId}/respond', [App\Http\Controllers\PdfCommentController::class, 'respond'])->name('pdf-comments.respond');
+    Route::post('/{commentId}/resolve', [App\Http\Controllers\PdfCommentController::class, 'resolve'])->middleware('role:admin_assistant,moderator,academic_coordinator,dean,vp_finance')->name('pdf-comments.resolve');
 });
 
 // 🟩 Equipment Management API (admin only)

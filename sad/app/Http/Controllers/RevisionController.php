@@ -27,10 +27,11 @@ class RevisionController extends Controller
             ->where('activity_plans.status', 'under_revision')
             ->select([
                 'activity_plans.id',
-                'activity_plans.category as title',
+                DB::raw("COALESCE(activity_plans.plan_name, CONCAT('Activity Plan #', activity_plans.id)) as title"),
                 'request_approvals.remarks as comment',
                 'activity_plans.status',
-                DB::raw("'activity_plan' as request_type")
+                DB::raw("'activity_plan' as request_type"),
+                'request_approvals.approver_role'
             ])
             ->get();
 
@@ -45,21 +46,73 @@ class RevisionController extends Controller
             ->where('equipment_requests.status', 'under_revision')
             ->select([
                 'equipment_requests.id',
-                'equipment_requests.purpose as title',
+                DB::raw("CONCAT('Equipment Request #', equipment_requests.id) as title"),
                 'request_approvals.remarks as comment',
                 'equipment_requests.status',
-                DB::raw("'equipment' as request_type")
+                DB::raw("'equipment' as request_type"),
+                'request_approvals.approver_role'
             ])
             ->get();
 
-        // Combine both types of revisions
-        $revisions = $activityRevisions->concat($equipmentRevisions)->map(function ($revision) {
+        // Fetch budget requests that need revision
+        $budgetRevisions = DB::table('budget_requests')
+            ->leftJoin('request_approvals', function ($join) {
+                $join->on('budget_requests.id', '=', 'request_approvals.request_id')
+                    ->where('request_approvals.request_type', '=', 'budget_request')
+                    ->where('request_approvals.status', '=', 'revision_requested');
+            })
+            ->where('budget_requests.user_id', $userId)
+            ->where('budget_requests.status', 'under_revision')
+            ->select([
+                'budget_requests.id',
+                DB::raw("COALESCE(budget_requests.request_name, CONCAT('Budget Request #', budget_requests.id)) as title"),
+                'request_approvals.remarks as comment',
+                'budget_requests.status',
+                DB::raw("'budget_request' as request_type"),
+                'request_approvals.approver_role'
+            ])
+            ->get();
+
+        // Combine all types of revisions
+        $revisions = $activityRevisions->concat($equipmentRevisions)->concat($budgetRevisions)->map(function ($revision) {
+            // Get all PDF comments for this request
+            $pdfComments = DB::table('pdf_comments')
+                ->join('users', 'pdf_comments.approver_id', '=', 'users.id')
+                ->where('pdf_comments.request_type', $revision->request_type)
+                ->where('pdf_comments.request_id', $revision->id)
+                ->select([
+                    'pdf_comments.comment_text',
+                    'pdf_comments.page_number',
+                    'pdf_comments.status',
+                    DB::raw("CONCAT(users.first_name, ' ', users.last_name) as approver_name"),
+                    'users.role as approver_role',
+                    'pdf_comments.created_at'
+                ])
+                ->orderBy('pdf_comments.created_at', 'asc')
+                ->get();
+
+            $commentCount = $pdfComments->count();
+            $commentText = '';
+            $hasMultipleComments = $commentCount > 1;
+
+            if ($commentCount === 0) {
+                // Fallback to approval remarks if no PDF comments
+                $commentText = $revision->comment ?? 'No comment provided';
+            } elseif ($commentCount === 1) {
+                $commentText = $pdfComments->first()->comment_text;
+            } else {
+                // Show first comment with indicator
+                $commentText = $pdfComments->first()->comment_text;
+            }
+
             return [
                 'id' => $revision->id,
                 'title' => $revision->title,
-                'comment' => $revision->comment ?? 'No comment provided',
+                'comment' => $commentText,
                 'status' => $revision->status,
-                'request_type' => $revision->request_type
+                'request_type' => $revision->request_type,
+                'comment_count' => $commentCount,
+                'has_multiple_comments' => $hasMultipleComments
             ];
         });
 

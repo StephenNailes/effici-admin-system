@@ -22,6 +22,7 @@ import tuvCertified from "/public/images/tuv-certified.jpg";
 import uicFooter from "/public/images/uic-footer.jpg";
 import axios from 'axios';
 import { toast } from 'react-toastify';
+import CommentsSidebar from '@/components/CommentsSidebar';
 import {
   Undo2,
   Redo2,
@@ -1501,6 +1502,10 @@ const App: React.FC = () => {
   const planStatus: string | null = plan?.status ?? null;
   const revisionRemarks: string | null = (page.props as any).revisionRemarks ?? null;
   const draftStorageKey = plan?.id ? `activity_plan_draft_${plan.id}` : 'activity_plan_draft_new';
+  
+  // Comments sidebar state
+  const [showCommentsSidebar, setShowCommentsSidebar] = useState<boolean>(false);
+  
   // PDF generation removed; drafts remain HTML-only
   // CSRF priming to avoid 419 on POST
   const [csrfReady, setCsrfReady] = useState(false);
@@ -2776,6 +2781,7 @@ const App: React.FC = () => {
           </div>
         </div>
       )}
+
       
       {/* Hidden measurement pages (no-print) */}
       <div className="no-print" style={{ position: 'absolute', left: '-9999px', visibility: 'hidden', pointerEvents: 'none' }}>
@@ -2819,7 +2825,22 @@ const App: React.FC = () => {
     />
       </div>
       
-      <div ref={pageContainerRef} className="App">
+      {/* Comments Sidebar - show when plan has PDF URL (generated) */}
+      {plan?.id && (
+        <CommentsSidebar
+          requestId={plan.id}
+          requestType="activity_plan"
+          pdfUrl={plan?.pdf_path ? `/storage/${plan.pdf_path}` : ''}
+          isVisible={showCommentsSidebar}
+          onToggle={() => setShowCommentsSidebar(!showCommentsSidebar)}
+        />
+      )}
+
+      <div
+        ref={pageContainerRef}
+        className={`App ${showCommentsSidebar ? 'mr-[400px]' : ''}`}
+        style={showCommentsSidebar ? { transition: 'margin-right 200ms ease' } : undefined}
+      >
     <GlobalStyles />
   {/* Header settings UI moved to toolbar modal */}
   {!isReadOnly && (

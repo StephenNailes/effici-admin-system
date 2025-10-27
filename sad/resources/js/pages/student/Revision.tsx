@@ -1,7 +1,7 @@
 import MainLayout from '@/layouts/mainlayout'
 import { motion } from 'framer-motion'
 import { Link, router } from '@inertiajs/react'
-import { ArrowLeft, ArrowRight } from "lucide-react"
+import { ArrowLeft, ArrowRight, MessageSquare } from "lucide-react"
 import { FaSearch, FaFilter } from "react-icons/fa"
 import { useState } from 'react'
 import FilterSelect from '@/components/FilterSelect'
@@ -12,7 +12,9 @@ interface Revision {
   title: string
   comment: string
   status: string
-  request_type: string // 'activity' or 'equipment'
+  request_type: string // 'activity_plan' or 'equipment' or 'budget_request'
+  comment_count: number
+  has_multiple_comments: boolean
 }
 
 // Define props for the component
@@ -38,6 +40,15 @@ const getStatusBadge = (status: string) => {
       {displayStatus}
     </span>
   )
+}
+
+const getRequestTypeLabel = (requestType: string) => {
+  const labels: Record<string, string> = {
+    activity_plan: 'Activity Plan',
+    budget_request: 'Budget Request',
+    equipment: 'Equipment Request',
+  }
+  return labels[requestType] || requestType
 }
 
 export default function Revision({ revisions = [] }: RevisionProps) {
@@ -139,7 +150,8 @@ export default function Revision({ revisions = [] }: RevisionProps) {
               value={filterType}
               onChange={setFilterType}
               options={[
-                { value: 'activity', label: 'Activity Plan', colorClass: 'bg-blue-100 text-blue-700' },
+                { value: 'activity_plan', label: 'Activity Plan', colorClass: 'bg-blue-100 text-blue-700' },
+                { value: 'budget_request', label: 'Budget Request', colorClass: 'bg-indigo-100 text-indigo-700' },
                 { value: 'equipment', label: 'Equipment Request', colorClass: 'bg-purple-100 text-purple-700' },
               ]}
             />
@@ -189,10 +201,25 @@ export default function Revision({ revisions = [] }: RevisionProps) {
                       className="border-b border-gray-100 hover:bg-gray-50 transition-colors text-black"
                     >
                       <td className="w-1/4 px-8 py-4 align-middle text-left">
-                        {req.title}
+                        <span className="font-semibold text-gray-900">
+                          {getRequestTypeLabel(req.request_type)}
+                        </span>
+                        <div className="text-sm text-gray-600 mt-1">
+                          {req.title}
+                        </div>
                       </td>
                       <td className="w-1/3 px-8 py-4 align-middle text-left">
-                        {req.comment}
+                        <div className="flex items-start gap-2">
+                          <div className="flex-1">
+                            {req.comment}
+                          </div>
+                          {req.has_multiple_comments && (
+                            <span className="flex-shrink-0 inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-700 border border-blue-300 rounded-full text-xs font-semibold">
+                              <MessageSquare className="w-3 h-3" />
+                              {req.comment_count} comments
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td className="w-1/6 px-8 py-4 align-middle text-left">
                         {getStatusBadge(req.status || 'Revision')}
@@ -213,7 +240,7 @@ export default function Revision({ revisions = [] }: RevisionProps) {
                             }
                           }}
                         >
-                          Revise
+                          {req.has_multiple_comments ? 'View & Revise' : 'Revise'}
                         </motion.button>
                       </td>
                     </motion.tr>
