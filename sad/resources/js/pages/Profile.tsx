@@ -318,8 +318,8 @@ export default function Profile() {
                       </div>
                       </div>
 
-                      {/* School ID Row - Only show for students; placed under Name for consistent spacing */}
-                      {user.role === 'student' && (
+                      {/* School ID Row - Show for students and student officers; placed under Name for consistent spacing */}
+                      {(user.role === 'student' || user.role === 'student_officer') && (
                         <div className="flex items-center gap-4">
                           <Landmark className="text-[#e6232a]/80 w-5 h-5 flex-shrink-0" />
                           <div className="flex flex-col">

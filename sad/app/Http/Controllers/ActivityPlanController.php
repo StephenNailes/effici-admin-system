@@ -388,17 +388,18 @@ class ActivityPlanController extends Controller
             }
 
             try {
-                // Approx A4 preview at small size; scale down for speed
-                // 794x1123 is roughly A4 at 96dpi; adjust smaller for thumbnail
+                // A4 aspect ratio (portrait) is 210mm x 297mm => height/width ≈ 1.414
+                // Use a smaller canvas for performance while keeping the correct ratio
                 $width = 560; // thumbnail width
-                $height = (int) round($width * (11 / 8.5));
+                $height = (int) round($width * (297 / 210)); // ≈ 1.414 ratio
 
                 $b = Browsershot::html($html)
                     ->timeout(30)
                     ->emulateMedia('print')
                     ->waitUntilNetworkIdle()
                     ->windowSize($width, $height)
-                    ->deviceScaleFactor(1)
+                    // Slightly higher scale for crisper thumbnail without large file size
+                    ->deviceScaleFactor(2)
                     ->setScreenshotType('png');
 
                 // Try to capture only the first page when possible
@@ -561,6 +562,7 @@ class ActivityPlanController extends Controller
             return response()->json([
                 'success' => true,
                 'pdf_url' => Storage::url($path),
+                'pdf_path' => $path,
                 'filename' => $filename,
             ]);
         } catch (\Exception $e) {

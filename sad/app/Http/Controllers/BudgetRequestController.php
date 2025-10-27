@@ -295,15 +295,16 @@ class BudgetRequestController extends Controller
             }
 
             try {
+                // A4 portrait ratio (210x297) for correct, non-compressed thumbnails
                 $width = 560;
-                $height = (int) round($width * (11 / 8.5));
+                $height = (int) round($width * (297 / 210));
 
                 $b = Browsershot::html($html)
                     ->timeout(30)
                     ->emulateMedia('print')
                     ->waitUntilNetworkIdle()
                     ->windowSize($width, $height)
-                    ->deviceScaleFactor(1)
+                    ->deviceScaleFactor(2)
                     ->setScreenshotType('png');
 
                 $selectors = ['.page', '#editable-content-page-0', '.ap-scope .page', '[data-page-index="0"]'];
@@ -410,6 +411,7 @@ class BudgetRequestController extends Controller
             return response()->json([
                 'success' => true,
                 'pdf_url' => Storage::url($path),
+                'pdf_path' => $path,
                 'filename' => $filename,
             ]);
         } catch (\Exception $e) {

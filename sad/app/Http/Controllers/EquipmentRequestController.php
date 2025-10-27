@@ -187,7 +187,8 @@ class EquipmentRequestController extends Controller
             ->where('ap.user_id', Auth::id())
             ->select(
                 'ap.id',
-                'ap.category as purpose',
+                'ap.plan_name',
+                'ap.category',
                 'ap.status',
                 'ap.created_at',
                 'ra.approver_role',
@@ -196,6 +197,29 @@ class EquipmentRequestController extends Controller
                 DB::raw("CONCAT(approver.first_name, ' ', approver.last_name) as approver_name")
             )
             ->orderByDesc('ap.created_at')
+            ->get();
+
+        // Get budget requests with approval information
+        $budgetRequests = DB::table('budget_requests as br')
+            ->leftJoin('request_approvals as ra', function($join) {
+                $join->on('br.id', '=', 'ra.request_id')
+                     ->where('ra.request_type', '=', 'budget_request')
+                     ->where('ra.status', '!=', 'pending');
+            })
+            ->leftJoin('users as approver', 'ra.approver_id', '=', 'approver.id')
+            ->where('br.user_id', Auth::id())
+            ->select(
+                'br.id',
+                'br.request_name',
+                'br.category',
+                'br.status',
+                'br.created_at',
+                'ra.approver_role',
+                'ra.status as approval_status',
+                'ra.updated_at as approval_date',
+                DB::raw("CONCAT(approver.first_name, ' ', approver.last_name) as approver_name")
+            )
+            ->orderByDesc('br.created_at')
             ->get();
 
         // Combine and format both types of requests
@@ -254,12 +278,32 @@ class EquipmentRequestController extends Controller
                 'type' => 'Activity Plan',
                 'date' => $req->created_at ? Carbon::parse($req->created_at)->toIso8601String() : null,
                 'status' => ucfirst($req->status),
-                'purpose' => $req->purpose,
+                // Expose title and priority explicitly
+                'purpose' => $req->plan_name, // for legacy UI usage
+                'request_name' => $req->plan_name,
+                'category' => $req->category,
                 'approver_role' => $req->approver_role ? ucwords(str_replace('_', ' ', $req->approver_role)) : null,
                 'approver_name' => $req->approver_name,
                 'approval_status' => $req->approval_status,
                 'approval_date' => $req->approval_date ? Carbon::parse($req->approval_date)->toIso8601String() : null,
                 'items' => [], // Activity plans don't have equipment items
+            ]);
+        }
+
+        foreach ($budgetRequests as $req) {
+            $allRequests->push([
+                'id' => $req->id,
+                'type' => 'Budget Request',
+                'date' => $req->created_at ? Carbon::parse($req->created_at)->toIso8601String() : null,
+                'status' => ucfirst($req->status),
+                'purpose' => $req->request_name ?: ('Budget Request - ' . ucfirst($req->category)),
+                'request_name' => $req->request_name,
+                'category' => $req->category,
+                'approver_role' => $req->approver_role ? ucwords(str_replace('_', ' ', $req->approver_role)) : null,
+                'approver_name' => $req->approver_name,
+                'approval_status' => $req->approval_status,
+                'approval_date' => $req->approval_date ? Carbon::parse($req->approval_date)->toIso8601String() : null,
+                'items' => [], // Budget requests don't have equipment items
             ]);
         }
 

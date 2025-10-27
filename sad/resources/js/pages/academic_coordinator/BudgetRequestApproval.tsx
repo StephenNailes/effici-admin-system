@@ -6,6 +6,7 @@ import axios from "axios";
 import { router } from "@inertiajs/react";
 import PDFPreviewModal from "@/components/PDFPreviewModal";
 import AddPdfCommentsModal from "@/components/AddPdfCommentsModal";
+import CommentSavedModal from "@/components/CommentSavedModal";
 import { toast } from 'react-toastify';
 import ReactSignatureCanvas from 'react-signature-canvas';
 
@@ -34,6 +35,7 @@ export default function BudgetRequestApproval({ id }: Props) {
   const [saving, setSaving] = useState(false);
   const [isPanMode, setIsPanMode] = useState(false);
   const [showCommentViewer, setShowCommentViewer] = useState(false);
+  const [showCommentSaved, setShowCommentSaved] = useState(false);
   const panTimerRef = useRef<number | null>(null);
   const signatureCanvasRef = useRef<ReactSignatureCanvas | null>(null);
   const pdfContainerRef = useRef<HTMLDivElement | null>(null);
@@ -642,7 +644,7 @@ export default function BudgetRequestApproval({ id }: Props) {
                     className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
                   >
                     <MessageSquare className="w-4 h-4" />
-                    Add PDF Comments
+                    Add Comments
                   </button>
                   <button
                     onClick={handleApprove}
@@ -769,7 +771,7 @@ export default function BudgetRequestApproval({ id }: Props) {
                   'Content-Type': 'application/json'
                 }
               });
-              toast.success('Comments saved successfully!');
+              setShowCommentSaved(true);
               setShowCommentViewer(false);
             } catch (error) {
               console.error('Error saving comments:', error);
@@ -778,6 +780,10 @@ export default function BudgetRequestApproval({ id }: Props) {
           }}
         />
       )}
+      <CommentSavedModal 
+        isOpen={showCommentSaved} 
+        onClose={() => setShowCommentSaved(false)} 
+      />
     </MainLayout>
   );
 }

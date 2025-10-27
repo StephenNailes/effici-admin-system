@@ -15,7 +15,7 @@ interface Props {
   selectedCommentId?: string; // For auto-navigating to a specific comment
 }
 
-export default function AddPdfCommentsModal({ isOpen, onClose, pdfUrl, requestId, requestType, isApprover = true, onSaveComments, title = 'Add PDF Comments', selectedCommentId }: Props) {
+export default function AddPdfCommentsModal({ isOpen, onClose, pdfUrl, requestId, requestType, isApprover = true, onSaveComments, title = 'Add Comments', selectedCommentId }: Props) {
   const [existingComments, setExistingComments] = useState<PdfViewerComment[]>([]);
   const [loading, setLoading] = useState(false);
 

@@ -50,11 +50,22 @@ class PdfCommentController extends Controller
 
     /**
      * Get comments for a request
+     * - Approvers only see their own comments
+     * - Students see all comments
      */
     public function index($requestType, $requestId)
     {
-        $comments = PdfComment::where('request_type', $requestType)
-            ->where('request_id', $requestId)
+        $user = Auth::user();
+        $query = PdfComment::where('request_type', $requestType)
+            ->where('request_id', $requestId);
+
+        // If user is an approver, only show their own comments
+        if (in_array($user->role, ['admin_assistant', 'moderator', 'academic_coordinator', 'dean', 'vp_finance'])) {
+            $query->where('approver_role', $user->role);
+        }
+        // Students see all comments from all approvers
+
+        $comments = $query
             ->with('approver:id,first_name,last_name,role')
             ->orderBy('page_number')
             ->orderBy('created_at')

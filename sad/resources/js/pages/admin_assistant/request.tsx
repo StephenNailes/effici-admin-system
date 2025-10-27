@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import MainLayout from "@/layouts/mainlayout";
 import { Search, Eye, FileText, Clock, CheckCircle, Edit, Check, Minus, Inbox, Loader2 } from "lucide-react";
-import RequestPriorityFilterDropdown from "@/components/RequestPriorityFilterDropdown";
+import RequestFilterDropdown from "@/components/RequestFilterDropdown";
 import EquipmentModal from "@/components/EquipmentModal";
 import StockConflictModal from "@/components/StockConflictModal";
 import BatchApprovalModal from "@/components/BatchApprovalModal";
@@ -52,7 +52,7 @@ export default function Request() {
   const [equipment, setEquipment] = useState<EquipmentItem[]>([]);
   const [equipmentLoading, setEquipmentLoading] = useState(true);
   // Using extracted dropdown component now
-  const [filters, setFilters] = useState({ status: "", priority: "" });
+  const [filters, setFilters] = useState({ status: "", priority: "", requestType: "" });
   const [currentPage, setCurrentPage] = useState(1);
   const [stockConflictModalOpen, setStockConflictModalOpen] = useState(false);
   const [stockConflictDetails, setStockConflictDetails] = useState<any>(null);
@@ -414,6 +414,9 @@ export default function Request() {
       );
     })
     .filter((r) =>
+      filters.requestType ? r.request_type?.toLowerCase() === filters.requestType : true
+    )
+    .filter((r) =>
       filters.status ? r.approval_status?.toLowerCase() === filters.status : true
     )
     .filter((r) =>
@@ -531,13 +534,15 @@ export default function Request() {
             />
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5 pointer-events-none" />
           </div>
-          <RequestPriorityFilterDropdown
+          <RequestFilterDropdown
+            status={filters.status}
             priority={filters.priority}
-            onChange={(value) => setFilters(prev => ({ ...prev, priority: value }))}
+            requestType={filters.requestType}
+            onChangeStatus={(value) => setFilters(prev => ({ ...prev, status: value }))}
+            onChangePriority={(value) => setFilters(prev => ({ ...prev, priority: value }))}
+            onChangeRequestType={(value) => setFilters(prev => ({ ...prev, requestType: value }))}
           />
         </motion.div>
-
-  {/* Priority filter dropdown component extracted */}
 
         {/* Batch Actions */}
         {selectedApprovals.length > 0 && (
@@ -651,7 +656,7 @@ export default function Request() {
                       <Inbox className="w-12 h-12 text-gray-300" />
                       <p className="text-sm font-medium">No requests match the current filters.</p>
                       <button
-                        onClick={() => { setFilters({ status: "", priority: "" }); setSearchTerm(""); }}
+                        onClick={() => { setFilters({ status: "", priority: "", requestType: "" }); setSearchTerm(""); }}
                         className="text-xs text-red-600 hover:underline"
                       >
                         Clear filters & search

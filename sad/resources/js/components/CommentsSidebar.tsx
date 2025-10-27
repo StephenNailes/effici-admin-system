@@ -12,6 +12,11 @@ interface CommentsSidebarProps {
   pdfUrl: string;
   isVisible: boolean;
   onToggle: () => void;
+  /**
+   * When true, shows the floating launcher button that opens the sidebar.
+   * Use this to gate visibility based on context (e.g., only under revision inside editor).
+   */
+  showLauncher?: boolean;
 }
 
 export default function CommentsSidebar({ 
@@ -19,7 +24,8 @@ export default function CommentsSidebar({
   requestType, 
   pdfUrl, 
   isVisible, 
-  onToggle 
+  onToggle,
+  showLauncher = false,
 }: CommentsSidebarProps) {
   const [comments, setComments] = useState<CommentCardData[]>([]);
   const [selectedComment, setSelectedComment] = useState<CommentCardData | null>(null);
@@ -151,8 +157,8 @@ export default function CommentsSidebar({
         allComments={transformedComments}
       />
 
-      {/* Floating Show button (only when sidebar is hidden) */}
-      {!isVisible && (
+      {/* Floating Show button (only when sidebar is hidden and launcher enabled) */}
+      {!isVisible && showLauncher && (
         <motion.button
           initial={{ opacity: 0, x: 20 }}
           animate={{ opacity: 1, x: 0 }}

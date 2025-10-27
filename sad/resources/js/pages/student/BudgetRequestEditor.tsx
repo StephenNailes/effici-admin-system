@@ -12,6 +12,7 @@ import HeaderSettingsModal from "@/components/HeaderSettingsModal";
 import InfoModal from "@/components/InfoModal";
 import UnsavedChangesModal from "@/components/UnsavedChangesModal";
 import GeneratePdfConfirmModal from "@/components/GeneratePdfConfirmModal";
+import PdfRequiredModal from "@/components/PdfRequiredModal";
 // Local type definitions (no external template export/generation)
 export type Member = { name: string; role: string };
 export type Signatory = { name: string; position: string };
@@ -1159,9 +1160,10 @@ interface SignatoriesProps {
   innerRef?: React.RefObject<HTMLDivElement | null>;
   signatures?: Array<{id: string; data: string; x: number; y: number}>;
   onSignatureMove?: (id: string, x: number, y: number) => void;
+  onSignatureRemove?: (id: string) => void;
 }
 
-const Signatories: React.FC<SignatoriesProps> = ({ signatories, onAdd, onDelete, innerRef, signatures = [], onSignatureMove }) => {
+const Signatories: React.FC<SignatoriesProps> = ({ signatories, onAdd, onDelete, innerRef, signatures = [], onSignatureMove, onSignatureRemove }) => {
   const [addingTo, setAddingTo] = useState<string | null>(null);
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const dragOffsetRef = useRef<{dx: number; dy: number}>({ dx: 0, dy: 0 });
@@ -1170,33 +1172,29 @@ const Signatories: React.FC<SignatoriesProps> = ({ signatories, onAdd, onDelete,
   // Attach global mousemove/mouseup while dragging
   useEffect(() => {
     const handleMove = (e: MouseEvent) => {
-      if (!draggingId || !onSignatureMove || !innerRef?.current || !preparedByRef?.current) return;
+      if (!draggingId || !onSignatureMove || !innerRef?.current) return;
       const containerEl = innerRef.current;
-      const preparedByEl = preparedByRef.current;
-      
-      // Get bounding rects
+
+      // Get bounding rect for the entire signatories area (container)
       const containerRect = containerEl.getBoundingClientRect();
-      const preparedByRect = preparedByEl.getBoundingClientRect();
-      
+
       // Adjust for CSS transform scale applied to pages wrapper (zoom)
       const scaleX = containerRect.width / (containerEl.offsetWidth || containerRect.width);
       const scaleY = containerRect.height / (containerEl.offsetHeight || containerRect.height);
-      
+
       // Compute position relative to container (for absolute positioning)
       let newX = (e.clientX - containerRect.left) / (scaleX || 1) - dragOffsetRef.current.dx;
       let newY = (e.clientY - containerRect.top) / (scaleY || 1) - dragOffsetRef.current.dy;
-      
-      // Calculate "Prepared by:" section bounds relative to container
-      const preparedByTop = (preparedByRect.top - containerRect.top) / (scaleY || 1);
-      const preparedByLeft = (preparedByRect.left - containerRect.left) / (scaleX || 1);
-      const preparedByWidth = preparedByRect.width / (scaleX || 1);
-      const preparedByHeight = preparedByRect.height / (scaleY || 1);
-      
-      // Clamp within "Prepared by:" section only
+
+      // Clamp within the signatories container
       const margin = 5;
-      newX = Math.max(preparedByLeft - margin, Math.min(preparedByLeft + preparedByWidth - 1 + margin, newX));
-      newY = Math.max(preparedByTop - margin, Math.min(preparedByTop + preparedByHeight - 1 + margin, newY));
-      
+      const left = 0 + margin;
+      const top = 0 + margin;
+      const width = (containerEl.offsetWidth || containerRect.width) - margin * 2;
+      const height = (containerEl.offsetHeight || containerRect.height) - margin * 2;
+      newX = Math.max(left, Math.min(left + width - 1, newX));
+      newY = Math.max(top, Math.min(top + height - 1, newY));
+
       onSignatureMove(draggingId, newX, newY);
     };
     const handleUp = () => {
@@ -1245,7 +1243,25 @@ const Signatories: React.FC<SignatoriesProps> = ({ signatories, onAdd, onDelete,
             }
           }}
         >
-          <img src={sig.data} alt="E-Signature" style={{ maxWidth: '240px', display: 'block', pointerEvents: 'none' }} />
+          <div className="relative group">
+            <img src={sig.data} alt="E-Signature" style={{ maxWidth: '240px', display: 'block', pointerEvents: 'none' }} />
+            {onSignatureRemove && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onSignatureRemove(sig.id);
+                }}
+                onMouseDown={(e) => e.stopPropagation()}
+                className="no-print absolute -top-2 -right-2 bg-red-500 hover:bg-red-600 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                title="Remove signature"
+                style={{ pointerEvents: 'auto' }}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                </svg>
+              </button>
+            )}
+          </div>
         </div>
       ))}
       
@@ -1279,8 +1295,8 @@ const Signatories: React.FC<SignatoriesProps> = ({ signatories, onAdd, onDelete,
                         ) : (
                             // Only show "+ Add Signatory" button if:
                             // - Category is NOT "Prepared by:" OR
-                            // - Category is "Prepared by:" AND no people added yet
-                            (category !== "Prepared by:" || people.length === 0) && (
+                            // - Category is "Prepared by:" AND fewer than 2 people added
+                            (category !== "Prepared by:" || people.length < 2) && (
                                 <div className="pt-2">
                                     <button 
                       onClick={() => setAddingTo(category)}
@@ -1548,6 +1564,8 @@ const App: React.FC = () => {
   const [signatures, setSignatures] = useState<Array<{id: string; data: string; x: number; y: number}>>([]);
   const [showSubmissionModal, setShowSubmissionModal] = useState(false);
   const [showSignatureWarning, setShowSignatureWarning] = useState(false);
+  const [showPdfRequiredModal, setShowPdfRequiredModal] = useState(false);
+  const [currentPdfPath, setCurrentPdfPath] = useState<string | null>(plan?.pdf_path || null);
   const [isSaving, setIsSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
@@ -1592,10 +1610,18 @@ const App: React.FC = () => {
   const handleDeleteMember = (index: number) => setMembers(members.filter((_, i) => i !== index));
   
   const handleAddSignatory = (category: string, name: string, position: string) => {
-    setSignatories(prev => ({
+    setSignatories(prev => {
+      const current = prev[category] ?? [];
+      if (category === "Prepared by:" && current.length >= 2) {
+        // Enforce maximum of 2 for Prepared by
+        try { toast.warning('Prepared by can only have up to 2 persons.'); } catch {}
+        return prev;
+      }
+      return {
         ...prev,
-        [category]: [...prev[category], { name, position }]
-    }));
+        [category]: [...current, { name, position }]
+      };
+    });
   };
 
   const handleDeleteSignatory = (category: string, index: number) => {
@@ -1664,8 +1690,9 @@ const App: React.FC = () => {
           "Prepared by:": [],
           "Noted by:": [
             { name: "MR. CEASAR IAN P. BENABLO, MIT", position: "Dean, College of Computer Studies" },
+            { name: "MR. MICHEL B. BOLO", position: "Academic Coordinator, College of Computer Studies" },
           ],
-          "Approved by:": []
+          "Approved by:": [ { name: "S. MA. CAROLINA ANIMAS, RVM", position: "Vice President for Finance" }]
         });
         setSignatures([]);
         setHeaderEmail('sites@uic.edu.ph');
@@ -1814,8 +1841,8 @@ const App: React.FC = () => {
   };
 
   const handleToolbarStartSignature = (range: Range | null) => {
-    // Check if a signature already exists
-    if (signatures.length > 0) {
+    // Check if already have 2 signatures (maximum for Prepared by)
+    if (signatures.length >= 2) {
       setShowSignatureWarning(true);
       return;
     }
@@ -1863,7 +1890,13 @@ const App: React.FC = () => {
     setSignatures(prev => prev.map(sig => 
       sig.id === id ? { ...sig, x, y } : sig
     ));
-  };  const handleCancelSignature = () => {
+  };
+
+  const handleRemoveSignature = (id: string) => {
+    setSignatures(prev => prev.filter(sig => sig.id !== id));
+  };
+
+  const handleCancelSignature = () => {
     setShowSignatureCanvas(false);
     setSignatureRole(null);
   };
@@ -2086,6 +2119,10 @@ const App: React.FC = () => {
 
       if (response.data.success) {
         setShowPdfSuccess(true);
+        // Update the current PDF path so submission can proceed
+        if (response.data.pdf_path) {
+          setCurrentPdfPath(response.data.pdf_path);
+        }
         // Optionally download the PDF
         window.open(response.data.pdf_url, '_blank');
       } else {
@@ -2227,15 +2264,12 @@ const App: React.FC = () => {
       if (response.data.success) {
         // Also store in localStorage as backup
         localStorage.setItem(draftStorageKey, JSON.stringify(draftData));
-        // Show toast notification
+        
+        // Always show toast notification on explicit save
         if (isUnderRevision) {
-          // Under revision: explicitly inform that changes were saved without status change
           toast.success('Changes saved');
         } else {
-          // For drafts: keep existing behavior (first explicit save only)
-          if (!lastSaved) {
-            toast.success('Draft saved');
-          }
+          toast.success('Draft saved');
         }
 
         setLastSaved(new Date());
@@ -2338,12 +2372,37 @@ const App: React.FC = () => {
     }
   }, [plan?.id, isSaving, pages, members, signatories, signatures, headerEmail, headerSociety, draftStorageKey]);
 
-  // Mark as having unsaved changes when content changes
+  // Mark as having unsaved changes when content actually differs from last save
   useEffect(() => {
-    if (pages.length > 0) {
+    // Skip if no data loaded yet
+    if (!isDataLoaded) return;
+    
+    // If there's no baseline snapshot yet (brand new document), any content means unsaved changes
+    if (!lastSavedSnapshot) {
+      const hasContent = pages.length > 0;
+      setHasUnsavedChanges(hasContent);
+      return;
+    }
+    
+    // For existing documents with a baseline, compare snapshots
+    try {
+      const currentSnapshot = JSON.stringify({
+        pages,
+        members,
+        signatories,
+        signatures,
+        headerEmail,
+        headerSociety,
+      });
+      
+      // Set unsaved changes flag based on whether content differs from saved state
+      const hasChanges = currentSnapshot !== lastSavedSnapshot;
+      setHasUnsavedChanges(hasChanges);
+    } catch (e) {
+      // If JSON.stringify fails, assume changes exist
       setHasUnsavedChanges(true);
     }
-  }, [pages, members, signatories]);
+  }, [pages, members, signatories, signatures, headerEmail, headerSociety, lastSavedSnapshot, isDataLoaded]);
 
   // Keyboard shortcut for saving (Ctrl+S / Cmd+S)
   useEffect(() => {
@@ -2817,14 +2876,15 @@ const App: React.FC = () => {
     />
       </div>
       
-      {/* Comments Sidebar - show when plan has PDF URL (generated) */}
-      {plan?.id && (
+      {/* Comments Sidebar - only show launcher when under revision */}
+      {plan?.id && isUnderRevision && (
         <CommentsSidebar
           requestId={plan.id}
           requestType="budget_request"
           pdfUrl={plan?.pdf_path ? `/storage/${plan.pdf_path}` : ''}
           isVisible={showCommentsSidebar}
           onToggle={() => setShowCommentsSidebar(!showCommentsSidebar)}
+          showLauncher={true}
         />
       )}
 
@@ -2845,6 +2905,12 @@ const App: React.FC = () => {
   onGeneratePDF={openGeneratePDFConfirm}
       onOpenHeaderSettings={() => setIsHeaderSettingsOpen(true)}
       onSubmit={() => {
+        // Check if PDF has been generated before allowing submission
+        if (!currentPdfPath) {
+          setShowPdfRequiredModal(true);
+          return;
+        }
+        
         // Under revision: show warning modal; otherwise show full submission modal
         if (isUnderRevision) {
           setShowRevisionSubmitWarning(true);
@@ -2870,8 +2936,10 @@ const App: React.FC = () => {
                         signatories={signatories}
                         onAdd={handleAddSignatory}
                         onDelete={handleDeleteSignatory}
+                        innerRef={signatoriesRef}
                         signatures={signatures}
                         onSignatureMove={handleSignatureMove}
+                        onSignatureRemove={handleRemoveSignature}
                     />
                   }
                   headerEmail={headerEmail}
@@ -2974,6 +3042,13 @@ const App: React.FC = () => {
         processing={pdfGenerating}
         onCancel={() => setShowGeneratePdfConfirm(false)}
         onConfirm={handleGeneratePDF}
+      />
+
+      {/* PDF Required Modal - shown when trying to submit without PDF */}
+      <PdfRequiredModal
+        isOpen={showPdfRequiredModal}
+        onClose={() => setShowPdfRequiredModal(false)}
+        onGeneratePdf={handleGeneratePDF}
       />
 
       {/* Under-revision resubmission warning */}

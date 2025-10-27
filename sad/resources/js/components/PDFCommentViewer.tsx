@@ -49,6 +49,7 @@ export default function PDFCommentViewer({
   const [responseText, setResponseText] = useState('');
   const [isCommentMode, setIsCommentMode] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [pageRendered, setPageRendered] = useState(false);
   
   // Rectangle drawing state
   const [isDrawing, setIsDrawing] = useState(false);
@@ -83,6 +84,7 @@ export default function PDFCommentViewer({
     if (pdfContainerRef.current) {
       pdfContainerRef.current.scrollTo({ top: 0, left: 0, behavior: 'auto' });
     }
+    setPageRendered(false);
   }, [currentPage]);
 
   const handleMouseDown = (e: React.MouseEvent) => {
@@ -243,7 +245,6 @@ export default function PDFCommentViewer({
         await (maybePromise as Promise<void>);
       }
       setIsCommentMode(false);
-      alert('Comments saved successfully!');
     } catch (error) {
       console.error('Error saving comments:', error);
       alert('Failed to save comments. Please try again.');
@@ -254,6 +255,14 @@ export default function PDFCommentViewer({
 
   const getCommentsByPage = (page: number) => {
     return comments.filter(c => c.pageNumber === page);
+  };
+
+  // Navigate to comment's page when clicked in sidebar
+  const handleCommentClick = (comment: PdfViewerComment) => {
+    if (comment.pageNumber !== currentPage) {
+      setCurrentPage(comment.pageNumber);
+    }
+    setSelectedComment(comment);
   };
 
   // Styling helpers for overlays and chips
@@ -362,6 +371,7 @@ export default function PDFCommentViewer({
                   renderTextLayer={true}
                   renderAnnotationLayer={true}
                   className="shadow-2xl"
+                  onRenderSuccess={() => setPageRendered(true)}
                 />
               </Document>
 
@@ -379,18 +389,16 @@ export default function PDFCommentViewer({
             )}
 
             {/* Render existing comments as overlays */}
-            {getCommentsByPage(currentPage).map((comment, idx) => {
-              if (!pageRef.current) return null;
-              const rect = pageRef.current.getBoundingClientRect();
+            {pageRendered && getCommentsByPage(currentPage).map((comment, idx) => {
               return (
                 <div
                   key={comment.id}
                   className={`absolute border-2 ${getOverlayClasses(comment.status)} cursor-pointer transition-all`}
                   style={{
-                    left: `${(comment.x / 100) * rect.width}px`,
-                    top: `${(comment.y / 100) * rect.height}px`,
-                    width: `${(comment.width / 100) * rect.width}px`,
-                    height: `${(comment.height / 100) * rect.height}px`,
+                    left: `${comment.x}%`,
+                    top: `${comment.y}%`,
+                    width: `${comment.width}%`,
+                    height: `${comment.height}%`,
                   }}
                   onClick={(e) => {
                     e.stopPropagation();
@@ -436,9 +444,10 @@ export default function PDFCommentViewer({
             comments.map((comment, idx) => (
               <div
                 key={comment.id}
-                className={`border rounded-lg p-3 ${
-                  selectedComment?.id === comment.id ? 'ring-2 ring-blue-500' : ''
+                className={`border rounded-lg p-3 cursor-pointer transition-all ${
+                  selectedComment?.id === comment.id ? 'ring-2 ring-blue-500 bg-blue-50' : 'hover:bg-gray-50'
                 }`}
+                onClick={() => handleCommentClick(comment)}
               >
                 {/* Comment Header */}
                 <div className="flex items-start justify-between mb-2">
@@ -461,7 +470,10 @@ export default function PDFCommentViewer({
                     </span>
                     {isApprover && !comment.studentResponse && (
                       <button
-                        onClick={() => deleteComment(comment.id)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          deleteComment(comment.id);
+                        }}
                         className="text-red-600 hover:text-red-800 text-xs font-bold px-1"
                         title="Delete comment"
                       >
@@ -478,6 +490,7 @@ export default function PDFCommentViewer({
                     rows={3}
                     placeholder="Enter your comment..."
                     value={comment.text}
+                    onClick={(e) => e.stopPropagation()}
                     onChange={(e) => updateCommentText(comment.id, e.target.value)}
                     autoFocus
                   />
@@ -495,7 +508,7 @@ export default function PDFCommentViewer({
 
                 {/* Student Response Input */}
                 {!isApprover && comment.status === 'pending' && (
-                  <div className="mt-2">
+                  <div className="mt-2" onClick={(e) => e.stopPropagation()}>
                     <textarea
                       className="w-full p-2 border rounded text-sm outline-none focus:outline-none focus:ring-2 focus:ring-blue-500"
                       rows={2}
@@ -519,7 +532,10 @@ export default function PDFCommentViewer({
                 {/* Approver Actions - ONLY FOR APPROVERS */}
                 {isApprover && comment.studentResponse && comment.status === 'addressed' && (
                   <button
-                    onClick={() => handleResolveComment(comment.id)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleResolveComment(comment.id);
+                    }}
                     className="mt-2 px-3 py-1 bg-green-600 text-white text-sm rounded hover:bg-green-700 flex items-center gap-1"
                   >
                     <Check className="w-3 h-3" />

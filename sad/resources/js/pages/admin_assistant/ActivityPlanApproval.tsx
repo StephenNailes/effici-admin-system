@@ -6,6 +6,7 @@ import axios from "axios";
 import { router } from "@inertiajs/react";
 import PDFPreviewModal from "@/components/PDFPreviewModal";
 import AddPdfCommentsModal from "@/components/AddPdfCommentsModal";
+import CommentSavedModal from "@/components/CommentSavedModal";
 import { toast } from 'react-toastify';
 
 interface Props {
@@ -19,6 +20,7 @@ export default function ActivityPlanApproval({ id }: Props) {
   const [submitting, setSubmitting] = useState(false);
   const [showPdf, setShowPdf] = useState(false);
   const [showCommentViewer, setShowCommentViewer] = useState(false);
+  const [showCommentSaved, setShowCommentSaved] = useState(false);
 
   useEffect(() => {
     axios
@@ -283,7 +285,7 @@ export default function ActivityPlanApproval({ id }: Props) {
                       className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
                     >
                       <MessageSquare className="w-4 h-4" />
-                      Add PDF Comments
+                      Add Comments
                     </button>
                     <button
                       onClick={handleApprove}
@@ -349,7 +351,7 @@ export default function ActivityPlanApproval({ id }: Props) {
                   'Content-Type': 'application/json'
                 }
               });
-              toast.success('Comments saved successfully!');
+              setShowCommentSaved(true);
               setShowCommentViewer(false);
             } catch (error) {
               console.error('Error saving comments:', error);
@@ -358,6 +360,11 @@ export default function ActivityPlanApproval({ id }: Props) {
           }}
         />
       )}
+
+      <CommentSavedModal
+        isOpen={showCommentSaved}
+        onClose={() => setShowCommentSaved(false)}
+      />
     </MainLayout>
   );
 }
