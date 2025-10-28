@@ -53,7 +53,12 @@ RUN apk add --no-cache \
     libjpeg-turbo \
     libwebp \
     icu-libs \
+    nodejs \
+    npm \
     && rm -rf /var/cache/apk/*
+
+# Install Puppeteer globally for Browsershot
+RUN npm install -g puppeteer@latest --unsafe-perm=true --allow-root
 
 # Install build dependencies and PHP extensions, then remove build deps
 RUN apk add --no-cache --virtual .build-deps \
@@ -118,7 +123,11 @@ RUN chmod +x /usr/local/bin/entrypoint.sh \
 
 # Set Chromium environment for Browsershot
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
-    PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser
+    PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser \
+    NODE_PATH=/usr/lib/node_modules
+
+# Create chromium-browser symlink if it doesn't exist
+RUN ln -sf /usr/bin/chromium /usr/bin/chromium-browser || true
 
 # Expose port
 EXPOSE 8080
