@@ -21,7 +21,7 @@ export default function ActivityLog() {
   const logsPerPage = 8;
 
   const allRequests = logs || [];
-  console.log("Logs from Laravel:", logs);
+  // console.log("Logs from Laravel:", logs); // removed noisy debug log
   // 🔍 Filtering
   const filteredRequests = allRequests.filter((req) => {
     const matchesSearch =
@@ -46,19 +46,48 @@ export default function ActivityLog() {
   );
 
   const getStatusBadge = (status: string) => {
-    const colors: Record<string, string> = {
-      Approved: "bg-green-100 text-green-700 border-green-300",
-      Pending: "bg-yellow-100 text-yellow-700 border-yellow-300",
+    const raw = (status || '').toString();
+    const key = raw.trim().toLowerCase().replace(/\s+/g, '_');
+    // Human-friendly label: snake_case -> Title Case
+    const label = raw
+      .trim()
+      .replace(/_/g, ' ')
+      .replace(/\b\w/g, (c) => c.toUpperCase());
 
-      Completed: "bg-green-100 text-green-800 border-green-400",
+    // Unified color map covering common statuses in the system
+    const colorMap: Record<string, string> = {
+      approved: 'bg-green-100 text-green-700 border-green-300',
+      pending: 'bg-yellow-100 text-yellow-700 border-yellow-300',
+      completed: 'bg-emerald-100 text-emerald-700 border-emerald-300',
+      revision_requested: 'bg-rose-100 text-rose-700 border-rose-300',
+      under_revision: 'bg-rose-100 text-rose-700 border-rose-300',
+      denied: 'bg-red-100 text-red-700 border-red-300',
+      cancelled: 'bg-gray-200 text-gray-700 border-gray-300',
+      canceled: 'bg-gray-200 text-gray-700 border-gray-300', // alt spelling
+      overdue: 'bg-red-100 text-red-700 border-red-300',
+      returned: 'bg-indigo-100 text-indigo-700 border-indigo-300',
+      checked_out: 'bg-blue-100 text-blue-700 border-blue-300', // improved design
+      checkedout: 'bg-blue-100 text-blue-700 border-blue-300',
     };
+
+    const classes = colorMap[key] || 'bg-gray-100 text-gray-700 border-gray-300';
+
     return (
       <span
-        className={`px-3 py-1 rounded-full text-sm font-semibold border ${
-          colors[status] || "bg-gray-100 text-gray-700 border-gray-300"
-        }`}
+        className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-sm font-semibold border ${classes}`}
       >
-        {status}
+        <span className={`h-2 w-2 rounded-full ${
+          key === 'approved' ? 'bg-green-500' :
+          key === 'pending' ? 'bg-yellow-500' :
+          key === 'completed' ? 'bg-emerald-500' :
+          key === 'revision_requested' || key === 'under_revision' ? 'bg-rose-500' :
+          key === 'checked_out' || key === 'checkedout' ? 'bg-blue-500' :
+          key === 'returned' ? 'bg-indigo-500' :
+          key === 'overdue' || key === 'denied' ? 'bg-red-500' :
+          key === 'cancelled' || key === 'canceled' ? 'bg-gray-500' :
+          'bg-gray-400'
+        }`} />
+        {label}
       </span>
     );
   };
