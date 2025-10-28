@@ -20,14 +20,15 @@ php artisan tinker --execute="DB::connection()->getPdo(); echo 'Database connect
 # Show Laravel version
 php artisan --version
 
-# Clear any cached config and optimize for production
-echo "Optimizing application..."
-php artisan config:clear || true
+# Clear all caches (important for fresh start)
+echo "Clearing caches..."
 php artisan cache:clear || true
+php artisan config:clear || true
+php artisan route:clear || true
 php artisan view:clear || true
-php artisan config:cache || echo "WARNING: Config cache failed"
-php artisan route:cache || echo "WARNING: Route cache failed"
-php artisan view:cache || echo "WARNING: View cache failed"
+
+# Note: Not caching config in Docker because it causes cache path issues
+# Laravel will work fine without cached config, just slightly slower
 
 echo "Application ready!"
 

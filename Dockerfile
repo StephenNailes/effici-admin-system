@@ -72,8 +72,16 @@ COPY --from=frontend-builder /app/public/build ./public/build
 # Complete Composer installation and set permissions in single layer
 RUN composer dump-autoload --optimize --no-dev \
     && chown -R www-data:www-data /var/www/html \
-    && mkdir -p storage/logs storage/framework/{cache,sessions,views} storage/app/public \
-    && chmod -R 775 storage bootstrap/cache \
+    && mkdir -p storage/logs \
+    && mkdir -p storage/framework/cache/data \
+    && mkdir -p storage/framework/sessions \
+    && mkdir -p storage/framework/views \
+    && mkdir -p storage/app/public \
+    && mkdir -p bootstrap/cache \
+    && chmod -R 775 storage \
+    && chmod -R 775 bootstrap/cache \
+    && chown -R www-data:www-data storage \
+    && chown -R www-data:www-data bootstrap/cache \
     && mkdir -p /var/log/supervisor \
     && chown -R www-data:www-data /var/log/supervisor \
     && php artisan storage:link || true
