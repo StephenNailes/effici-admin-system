@@ -345,10 +345,21 @@ class BudgetRequestController extends Controller
         $html = $validated['html'];
 
         try {
-            $pdf = Browsershot::html($html)
-                ->setNodeBinary(config('browsershot.node_binary', 'node'))
-                ->setNpmBinary(config('browsershot.npm_binary', 'npm'))
-                ->format('A4')
+            $browsershot = Browsershot::html($html);
+            
+            // Set paths based on environment (Linux production vs Windows local)
+            if (PHP_OS_FAMILY === 'Linux') {
+                $browsershot->setNodeBinary('/usr/bin/node')
+                    ->setNpmBinary('/usr/bin/npm')
+                    ->setIncludePath('$PATH:/usr/local/bin:/usr/bin')
+                    ->setNodeModulePath('/usr/lib/node_modules');
+            } else {
+                // Use default node/npm from PATH on Windows
+                $browsershot->setNodeBinary('node')
+                    ->setNpmBinary('npm');
+            }
+            
+            $pdf = $browsershot->format('A4')
                 ->margins(0, 0, 0, 0)
                 ->showBackground()
                 ->emulateMedia('print')
@@ -392,10 +403,21 @@ class BudgetRequestController extends Controller
         $html = $validated['html'];
 
         try {
-            $pdf = Browsershot::html($html)
-                ->setNodeBinary(config('browsershot.node_binary', 'node'))
-                ->setNpmBinary(config('browsershot.npm_binary', 'npm'))
-                ->format('A4')
+            $browsershot = Browsershot::html($html);
+            
+            // Set paths based on environment (Linux production vs Windows local)
+            if (PHP_OS_FAMILY === 'Linux') {
+                $browsershot->setNodeBinary('/usr/bin/node')
+                    ->setNpmBinary('/usr/bin/npm')
+                    ->setIncludePath('$PATH:/usr/local/bin:/usr/bin')
+                    ->setNodeModulePath('/usr/lib/node_modules');
+            } else {
+                // Use default node/npm from PATH on Windows
+                $browsershot->setNodeBinary('node')
+                    ->setNpmBinary('npm');
+            }
+            
+            $pdf = $browsershot->format('A4')
                 ->margins(0, 0, 0, 0)
                 ->showBackground()
                 ->emulateMedia('print')

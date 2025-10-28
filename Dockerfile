@@ -124,10 +124,13 @@ RUN chmod +x /usr/local/bin/entrypoint.sh \
 # Set Chromium environment for Browsershot
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
     PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser \
-    NODE_PATH=/usr/lib/node_modules
+    NODE_PATH=/usr/lib/node_modules \
+    PATH="/usr/local/bin:/usr/bin:$PATH"
 
 # Create chromium-browser symlink if it doesn't exist
-RUN ln -sf /usr/bin/chromium /usr/bin/chromium-browser || true
+RUN ln -sf /usr/bin/chromium /usr/bin/chromium-browser || true \
+    && which node && which npm \
+    && node --version && npm --version
 
 # Expose port
 EXPOSE 8080
