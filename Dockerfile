@@ -9,11 +9,27 @@ COPY sad/package*.json ./
 # Install dependencies
 RUN npm ci --silent
 
-# Copy frontend source and config
-COPY sad/resources ./resources
-COPY sad/public ./public
+# Copy necessary Laravel files for Vite build
+COPY sad/artisan ./artisan
 COPY sad/vite.config.ts ./vite.config.ts
 COPY sad/tsconfig.json ./tsconfig.json
+
+# Copy frontend source
+COPY sad/resources ./resources
+COPY sad/public ./public
+
+# Copy composer files and install Ziggy (required for Vite build)
+COPY sad/composer.json sad/composer.lock ./
+RUN apk add --no-cache php83 php83-tokenizer php83-xml php83-dom php83-xmlwriter php83-simplexml \
+    && ln -s /usr/bin/php83 /usr/bin/php \
+    && php -r "copy('https://getcomposer.org/installer', 'composer-setup.php');" \
+    && php composer-setup.php --install-dir=/usr/local/bin --filename=composer \
+    && rm composer-setup.php \
+    && composer install --no-dev --no-scripts --no-autoloader --prefer-dist \
+    && composer dump-autoload
+
+# Create .env file for Vite build (Vite needs this)
+RUN echo "VITE_APP_NAME=EfficiAdmin" > .env
 
 # Build frontend assets
 RUN npm run build
