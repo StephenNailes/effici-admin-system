@@ -15,31 +15,26 @@ return new class extends Migration
             $table->id();
             $table->enum('request_type', ['activity_plan', 'budget_request']);
             $table->unsignedBigInteger('request_id');
-            $table->unsignedBigInteger('approver_id');
-            $table->enum('approver_role', ['admin_assistant', 'moderator', 'academic_coordinator', 'dean', 'vp_finance']);
-            
-            // Page and region coordinates (percentage-based for consistency across PDF regenerations)
+            $table->foreignId('approver_id')->constrained('users')->onDelete('cascade');
+            $table->enum('approver_role', [
+                'admin_assistant',
+                'moderator',
+                'academic_coordinator',
+                'dean',
+                'vp_finance'
+            ]);
             $table->integer('page_number')->default(1);
-            $table->float('region_x1_pct'); // Percentage from left (0-100)
-            $table->float('region_y1_pct'); // Percentage from top (0-100)
-            $table->float('region_x2_pct'); // Percentage from left (0-100)
-            $table->float('region_y2_pct'); // Percentage from top (0-100)
-            
-            // Comment content
+            $table->double('region_x1_pct');
+            $table->double('region_y1_pct');
+            $table->double('region_x2_pct');
+            $table->double('region_y2_pct');
             $table->text('comment_text');
-            
-            // Resolution workflow
             $table->enum('status', ['pending', 'addressed', 'resolved'])->default('pending');
             $table->text('student_response')->nullable();
             $table->timestamp('responded_at')->nullable();
             $table->timestamp('resolved_at')->nullable();
-            
             $table->timestamps();
             
-            // Foreign keys
-            $table->foreign('approver_id')->references('id')->on('users')->onDelete('cascade');
-            
-            // Indexes
             $table->index(['request_type', 'request_id']);
             $table->index('status');
         });

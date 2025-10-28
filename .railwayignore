@@ -1,0 +1,10 @@
+sad/node_modules
+sad/vendor
+sad/storage/logs
+sad/storage/framework/cache
+sad/storage/framework/sessions
+sad/storage/framework/views
+sad/.env
+sad/.env.example
+sad/.git
+sad/tests
