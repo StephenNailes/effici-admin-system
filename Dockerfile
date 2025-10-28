@@ -66,7 +66,9 @@ RUN chown -R www-data:www-data /var/www/html \
     && chmod -R 755 /var/www/html/storage \
     && chmod -R 755 /var/www/html/bootstrap/cache \
     && mkdir -p /var/log/supervisor \
-    && chown -R www-data:www-data /var/log/supervisor
+    && chown -R www-data:www-data /var/log/supervisor \
+    && cd /var/www/html \
+    && php artisan storage:link || true
 
 # Configure Nginx
 COPY docker/nginx.conf /etc/nginx/nginx.conf

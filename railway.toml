@@ -3,7 +3,7 @@ builder = "dockerfile"
 dockerfilePath = "Dockerfile"
 
 [deploy]
-startCommand = "sh -c 'cd /var/www/html && (php artisan storage:link 2>/dev/null || true) && /usr/bin/supervisord -c /etc/supervisord.conf'"
+startCommand = "/usr/bin/supervisord -c /etc/supervisord.conf"
 healthcheckPath = "/health"
 healthcheckTimeout = 100
 restartPolicyType = "ON_FAILURE"
