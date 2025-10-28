@@ -9,12 +9,10 @@ COPY sad/package*.json ./
 # Install dependencies
 RUN npm ci --silent
 
-# Copy frontend source
+# Copy frontend source and config
 COPY sad/resources ./resources
 COPY sad/vite.config.ts ./vite.config.ts
 COPY sad/tsconfig.json ./tsconfig.json
-COPY sad/tailwind.config.js ./tailwind.config.js
-COPY sad/postcss.config.js ./postcss.config.js
 
 # Build frontend assets
 RUN npm run build
