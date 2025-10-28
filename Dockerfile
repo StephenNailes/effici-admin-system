@@ -40,11 +40,12 @@ RUN apk add --no-cache \
     libjpeg-turbo-dev \
     libwebp-dev \
     libxpm-dev \
+    icu-dev \
     && rm -rf /var/cache/apk/*
 
 # Install PHP extensions
 RUN docker-php-ext-configure gd --with-freetype --with-jpeg --with-webp \
-    && docker-php-ext-install -j$(nproc) gd pdo pdo_mysql bcmath opcache
+    && docker-php-ext-install -j$(nproc) gd pdo pdo_mysql bcmath opcache intl
 
 # Install Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer

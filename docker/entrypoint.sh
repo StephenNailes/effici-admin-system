@@ -10,9 +10,9 @@ if [ -z "$APP_KEY" ]; then
     exit 1
 fi
 
-# Test database connection
+# Test database connection with a simple query
 echo "Testing database connection..."
-php artisan db:show || echo "WARNING: Database connection failed"
+php artisan tinker --execute="DB::connection()->getPdo(); echo 'Database connected successfully';" || echo "WARNING: Database connection test failed"
 
 # Show Laravel version
 php artisan --version
