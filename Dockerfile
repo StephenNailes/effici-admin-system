@@ -80,6 +80,10 @@ COPY docker/default.conf /etc/nginx/http.d/default.conf
 # Configure Supervisor
 COPY docker/supervisord.conf /etc/supervisord.conf
 
+# Copy entrypoint script
+COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
+
 # Configure PHP
 RUN echo "opcache.enable=1" >> /usr/local/etc/php/conf.d/opcache.ini \
     && echo "opcache.memory_consumption=256" >> /usr/local/etc/php/conf.d/opcache.ini \
@@ -92,6 +96,13 @@ ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
 
 # Expose port
 EXPOSE 8080
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=40s \
+    CMD wget --no-verbose --tries=1 --spider http://localhost:8080/health || exit 1
+
+# Start supervisor
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=40s \
