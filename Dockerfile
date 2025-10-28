@@ -11,6 +11,7 @@ RUN npm ci --silent
 
 # Copy frontend source and config
 COPY sad/resources ./resources
+COPY sad/public ./public
 COPY sad/vite.config.ts ./vite.config.ts
 COPY sad/tsconfig.json ./tsconfig.json
 
