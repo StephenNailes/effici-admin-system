@@ -64,7 +64,7 @@ class RoleUpdateRequestController extends Controller
             $this->notifications->notifyNewRoleUpdateRequest($user->first_name.' '.$user->last_name, $roleRequest->id);
         }
 
-        return redirect()->route('student.role-request.create')->with('success', 'Officer verification request submitted. The Admin Assistant will review your details.');
+        return redirect()->route('profile')->with('success', 'Officer verification request submitted. The Admin Assistant will review your details.');
     }
 
     // Admin Assistant: list all role update requests

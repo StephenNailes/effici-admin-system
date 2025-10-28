@@ -5,12 +5,13 @@ import { Filter } from 'lucide-react';
 interface RequestFilterDropdownProps {
   status: string; // '' means all
   priority: string; // '' means all
-  requestType: string; // '' means all
+  requestType?: string; // '' means all - optional for backward compatibility
   onChangeStatus: (val: string) => void;
   onChangePriority: (val: string) => void;
-  onChangeRequestType: (val: string) => void;
+  onChangeRequestType?: (val: string) => void; // optional for backward compatibility
   showStatus?: boolean; // if false, only show priority section
   showRequestType?: boolean; // if false, hide request type section
+  showEquipmentType?: boolean; // if false, hide equipment option (for roles that don't handle equipment)
   className?: string;
 }
 
@@ -38,12 +39,13 @@ const requestTypeOptions = [
 export const RequestFilterDropdown: React.FC<RequestFilterDropdownProps> = ({
   status,
   priority,
-  requestType,
+  requestType = '',
   onChangeStatus,
   onChangePriority,
-  onChangeRequestType,
+  onChangeRequestType = () => {},
   showStatus = true,
   showRequestType = true,
+  showEquipmentType = true,
   className
 }) => {
   const [open, setOpen] = useState(false);
@@ -60,6 +62,11 @@ export const RequestFilterDropdown: React.FC<RequestFilterDropdownProps> = ({
   }, [open]);
 
   const activeFilterCount = [status, priority, requestType].filter(f => f !== '').length;
+
+  // Filter request type options based on showEquipmentType prop
+  const availableRequestTypes = showEquipmentType 
+    ? requestTypeOptions 
+    : requestTypeOptions.filter(opt => opt.value !== 'equipment');
 
   return (
     <div className={className} ref={ref}>
@@ -99,7 +106,7 @@ export const RequestFilterDropdown: React.FC<RequestFilterDropdownProps> = ({
                 <>
                   <li className="px-3 pt-2 pb-1 text-[10px] tracking-wider font-semibold text-red-600 uppercase flex items-center justify-between">
                     <span>Request Type</span>
-                    {requestType && (
+                    {requestType && onChangeRequestType && (
                       <button
                         type="button"
                         onClick={() => onChangeRequestType('')}
@@ -109,13 +116,13 @@ export const RequestFilterDropdown: React.FC<RequestFilterDropdownProps> = ({
                       </button>
                     )}
                   </li>
-                  {requestTypeOptions.map(opt => {
+                  {availableRequestTypes.map(opt => {
                     const active = requestType === opt.value;
                     return (
                       <button
                         key={opt.value + opt.label}
                         type="button"
-                        onClick={() => onChangeRequestType(opt.value)}
+                        onClick={() => onChangeRequestType && onChangeRequestType(opt.value)}
                         className={`w-full flex items-center justify-between px-3 py-2 text-left transition-colors ${active ? 'bg-red-50 text-red-700 font-medium' : 'text-gray-700 hover:bg-red-50 hover:text-red-700'}`}
                       >
                         <span>{opt.label}</span>
@@ -187,7 +194,11 @@ export const RequestFilterDropdown: React.FC<RequestFilterDropdownProps> = ({
             <div className="border-t border-gray-200 px-3 py-2 bg-gray-50 flex gap-2">
               <button
                 type="button"
-                onClick={() => { onChangeStatus(''); onChangePriority(''); onChangeRequestType(''); }}
+                onClick={() => { 
+                  onChangeStatus(''); 
+                  onChangePriority(''); 
+                  if (onChangeRequestType) onChangeRequestType(''); 
+                }}
                 className="flex-1 px-3 py-2 text-xs font-medium rounded-md border border-gray-300 bg-white text-gray-700 hover:bg-gray-100 transition-colors"
               >Reset All</button>
               <button

@@ -264,6 +264,7 @@ export default function Request() {
               onChangeStatus={setStatusFilter}
               onChangePriority={setPriorityFilter}
               showStatus={true}
+              showRequestType={false}
             />
           </div>
 

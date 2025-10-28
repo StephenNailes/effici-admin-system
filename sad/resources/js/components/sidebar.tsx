@@ -11,7 +11,6 @@ import {
   FaClipboardList, // Add for Activity Plan
   FaDollarSign,    // Add for Budget Request
   FaToolbox,       // Add for Borrow Equipment
-  FaChartBar,      // Add for Analytics Dashboard
   FaBell,          // Add for Notifications
   FaCalendarAlt,   // Add for Events notification indicator
   FaBullhorn,      // Add for Announcements notification indicator
@@ -263,7 +262,6 @@ export default function Sidebar() {
       { name: 'Request Management', href: route('admin.requests'), routeName: 'admin.requests', icon: <FaFileAlt /> },
   { name: 'Equipment Management', href: route('admin.equipment-management'), routeName: 'admin.equipment-management', icon: <FaToolbox /> },
   { name: 'Role Management', href: route('admin.role-requests'), routeName: 'admin.role-requests', icon: <FaUserShield /> },
-      { name: 'Analytics', href: route('admin_assistant.analytics'), routeName: 'admin_assistant.analytics', icon: <FaChartBar /> },
       { name: 'Activity History', href: route('admin.activity-history'), routeName: 'admin.activity-history', icon: <FaChartLine /> },
       { name: 'Calendar', href: route('calendar'), routeName: 'calendar', icon: <FaCalendarAlt /> },
     ],
@@ -333,9 +331,6 @@ export default function Sidebar() {
 
                     {role === 'admin_assistant' && item.name === 'Request Management' && !added['Management'] && (
                       (added['Management'] = true) && <SectionHeading label="Management" />
-                    )}
-                    {role === 'admin_assistant' && item.name === 'Analytics' && !added['Insights'] && (
-                      (added['Insights'] = true) && <SectionHeading label="Insights" />
                     )}
                     {role === 'admin_assistant' && item.name === 'Activity History' && !added['History'] && (
                       (added['History'] = true) && <SectionHeading label="History" />

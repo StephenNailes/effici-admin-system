@@ -28,8 +28,9 @@ export default function Request() {
   const [stats, setStats] = useState({ total: 0, pending: 0, approved: 0, underRevision: 0 });
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  // Status filter removed (dean now filters only by priority)
+  // Status filter removed (moderator now filters only by priority)
   const [priorityFilter, setPriorityFilter] = useState(''); // '' means all
+  const [requestTypeFilter, setRequestTypeFilter] = useState(''); // '' means all types
   const [selectedApprovals, setSelectedApprovals] = useState<number[]>([]);
   const [batchApprovalModalOpen, setBatchApprovalModalOpen] = useState(false);
   const PAGE_SIZE = 8;
@@ -132,7 +133,7 @@ export default function Request() {
     }
   };
 
-  // Filter requests based on search term, status, and priority
+  // Filter requests based on search term, priority, and request type
   // Moderator handles activity plans AND budget requests
   const filteredRequests = requests.filter((request: RequestData) => {
     // First filter: Show activity plans and budget requests
@@ -145,7 +146,8 @@ export default function Request() {
       request.activity_title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       request.request_type?.toLowerCase().replace('_', ' ').includes(searchTerm.toLowerCase());
     const matchesPriority = !priorityFilter || request.priority === priorityFilter;
-    return matchesSearch && matchesPriority;
+    const matchesRequestType = !requestTypeFilter || request.request_type === requestTypeFilter;
+    return matchesSearch && matchesPriority && matchesRequestType;
   });
 
   // Update stats to reflect filtered results
@@ -159,7 +161,7 @@ export default function Request() {
   // Pagination
   const totalPages = Math.ceil(filteredRequests.length / PAGE_SIZE);
   const paginated = filteredRequests.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
-  useEffect(() => { setCurrentPage(1); }, [searchTerm, priorityFilter]);
+  useEffect(() => { setCurrentPage(1); }, [searchTerm, priorityFilter, requestTypeFilter]);
   useEffect(() => { if (currentPage > totalPages && totalPages > 0) setCurrentPage(totalPages); }, [totalPages, currentPage]);
 
   const getStatusBadgeColor = (status: string) => {
@@ -236,7 +238,7 @@ export default function Request() {
         {/* Header */}
         <div className="mb-6">
           <div>
-            <h1 className="text-2xl font-bold text-black">Request Management</h1>
+            <h1 className="text-2xl font-bold text-red-600">Request Management</h1>
             <p className="text-gray-600">Review and approve student requests.</p>
           </div>
         </div>
@@ -307,13 +309,17 @@ export default function Request() {
           <RequestFilterDropdown
             status={''}
             priority={priorityFilter}
+            requestType={requestTypeFilter}
             onChangeStatus={() => { /* no-op: status removed */ }}
             onChangePriority={(val) => setPriorityFilter(val)}
+            onChangeRequestType={(val) => setRequestTypeFilter(val)}
             showStatus={false}
+            showRequestType={true}
+            showEquipmentType={false}
           />
         </div>
 
-        {/* Batch Actions */}
+        {/* Batch Actions */}z
         {selectedApprovals.length > 0 && (
           <div className="mb-4 flex justify-between items-center p-4 bg-red-50 border border-red-200 rounded-lg">
             <span className="text-red-700 font-medium">
