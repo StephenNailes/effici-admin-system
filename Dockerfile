@@ -20,13 +20,14 @@ COPY sad/public ./public
 
 # Copy composer files and install Ziggy (required for Vite build)
 COPY sad/composer.json sad/composer.lock ./
+COPY sad/bootstrap ./bootstrap
 RUN apk add --no-cache php83 php83-tokenizer php83-xml php83-dom php83-xmlwriter php83-simplexml php83-openssl php83-phar php83-mbstring php83-session php83-fileinfo php83-gd php83-iconv \
     && ln -sf /usr/bin/php83 /usr/bin/php \
     && php -r "copy('https://getcomposer.org/installer', 'composer-setup.php');" \
     && php composer-setup.php --install-dir=/usr/local/bin --filename=composer \
     && rm composer-setup.php \
     && composer install --no-dev --no-scripts --no-autoloader --prefer-dist \
-    && composer dump-autoload
+    && composer dump-autoload --no-scripts
 
 # Create .env file for Vite build (Vite needs this)
 RUN echo "VITE_APP_NAME=EfficiAdmin" > .env
