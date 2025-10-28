@@ -1,0 +1,26 @@
+# Docker
+.env.docker
+
+# Laravel
+sad/vendor/
+sad/node_modules/
+sad/storage/logs/
+sad/storage/framework/cache/
+sad/storage/framework/sessions/
+sad/storage/framework/views/
+sad/.env
+sad/.env.backup
+sad/.phpunit.result.cache
+
+# Build artifacts
+sad/public/hot
+sad/public/build/
+sad/public/storage
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db

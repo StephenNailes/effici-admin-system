@@ -1,0 +1,62 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      - APP_NAME=EfficiAdmin
+      - APP_ENV=production
+      - APP_DEBUG=false
+      - APP_KEY=${APP_KEY}
+      - APP_URL=${APP_URL}
+      - DB_CONNECTION=mysql
+      - DB_HOST=db
+      - DB_PORT=3306
+      - DB_DATABASE=effici_admin
+      - DB_USERNAME=effici_user
+      - DB_PASSWORD=${DB_PASSWORD}
+      - SESSION_DRIVER=database
+      - CACHE_STORE=database
+      - QUEUE_CONNECTION=database
+      - MAIL_MAILER=log
+      - UIC_API_BASE_URL=${UIC_API_BASE_URL}
+      - UIC_API_CLIENT_ID=${UIC_API_CLIENT_ID}
+      - UIC_API_CLIENT_SECRET=${UIC_API_CLIENT_SECRET}
+    volumes:
+      - storage:/var/www/html/storage
+      - ./sad/.env:/var/www/html/.env
+    depends_on:
+      - db
+    networks:
+      - effici-network
+    restart: unless-stopped
+
+  db:
+    image: mysql:8.0
+    environment:
+      - MYSQL_DATABASE=effici_admin
+      - MYSQL_USER=effici_user
+      - MYSQL_PASSWORD=${DB_PASSWORD}
+      - MYSQL_ROOT_PASSWORD=${DB_ROOT_PASSWORD}
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - effici-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  storage:
+  mysql_data:
+
+networks:
+  effici-network:
+    driver: bridge

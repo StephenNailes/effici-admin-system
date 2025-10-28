@@ -25,6 +25,11 @@ use App\Http\Controllers\AuthController;
 use App\Models\Event;
 use App\Models\Announcement;
 
+// Health check endpoint for Docker
+Route::get('/health', function () {
+    return response()->json(['status' => 'healthy'], 200);
+});
+
 // 🔁 Root: send authenticated users to their dashboard, guests to login
 Route::get('/', function () {
     if (Auth::check()) {
