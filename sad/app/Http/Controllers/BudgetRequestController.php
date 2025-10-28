@@ -31,7 +31,7 @@ class BudgetRequestController extends Controller
             $fileUrl = $r->currentFile ? asset('storage/' . ltrim($r->currentFile->file_path, '/')) : null;
             return [
                 'id' => $r->id,
-                'plan_name' => $r->request_name, // Align with ActivityPlan consumer
+                'request_name' => $r->request_name,
                 'status' => $r->status,
                 'created_at' => $r->created_at,
                 'updated_at' => $r->updated_at,
@@ -56,7 +56,7 @@ class BudgetRequestController extends Controller
         $submitted = collect($submittedPaginated->items())->map(function ($r) {
             return [
                 'id' => $r->id,
-                'plan_name' => $r->request_name,
+                'request_name' => $r->request_name,
                 'status' => $r->status,
                 'created_at' => $r->created_at,
                 'updated_at' => $r->updated_at,
