@@ -349,10 +349,16 @@ class BudgetRequestController extends Controller
             
             // Set paths based on environment (Linux production vs Windows local)
             if (PHP_OS_FAMILY === 'Linux') {
+                // Get npm global root dynamically
+                $npmRoot = trim(shell_exec('npm root -g'));
+                
                 $browsershot->setNodeBinary('/usr/bin/node')
                     ->setNpmBinary('/usr/bin/npm')
-                    ->setIncludePath('$PATH:/usr/local/bin:/usr/bin')
-                    ->setNodeModulePath('/usr/lib/node_modules');
+                    ->setIncludePath('$PATH:/usr/local/bin:/usr/bin');
+                
+                if ($npmRoot) {
+                    $browsershot->setNodeModulePath($npmRoot);
+                }
             } else {
                 // Use default node/npm from PATH on Windows
                 $browsershot->setNodeBinary('node')
@@ -407,10 +413,16 @@ class BudgetRequestController extends Controller
             
             // Set paths based on environment (Linux production vs Windows local)
             if (PHP_OS_FAMILY === 'Linux') {
+                // Get npm global root dynamically
+                $npmRoot = trim(shell_exec('npm root -g'));
+                
                 $browsershot->setNodeBinary('/usr/bin/node')
                     ->setNpmBinary('/usr/bin/npm')
-                    ->setIncludePath('$PATH:/usr/local/bin:/usr/bin')
-                    ->setNodeModulePath('/usr/lib/node_modules');
+                    ->setIncludePath('$PATH:/usr/local/bin:/usr/bin');
+                
+                if ($npmRoot) {
+                    $browsershot->setNodeModulePath($npmRoot);
+                }
             } else {
                 // Use default node/npm from PATH on Windows
                 $browsershot->setNodeBinary('node')
