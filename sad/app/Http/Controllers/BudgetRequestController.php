@@ -352,7 +352,7 @@ class BudgetRequestController extends Controller
                 // On Alpine Linux, npm global modules are in /usr/local/lib/node_modules
                 $browsershot->setNodeBinary('/usr/bin/node')
                     ->setNpmBinary('/usr/bin/npm')
-                    ->setChromePath('/usr/bin/chromium-browser')
+                    ->setChromePath('/usr/bin/chromium')
                     ->setIncludePath('$PATH:/usr/local/bin:/usr/bin')
                     ->setNodeModulePath('/usr/local/lib/node_modules');
             } else {
@@ -412,7 +412,7 @@ class BudgetRequestController extends Controller
                 // On Alpine Linux, npm global modules are in /usr/local/lib/node_modules
                 $browsershot->setNodeBinary('/usr/bin/node')
                     ->setNpmBinary('/usr/bin/npm')
-                    ->setChromePath('/usr/bin/chromium-browser')
+                    ->setChromePath('/usr/bin/chromium')
                     ->setIncludePath('$PATH:/usr/local/bin:/usr/bin')
                     ->setNodeModulePath('/usr/local/lib/node_modules');
             } else {

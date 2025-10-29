@@ -126,14 +126,13 @@ RUN chmod +x /usr/local/bin/entrypoint.sh \
 
 # Set Chromium environment for Browsershot
 # Get the actual npm global path dynamically and create symlink
-RUN ln -sf /usr/bin/chromium /usr/bin/chromium-browser || true && \
-    which node && which npm && \
+RUN which node && which npm && \
     node --version && npm --version && \
     echo "NPM Global Root: $(npm root -g)" && \
     echo "Chromium: $(which chromium)"
 
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
-    PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser \
+    PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium \
     PATH="/usr/local/bin:/usr/bin:$PATH" \
     NODE_PATH=/usr/local/lib/node_modules
 
