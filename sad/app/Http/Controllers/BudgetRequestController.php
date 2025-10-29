@@ -349,16 +349,12 @@ class BudgetRequestController extends Controller
             
             // Set paths based on environment (Linux production vs Windows local)
             if (PHP_OS_FAMILY === 'Linux') {
-                // Get npm global root dynamically
-                $npmRoot = trim(shell_exec('npm root -g'));
-                
+                // On Alpine Linux, npm global modules are in /usr/local/lib/node_modules
                 $browsershot->setNodeBinary('/usr/bin/node')
                     ->setNpmBinary('/usr/bin/npm')
-                    ->setIncludePath('$PATH:/usr/local/bin:/usr/bin');
-                
-                if ($npmRoot) {
-                    $browsershot->setNodeModulePath($npmRoot);
-                }
+                    ->setChromePath('/usr/bin/chromium-browser')
+                    ->setIncludePath('$PATH:/usr/local/bin:/usr/bin')
+                    ->setNodeModulePath('/usr/local/lib/node_modules');
             } else {
                 // Use default node/npm from PATH on Windows
                 $browsershot->setNodeBinary('node')
@@ -413,16 +409,12 @@ class BudgetRequestController extends Controller
             
             // Set paths based on environment (Linux production vs Windows local)
             if (PHP_OS_FAMILY === 'Linux') {
-                // Get npm global root dynamically
-                $npmRoot = trim(shell_exec('npm root -g'));
-                
+                // On Alpine Linux, npm global modules are in /usr/local/lib/node_modules
                 $browsershot->setNodeBinary('/usr/bin/node')
                     ->setNpmBinary('/usr/bin/npm')
-                    ->setIncludePath('$PATH:/usr/local/bin:/usr/bin');
-                
-                if ($npmRoot) {
-                    $browsershot->setNodeModulePath($npmRoot);
-                }
+                    ->setChromePath('/usr/bin/chromium-browser')
+                    ->setIncludePath('$PATH:/usr/local/bin:/usr/bin')
+                    ->setNodeModulePath('/usr/local/lib/node_modules');
             } else {
                 // Use default node/npm from PATH on Windows
                 $browsershot->setNodeBinary('node')

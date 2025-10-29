@@ -57,11 +57,11 @@ RUN apk add --no-cache \
     npm \
     && rm -rf /var/cache/apk/*
 
-# Install Puppeteer globally for Browsershot and verify installation
-RUN npm install -g puppeteer@latest --unsafe-perm=true --allow-root \
-    && npm root -g \
-    && ls -la $(npm root -g) \
-    && test -f $(npm root -g)/puppeteer/index.js && echo "Puppeteer installed successfully"
+# Install puppeteer-core globally (no Chromium download, uses system Chromium)
+RUN npm install -g puppeteer-core@latest --unsafe-perm=true --allow-root \
+    && NPM_ROOT=$(npm root -g) \
+    && echo "NPM Global Root: $NPM_ROOT" \
+    && ls -la $NPM_ROOT || true
 
 # Install build dependencies and PHP extensions, then remove build deps
 RUN apk add --no-cache --virtual .build-deps \
@@ -125,21 +125,17 @@ RUN chmod +x /usr/local/bin/entrypoint.sh \
     && echo "opcache.validate_timestamps=0" >> /usr/local/etc/php/conf.d/opcache.ini
 
 # Set Chromium environment for Browsershot
-# Get the actual npm global path dynamically
-RUN NPM_GLOBAL=$(npm root -g) && \
-    echo "export NODE_PATH=$NPM_GLOBAL" >> /etc/profile.d/node.sh && \
-    echo "NODE_PATH=$NPM_GLOBAL" && \
-    ln -sf /usr/bin/chromium /usr/bin/chromium-browser || true && \
+# Get the actual npm global path dynamically and create symlink
+RUN ln -sf /usr/bin/chromium /usr/bin/chromium-browser || true && \
     which node && which npm && \
     node --version && npm --version && \
-    echo "Puppeteer location: $(npm root -g)/puppeteer"
+    echo "NPM Global Root: $(npm root -g)" && \
+    echo "Chromium: $(which chromium)"
 
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
     PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser \
-    PATH="/usr/local/bin:/usr/bin:$PATH"
-
-# Set NODE_PATH to the actual npm global directory
-ENV NODE_PATH=/usr/lib/node_modules
+    PATH="/usr/local/bin:/usr/bin:$PATH" \
+    NODE_PATH=/usr/local/lib/node_modules
 
 # Expose port
 EXPOSE 8080
