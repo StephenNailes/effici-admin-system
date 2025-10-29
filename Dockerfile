@@ -57,11 +57,11 @@ RUN apk add --no-cache \
     npm \
     && rm -rf /var/cache/apk/*
 
-# Install puppeteer-core globally (no Chromium download, uses system Chromium)
-RUN npm install -g puppeteer-core@latest --unsafe-perm=true --allow-root \
+# Install Puppeteer globally with system Chromium
+RUN npm install -g puppeteer@latest --unsafe-perm=true --allow-root \
     && NPM_ROOT=$(npm root -g) \
     && echo "NPM Global Root: $NPM_ROOT" \
-    && ls -la $NPM_ROOT || true
+    && ls -la $NPM_ROOT/puppeteer || true
 
 # Install build dependencies and PHP extensions, then remove build deps
 RUN apk add --no-cache --virtual .build-deps \
