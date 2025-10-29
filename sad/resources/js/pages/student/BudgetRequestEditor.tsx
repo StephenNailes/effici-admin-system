@@ -1951,6 +1951,34 @@ const App: React.FC = () => {
     const interactiveElements = clone.querySelectorAll('.no-print, .formatting-toolbar, .sidebar-form, .add-signatory-form, .remove-btn, button[aria-label]');
     interactiveElements.forEach(el => el.remove());
     
+    // Convert all images to base64 data URIs for proper PDF rendering
+    const images = clone.querySelectorAll('img');
+    images.forEach(img => {
+      const originalSrc = img.getAttribute('src');
+      if (originalSrc && !originalSrc.startsWith('data:')) {
+        // Find the original image in the DOM to get its data
+        const originalImg = Array.from(document.querySelectorAll('img')).find(
+          original => original.getAttribute('src') === originalSrc
+        );
+        
+        if (originalImg) {
+          try {
+            const canvas = document.createElement('canvas');
+            canvas.width = originalImg.naturalWidth || originalImg.width;
+            canvas.height = originalImg.naturalHeight || originalImg.height;
+            const ctx = canvas.getContext('2d');
+            if (ctx) {
+              ctx.drawImage(originalImg as HTMLImageElement, 0, 0);
+              const dataUrl = canvas.toDataURL('image/png');
+              img.setAttribute('src', dataUrl);
+            }
+          } catch (e) {
+            console.warn('Could not convert image to base64:', originalSrc, e);
+          }
+        }
+      }
+    });
+    
     // Get the global styles element
     const globalStylesEl = document.getElementById('ap-global-css');
     const globalStyles = globalStylesEl ? globalStylesEl.textContent : '';
